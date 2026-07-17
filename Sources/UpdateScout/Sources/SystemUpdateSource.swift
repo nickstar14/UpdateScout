@@ -48,10 +48,10 @@ struct SystemUpdateSource: UpdateSource {
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
-        progress("Waiting for administrator authorization…")
+        progress("Authorizing — enter your password, then the install runs…")
         // Quote the label for the embedded shell; labels come from softwareupdate itself.
         let quoted = "'" + item.installToken.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        let result = try await Shell.runPrivileged("/usr/sbin/softwareupdate -i \(quoted)")
+        let result = try await Shell.runPrivileged("/usr/sbin/softwareupdate -i \(quoted)", tag: "install")
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed("softwareupdate -i \(item.installToken)", output: result.combined)
         }

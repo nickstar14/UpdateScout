@@ -11,8 +11,11 @@ enum AskpassDialog {
         let alert = NSAlert()
         alert.messageText = "UpdateScout is trying to install an update."
         alert.informativeText = "Enter your password to allow this."
-        alert.icon = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Lock")
-            .flatMap { $0.withSymbolConfiguration(.init(pointSize: 36, weight: .regular)) }
+        // The person-with-key glyph macOS uses for authentication prompts.
+        let iconConfig = NSImage.SymbolConfiguration(pointSize: 44, weight: .regular)
+            .applying(.init(hierarchicalColor: .controlAccentColor))
+        alert.icon = NSImage(systemSymbolName: "person.badge.key.fill", accessibilityDescription: "Authentication")
+            .flatMap { $0.withSymbolConfiguration(iconConfig) }
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
 

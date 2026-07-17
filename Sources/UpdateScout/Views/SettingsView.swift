@@ -10,10 +10,27 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
-    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.middle.rawValue
+    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.regular.rawValue
     @State private var showDockIcon = Prefs.showDockIcon
 
     var body: some View {
+        VStack(spacing: 0) {
+            // In-content title, same treatment as the status window header;
+            // fixed above the form so scrolling never runs into the titlebar.
+            HStack {
+                Text("Settings").font(.title3).bold()
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 34)   // clear the traffic lights
+            .padding(.bottom, 6)
+            settingsForm
+        }
+        .frame(width: 400, height: 640)
+        .background(GlassBackground())
+    }
+
+    private var settingsForm: some View {
         Form {
             if deps.anyMissing {
                 Section("Setup") {
@@ -132,8 +149,6 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)   // let the glass show through
-        .frame(width: 400, height: 640)     // matches the status window; form scrolls
-        .background(GlassBackground())
     }
 }
 

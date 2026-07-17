@@ -58,7 +58,7 @@ struct HomebrewSource: UpdateSource {
         let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
         let (kind, name) = (parts.first ?? "", parts.last ?? item.name)
         let args = kind == "cask" ? ["upgrade", "--cask", name] : ["upgrade", name]
-        let result = try await Shell.run(brew, args, lineHandler: progress)
+        let result = try await Shell.run(brew, args, tag: "install", lineHandler: progress)
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }

@@ -19,13 +19,13 @@ rm -f "$ZIP"
 ditto -c -k --keepParent build/UpdateScout.app "$ZIP"
 
 SIGN_UPDATE=$(find .build/artifacts/sparkle -name sign_update -not -path "*old_dsa*" | head -1)
-SIGNATURE=$("$SIGN_UPDATE" "$ZIP")   # emits: sparkle:edSignature="..." length="..."
-SIZE=$(stat -f %z "$ZIP")
+# sign_update's output already includes BOTH attributes: edSignature and length.
+SIGNATURE=$("$SIGN_UPDATE" "$ZIP")
 DATE=$(date -R)
 URL="https://github.com/$REPO/releases/download/v$VERSION/UpdateScout-$VERSION.zip"
 
 # Prepend the new item into appcast.xml.
-ITEM="        <item>\n            <title>Version $VERSION</title>\n            <pubDate>$DATE</pubDate>\n            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>\n            <enclosure url=\"$URL\"\n                sparkle:version=\"$BUILDNUM\"\n                sparkle:shortVersionString=\"$VERSION\"\n                $SIGNATURE\n                length=\"$SIZE\"\n                type=\"application/octet-stream\"/>\n        </item>"
+ITEM="        <item>\n            <title>Version $VERSION</title>\n            <pubDate>$DATE</pubDate>\n            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>\n            <enclosure url=\"$URL\"\n                sparkle:version=\"$BUILDNUM\"\n                sparkle:shortVersionString=\"$VERSION\"\n                $SIGNATURE\n                type=\"application/octet-stream\"/>\n        </item>"
 perl -0pi -e "s|(<language>en</language>)|\$1\n$ITEM|" appcast.xml
 
 git add Resources/Info.plist appcast.xml

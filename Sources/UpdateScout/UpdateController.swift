@@ -88,6 +88,21 @@ final class UpdateController: ObservableObject {
 
     private var pendingInstalls: [UpdateItem] = []
     private var isProcessingQueue = false
+    private var cancelRequested = false
+
+    /// Cancel a queued or in-flight install. Kills the child process (and any
+    /// pending auth prompt it spawned); the item stays in the list for retry.
+    func cancelInstall(_ item: UpdateItem) {
+        if installing[item.id] == "Queued…" {
+            pendingInstalls.removeAll { $0.id == item.id }
+            installing[item.id] = nil
+            return
+        }
+        guard installing[item.id] != nil else { return }
+        cancelRequested = true
+        installing[item.id] = "Cancelling…"
+        ProcessRegistry.shared.terminate(tag: "install")
+    }
 
     func update(_ item: UpdateItem) {
         if !item.scriptedInstall {
@@ -113,6 +128,7 @@ final class UpdateController: ObservableObject {
                     installing[item.id] = nil
                     continue
                 }
+                cancelRequested = false
                 installing[item.id] = "Starting…"
                 do {
                     try await source.install(item) { line in
@@ -127,7 +143,8 @@ final class UpdateController: ObservableObject {
                     Store.save(s)
                 } catch {
                     installing[item.id] = nil
-                    installErrors[item.id] = error.localizedDescription
+                    // A user-cancelled install isn't an error worth showing.
+                    if !cancelRequested { installErrors[item.id] = error.localizedDescription }
                 }
             }
             isProcessingQueue = false

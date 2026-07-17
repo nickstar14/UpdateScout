@@ -31,9 +31,24 @@ struct MASSource: UpdateSource {
         guard let mas = Shell.which("mas") else {
             throw UpdateScoutError.toolMissing("mas-cli", hint: "Run `brew install mas`.")
         }
-        let result = try await Shell.run(mas, ["upgrade", item.installToken], lineHandler: progress)
-        guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken)", output: result.combined)
+        let result = try await Shell.run(mas, ["upgrade", item.installToken], tag: "install", lineHandler: progress)
+        let sudoBlocked = result.combined.contains("sudo: a terminal is required")
+        if result.status == 0 && !sudoBlocked { return }
+
+        if sudoBlocked {
+            // mas 7 shells out to a hard-coded /usr/bin/sudo without -A, which
+            // cannot prompt from a GUI app (no terminal, askpass ignored).
+            // Re-run as root via macOS's own admin prompt instead; the SUDO_*
+            // variables mimic a sudo launch so mas still targets this user.
+            progress("Authorizing — enter your password, then the install runs…")
+            let cmd = "SUDO_UID=\(getuid()) SUDO_GID=\(getgid()) SUDO_USER='\(NSUserName())' "
+                + "'\(mas)' upgrade \(item.installToken)"
+            let priv = try await Shell.runPrivileged(cmd, tag: "install")
+            guard priv.status == 0 else {
+                throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken) (admin)", output: priv.combined)
+            }
+            return
         }
+        throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken)", output: result.combined)
     }
 }

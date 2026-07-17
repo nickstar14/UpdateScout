@@ -1,5 +1,23 @@
 import Foundation
 
+/// Tracks live child processes by tag so an in-flight install can be cancelled.
+final class ProcessRegistry: @unchecked Sendable {
+    static let shared = ProcessRegistry()
+    private let lock = NSLock()
+    private var procs: [String: [Process]] = [:]
+
+    func add(_ p: Process, tag: String) {
+        lock.lock(); procs[tag, default: []].append(p); lock.unlock()
+    }
+    func remove(_ p: Process, tag: String) {
+        lock.lock(); procs[tag]?.removeAll { $0 === p }; lock.unlock()
+    }
+    func terminate(tag: String) {
+        lock.lock(); let list = procs[tag] ?? []; lock.unlock()
+        list.forEach { $0.terminate() }
+    }
+}
+
 /// Async subprocess runner. Everything UpdateScout does externally goes through here.
 enum Shell {
     struct Result {
@@ -11,7 +29,7 @@ enum Shell {
 
     /// Run an executable directly (no shell interpretation of arguments).
     @discardableResult
-    static func run(_ executable: String, _ args: [String],
+    static func run(_ executable: String, _ args: [String], tag: String? = nil,
                     lineHandler: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -62,6 +80,7 @@ enum Shell {
 
         return try await withCheckedThrowingContinuation { cont in
             process.terminationHandler = { p in
+                if let tag { ProcessRegistry.shared.remove(p, tag: tag) }
                 outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
                 let outRest = try? outPipe.fileHandleForReading.readToEnd()
@@ -74,7 +93,10 @@ enum Shell {
                     cont.resume(returning: Result(status: p.terminationStatus, stdout: out, stderr: err))
                 }
             }
-            do { try process.run() } catch { cont.resume(throwing: error) }
+            do {
+                try process.run()
+                if let tag { ProcessRegistry.shared.add(process, tag: tag) }
+            } catch { cont.resume(throwing: error) }
         }
     }
 
@@ -93,12 +115,15 @@ enum Shell {
     /// The command string is embedded in an AppleScript `do shell script`, so
     /// callers must pass pre-quoted, trusted commands only (we only use this for
     /// `softwareupdate -i` with a label we quote ourselves).
-    static func runPrivileged(_ command: String) async throws -> Result {
+    static func runPrivileged(_ command: String, tag: String? = nil) async throws -> Result {
         let escaped = command
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let script = "do shell script \"\(escaped)\" with administrator privileges"
-        return try await run("/usr/bin/osascript", ["-e", script])
+        let result = try await run("/usr/bin/osascript", ["-e", script], tag: tag)
+        // The auth prompt steals focus and leaves our window buried — refront it.
+        await MainActor.run { UpdatesWindow.shared.show() }
+        return result
     }
 }
 

@@ -76,7 +76,14 @@ struct UpdateRow: View {
                 Spacer()
                 if let progress = controller.installing[item.id] {
                     VStack(alignment: .trailing, spacing: 2) {
-                        ProgressView().controlSize(.small)
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Button { controller.cancelInstall(item) } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.plain).foregroundStyle(.secondary)
+                            .help("Cancel this update")
+                        }
                         Text(progress).font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(1).frame(maxWidth: 160, alignment: .trailing)
                     }

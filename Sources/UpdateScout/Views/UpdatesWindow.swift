@@ -162,8 +162,8 @@ struct UpdatesView: View {
 /// drawing our own on top reads as fake white lines.
 struct GlassBackground: View {
     static let cornerRadius: CGFloat = 16
-    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.middle.rawValue
-    private var glassStyle: GlassStyle { GlassStyle(rawValue: glassStyleRaw) ?? .middle }
+    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.regular.rawValue
+    private var glassStyle: GlassStyle { GlassStyle.from(glassStyleRaw) }
 
     var body: some View {
         ZStack {

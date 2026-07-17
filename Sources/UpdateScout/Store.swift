@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import QuartzCore
 
 /// Local JSON persistence under ~/Library/Application Support/UpdateScout/.
 struct Store {
@@ -84,32 +85,42 @@ enum Appearance: String, CaseIterable, Identifiable {
     @MainActor static func apply(_ value: Appearance, animated: Bool = false) {
         guard animated else { return set(value) }
         // AppKit can't crossfade an appearance change, and snapshotting glass
-        // windows produces garbage. Soften the switch with a brief alpha dip.
+        // windows produces garbage. Fade fully out, switch while invisible
+        // (so the instant repaint is never seen), and ease back in.
         let windows = NSApp.windows.filter { $0.isVisible }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.12
-            windows.forEach { $0.animator().alphaValue = 0.6 }
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            windows.forEach { $0.animator().alphaValue = 0 }
         }, completionHandler: {
             set(value)
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.25
-                windows.forEach { $0.animator().alphaValue = 1 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.3
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    windows.forEach { $0.animator().alphaValue = 1 }
+                }
             }
         })
     }
 }
 
-/// How opaque the status window's Liquid Glass reads.
+/// How opaque the window's Liquid Glass reads — Apple's own tier names.
 enum GlassStyle: String, CaseIterable, Identifiable {
-    case clear, middle, frosted
+    case clear, regular, tinted
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
     /// Opacity of the window-background wash layered under the glass.
     var washOpacity: Double {
         switch self {
         case .clear: 0.35
-        case .middle: 0.7
-        case .frosted: 0.92
+        case .regular: 0.7
+        case .tinted: 0.92
         }
+    }
+    /// Accepts the pre-rename stored values ("middle"/"frosted") too.
+    static func from(_ raw: String) -> GlassStyle {
+        GlassStyle(rawValue: raw)
+            ?? (raw == "middle" ? .regular : raw == "frosted" ? .tinted : .regular)
     }
 }

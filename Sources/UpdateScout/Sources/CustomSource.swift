@@ -123,7 +123,7 @@ struct CustomSource: UpdateSource {
               let cmd = entries[index].installCommand
         else { throw UpdateScoutError.parseFailure("custom_sources.json entry for \(item.name)") }
 
-        let result = try await Shell.run("/bin/sh", ["-c", cmd], lineHandler: progress)
+        let result = try await Shell.run("/bin/sh", ["-c", cmd], tag: "install", lineHandler: progress)
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed(cmd, output: result.combined)
         }

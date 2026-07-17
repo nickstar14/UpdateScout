@@ -75,11 +75,9 @@ final class SettingsWindow {
                 rootView: SettingsView().environmentObject(UpdateController.shared))
             let w = NSWindow(contentViewController: hosting)
             w.title = "Settings"
-            w.styleMask = [.titled, .closable]
-            // Opaque titlebar: with a transparent one, the form scrolled
-            // visibly *through* the title area.
-            w.titlebarAppearsTransparent = false
-            w.titleVisibility = .visible
+            w.styleMask = [.titled, .closable, .fullSizeContentView]
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
             w.isOpaque = false
             w.backgroundColor = .clear
             w.isMovableByWindowBackground = true
