@@ -34,6 +34,9 @@ struct MASSource: UpdateSource {
         let result = try await Shell.run(mas, ["upgrade", item.installToken], tag: "install", lineHandler: progress)
         let sudoBlocked = result.combined.contains("sudo: a terminal is required")
         if result.status == 0 && !sudoBlocked { return }
+        // The row can be stale (app already updated, e.g. by the App Store
+        // itself) — mas then reports the ADAM ID as not installed. Not an error.
+        if result.combined.contains("No installed apps with ADAM ID") { return }
 
         if sudoBlocked {
             // mas 7 shells out to a hard-coded /usr/bin/sudo without -A, which
@@ -42,6 +45,7 @@ struct MASSource: UpdateSource {
             // properly so mas still operates on this user's account.
             progress("Authorizing — enter your password, then the install runs…")
             let priv = try await Shell.runPrivileged("'\(mas)' upgrade \(item.installToken)", tag: "install")
+            if priv.combined.contains("No installed apps with ADAM ID") { return }
             guard priv.status == 0 else {
                 throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken) (admin)", output: priv.combined)
             }

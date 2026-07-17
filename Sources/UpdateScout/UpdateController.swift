@@ -148,6 +148,9 @@ final class UpdateController: ObservableObject {
                 }
             }
             isProcessingQueue = false
+            // Re-detect once the queue drains so completed/externally-updated
+            // items fall off the list instead of going stale.
+            checkNow()
         }
     }
 
