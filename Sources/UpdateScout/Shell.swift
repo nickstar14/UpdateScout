@@ -111,16 +111,12 @@ enum Shell {
 
     // (Askpass helper lives below runPrivileged.)
 
-    /// Run a command that needs admin rights via macOS's own authorization prompt.
-    /// The command string is embedded in an AppleScript `do shell script`, so
-    /// callers must pass pre-quoted, trusted commands only (we only use this for
-    /// `softwareupdate -i` with a label we quote ourselves).
+    /// Run a command that needs admin rights. Uses `sudo -A`, which prompts
+    /// through our own askpass dialog (AskpassDialog) and — unlike the
+    /// osascript route — sets the real SUDO_UID/SUDO_USER environment that
+    /// tools like mas rely on. Callers pass pre-quoted, trusted commands only.
     static func runPrivileged(_ command: String, tag: String? = nil) async throws -> Result {
-        let escaped = command
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "do shell script \"\(escaped)\" with administrator privileges"
-        let result = try await run("/usr/bin/osascript", ["-e", script], tag: tag)
+        let result = try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command], tag: tag)
         // The auth prompt steals focus and leaves our window buried — refront it.
         await MainActor.run { UpdatesWindow.shared.show() }
         return result

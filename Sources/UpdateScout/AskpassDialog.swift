@@ -11,11 +11,7 @@ enum AskpassDialog {
         let alert = NSAlert()
         alert.messageText = "UpdateScout is trying to install an update."
         alert.informativeText = "Enter your password to allow this."
-        // The person-with-key glyph macOS uses for authentication prompts.
-        let iconConfig = NSImage.SymbolConfiguration(pointSize: 44, weight: .regular)
-            .applying(.init(hierarchicalColor: .controlAccentColor))
-        alert.icon = NSImage(systemSymbolName: "person.badge.key.fill", accessibilityDescription: "Authentication")
-            .flatMap { $0.withSymbolConfiguration(iconConfig) }
+        alert.icon = circularKeyIcon()
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
 
@@ -52,6 +48,24 @@ enum AskpassDialog {
             exit(0)
         }
         exit(1) // sudo treats a non-zero askpass exit as "cancelled"
+    }
+
+    /// A key glyph inside a tinted circle, like macOS's own auth prompts.
+    private static func circularKeyIcon() -> NSImage {
+        NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            let config = NSImage.SymbolConfiguration(pointSize: 30, weight: .medium)
+                .applying(.init(hierarchicalColor: .controlAccentColor))
+            if let symbol = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Key")?
+                .withSymbolConfiguration(config) {
+                let s = symbol.size
+                symbol.draw(in: NSRect(x: (rect.width - s.width) / 2,
+                                       y: (rect.height - s.height) / 2,
+                                       width: s.width, height: s.height))
+            }
+            return true
+        }
     }
 
     /// Swaps between the secure and plain fields, keeping their text in sync.
