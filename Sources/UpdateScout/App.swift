@@ -49,6 +49,15 @@ struct UpdateScoutApp: App {
             Appearance.apply(Prefs.appearance)
             if Prefs.showDockIcon { NSApp.setActivationPolicy(.regular) }
         }
+        // When the askpass dialog closes, bring the status window back to the
+        // front (the auth prompt pushes us behind other apps).
+        DistributedNotificationCenter.default().addObserver(
+            forName: .updateScoutRefront, object: nil, queue: .main
+        ) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                UpdatesWindow.shared.show()
+            }
+        }
         // First launch with missing dependencies → open Settings so the
         // Setup section can offer one-click installs.
         if !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {

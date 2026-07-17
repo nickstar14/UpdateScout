@@ -116,10 +116,9 @@ enum Shell {
     /// osascript route — sets the real SUDO_UID/SUDO_USER environment that
     /// tools like mas rely on. Callers pass pre-quoted, trusted commands only.
     static func runPrivileged(_ command: String, tag: String? = nil) async throws -> Result {
-        let result = try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command], tag: tag)
-        // The auth prompt steals focus and leaves our window buried — refront it.
-        await MainActor.run { UpdatesWindow.shared.show() }
-        return result
+        // (Refronting after the auth dialog is handled via the distributed
+        // notification the askpass process posts when it closes.)
+        return try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command], tag: tag)
     }
 }
 

@@ -1,5 +1,10 @@
 import AppKit
 
+extension Notification.Name {
+    /// Posted by the --askpass process when its dialog closes.
+    static let updateScoutRefront = Notification.Name("com.nickszun.updatescout.refront")
+}
+
 /// `UpdateScout --askpass`: sudo runs this (via askpass.sh) when an install
 /// needs elevation and there is no terminal. Shows a native-styled auth
 /// dialog and prints the entry to stdout for sudo. Nothing is stored.
@@ -41,6 +46,11 @@ enum AskpassDialog {
         app.activate(ignoringOtherApps: true)
         let response = alert.runModal()
         withExtendedLifetime(toggler) {}
+
+        // Tell the main app instance to bring its window back to the front now
+        // that the auth dialog is gone (the install keeps running behind it).
+        DistributedNotificationCenter.default().postNotificationName(
+            .updateScoutRefront, object: nil, userInfo: nil, deliverImmediately: true)
 
         if response == .alertFirstButtonReturn {
             let password = toggler.currentValue
