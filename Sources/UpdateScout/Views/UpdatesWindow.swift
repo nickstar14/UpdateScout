@@ -1,6 +1,17 @@
 import SwiftUI
 import AppKit
 
+extension NSWindow {
+    /// AppKit's center() sits windows above the vertical midpoint; this puts
+    /// them at the true center of the screen.
+    func centerExactly() {
+        guard let screen = screen ?? NSScreen.main else { return }
+        let vf = screen.visibleFrame
+        setFrameOrigin(NSPoint(x: vf.midX - frame.width / 2,
+                               y: vf.midY - frame.height / 2))
+    }
+}
+
 /// The main status window — borderless-titlebar, Liquid Glass background,
 /// movable by grabbing anywhere, resizable.
 @MainActor
@@ -24,10 +35,11 @@ final class UpdatesWindow {
             w.isReleasedWhenClosed = false
             w.setContentSize(NSSize(width: 560, height: 640))
             w.minSize = NSSize(width: 460, height: 380)
-            w.center()
             window = w
         }
+        let wasVisible = window?.isVisible ?? false
         window?.makeKeyAndOrderFront(nil)
+        if !wasVisible { window?.centerExactly() }
     }
 }
 

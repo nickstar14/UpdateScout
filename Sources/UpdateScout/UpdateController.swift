@@ -7,7 +7,7 @@ final class UpdateController: ObservableObject {
 
     nonisolated static let allSources: [any UpdateSource] = [
         HomebrewSource(), MASSource(), SystemUpdateSource(),
-        CaskOracleSource(), SparkleSource(), CustomSource()
+        CaskOracleSource(), ComponentsSource(), SparkleSource(), CustomSource()
     ]
 
     @Published var state = Store.load()
@@ -60,6 +60,10 @@ final class UpdateController: ObservableObject {
             items.removeAll { $0.sourceID == "sparkle" && scriptedNames.contains($0.name.lowercased()) }
             let caskNames = Set(items.filter { $0.sourceID == "caskOracle" }.map { $0.name.lowercased() })
             items.removeAll { $0.sourceID == "custom" && caskNames.contains($0.name.lowercased()) }
+            // An extension's parent app is often already listed by the oracle
+            // or a brew cask — same cask token means the same update.
+            let coveredTokens = Set(items.filter { $0.sourceID != "components" }.map(\.installToken))
+            items.removeAll { $0.sourceID == "components" && coveredTokens.contains($0.installToken) }
             items.sort { ($0.sourceID, $0.name.lowercased()) < ($1.sourceID, $1.name.lowercased()) }
             return (items, errors)
         }

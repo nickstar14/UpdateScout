@@ -82,9 +82,10 @@ final class SettingsWindow {
             w.backgroundColor = .clear
             w.isMovableByWindowBackground = true
             w.isReleasedWhenClosed = false
-            w.center()
             window = w
         }
+        let wasVisible = window?.isVisible ?? false
         window?.makeKeyAndOrderFront(nil)
+        if !wasVisible { window?.centerExactly() }
     }
 }
