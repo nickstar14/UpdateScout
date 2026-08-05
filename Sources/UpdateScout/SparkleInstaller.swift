@@ -10,8 +10,9 @@ import AppKit
 ///  1. The archive's Ed25519 signature (`sparkle:edSignature`) must verify
 ///     against the installed app's own `SUPublicEDKey`.
 ///  2. The unpacked bundle must pass `codesign --verify --deep --strict`.
-///  3. Its Team ID must match the installed app's Team ID — so a validly
-///     signed *but different* app can never replace it.
+///  3. If the installed app has a Team ID, the update's must match it — so a
+///     validly signed *but different* app can never replace it. (Ad-hoc-signed
+///     apps have no Team ID; there step 1 is the proof of provenance.)
 enum SparkleInstaller {
     struct Plan {
         let appURL: URL
@@ -41,14 +42,18 @@ enum SparkleInstaller {
         try fm.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: workDir) }
 
-        // 1. Download.
+        // 1. Download, reporting bytes as they arrive.
         progress("Downloading…")
-        let (tempFile, response) = try await URLSession.shared.download(from: plan.enclosureURL)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw UpdateScoutError.commandFailed("download", output: "HTTP error fetching \(plan.enclosureURL.lastPathComponent)")
-        }
         let archive = workDir.appendingPathComponent(plan.enclosureURL.lastPathComponent)
-        try fm.moveItem(at: tempFile, to: archive)
+        try await ProgressDownloader.download(from: plan.enclosureURL, to: archive) { written, total in
+            let done = ByteCountFormatter.string(fromByteCount: written, countStyle: .file)
+            if total > 0 {
+                let all = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
+                progress("Downloading… \(done) / \(all) (\(Int(Double(written) / Double(total) * 100))%)")
+            } else {
+                progress("Downloading… \(done)")
+            }
+        }
 
         // 2. Verify the signature before unpacking anything.
         progress("Verifying signature…")
@@ -197,5 +202,60 @@ enum SparkleInstaller {
               let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else { return nil }
         return plist["CFBundleIdentifier"] as? String
+    }
+}
+
+/// URLSession download that reports bytes written as it goes, so a row can show
+/// "Downloading… 42.3 MB / 84.4 MB (50%)". Throttled to ~4 updates/second.
+final class ProgressDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (Int64, Int64) -> Void
+    private var continuation: CheckedContinuation<Void, Error>?
+    private let destination: URL
+    private var lastReport = Date.distantPast
+
+    private init(destination: URL, onProgress: @escaping @Sendable (Int64, Int64) -> Void) {
+        self.destination = destination
+        self.onProgress = onProgress
+    }
+
+    static func download(from url: URL, to destination: URL,
+                         onProgress: @escaping @Sendable (Int64, Int64) -> Void) async throws {
+        let delegate = ProgressDownloader(destination: destination, onProgress: onProgress)
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            delegate.continuation = cont
+            session.downloadTask(with: url).resume()
+        }
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        guard Date().timeIntervalSince(lastReport) > 0.25 else { return }
+        lastReport = Date()
+        onProgress(totalBytesWritten, totalBytesExpectedToWrite)
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {
+        // The temp file is removed as soon as this returns, so move it now.
+        do {
+            if let http = downloadTask.response as? HTTPURLResponse, http.statusCode != 200 {
+                throw UpdateScoutError.commandFailed("download", output: "HTTP \(http.statusCode)")
+            }
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: location, to: destination)
+            continuation?.resume()
+        } catch {
+            continuation?.resume(throwing: error)
+        }
+        continuation = nil
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let error else { return }   // success is handled above
+        continuation?.resume(throwing: error)
+        continuation = nil
     }
 }
