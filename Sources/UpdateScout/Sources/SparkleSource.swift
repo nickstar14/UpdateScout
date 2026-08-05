@@ -9,6 +9,9 @@ struct SparkleSource: UpdateSource {
     let id = "sparkle"
     let displayName = "Sparkle apps"
 
+    /// Sentinel install token meaning "this is UpdateScout itself".
+    static let selfUpdateToken = "__self__"
+
     func detect() async throws -> [UpdateItem] {
         let fm = FileManager.default
         var candidates: [(name: String, path: String, version: String, feed: URL)] = []
@@ -49,6 +52,19 @@ struct SparkleSource: UpdateSource {
         let latestVersion = latest.shortVersion ?? latest.version
         guard isNewerVersion(latestVersion, than: installed) else { return nil }
 
+        // We can't swap our own bundle out from under ourselves — UpdateScout
+        // has an embedded Sparkle updater built for exactly that, so hand off
+        // to it (it shows release notes and relaunches us cleanly).
+        if appPath == Bundle.main.bundlePath {
+            return UpdateItem(sourceID: id, name: name,
+                              installedVersion: installed,
+                              latestVersion: latestVersion,
+                              url: latest.link ?? feed.absoluteString,
+                              caveat: "Opens UpdateScout's own updater.",
+                              installToken: Self.selfUpdateToken,
+                              scriptedInstall: true)
+        }
+
         // Installable in place only when we can verify the download: the app
         // must carry an SUPublicEDKey and the appcast must carry a signature.
         // Otherwise fall back to opening the release page.
@@ -67,6 +83,12 @@ struct SparkleSource: UpdateSource {
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         let appPath = item.installToken
         guard !appPath.isEmpty else { return }   // "Get…" rows just open item.url
+
+        if appPath == Self.selfUpdateToken {
+            progress("Opening UpdateScout's updater…")
+            await MainActor.run { SelfUpdater.checkForUpdates() }
+            return
+        }
 
         // Re-fetch the appcast so we install exactly what we verify right now.
         progress("Fetching update details…")

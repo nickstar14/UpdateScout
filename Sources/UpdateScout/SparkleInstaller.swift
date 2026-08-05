@@ -71,12 +71,17 @@ enum SparkleInstaller {
         guard verify.status == 0 else {
             throw UpdateScoutError.commandFailed("codesign --verify", output: verify.combined)
         }
+        // If the installed app has a Team ID, the update must carry the same one
+        // — that stops a validly signed app from a *different* developer (or an
+        // unsigned build) taking its place. Ad-hoc/unsigned apps have no Team ID
+        // to compare; there the Ed25519 check above is the proof of provenance,
+        // which is the same guarantee Sparkle itself relies on.
         let newTeam = try await teamIdentifier(of: newApp)
         let oldTeam = try await teamIdentifier(of: plan.appURL)
-        guard let newTeam, let oldTeam, newTeam == oldTeam else {
+        if let oldTeam, newTeam != oldTeam {
             throw UpdateScoutError.commandFailed(
                 "identity check",
-                output: "The update is signed by a different developer (\(newTeam ?? "unsigned") vs \(oldTeam ?? "unsigned")). Nothing was installed.")
+                output: "The update is signed by a different developer (\(newTeam ?? "unsigned") vs \(oldTeam)). Nothing was installed.")
         }
 
         // 5. Quit the app if it's running, then swap the bundle.

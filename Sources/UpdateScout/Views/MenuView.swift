@@ -74,19 +74,15 @@ struct UpdateRow: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let progress = controller.installing[item.id] {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Button { controller.cancelInstall(item) } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .buttonStyle(.plain).foregroundStyle(.secondary)
-                            .help("Cancel this update")
-                        }
-                        Text(progress).font(.caption2).foregroundStyle(.secondary)
-                            .lineLimit(1).frame(maxWidth: 160, alignment: .trailing)
+                if controller.installing[item.id] != nil {
+                    // Status text goes on its own full-width line below, so it
+                    // isn't squeezed into a narrow column here.
+                    ProgressView().controlSize(.small)
+                    Button { controller.cancelInstall(item) } label: {
+                        Image(systemName: "xmark.circle.fill")
                     }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help("Cancel this update")
                 } else {
                     Button(item.scriptedInstall ? "Update" : "Get…") { controller.update(item) }
                         .controlSize(.small)
@@ -102,9 +98,16 @@ struct UpdateRow: View {
                     .frame(width: 22)
                 }
             }
-            if let caveat = item.caveat {
+            if let progress = controller.installing[item.id] {
+                Text(progress)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let caveat = item.caveat {
                 Label(caveat, systemImage: "info.circle")
                     .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let error = controller.installErrors[item.id] {
                 Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3)
