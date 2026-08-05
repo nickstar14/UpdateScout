@@ -113,13 +113,18 @@ enum AppcastParser {
         private var current: Latest?
         private var currentElement = ""
         private var buffer = ""
+        /// Appcasts may carry binary-patch enclosures inside <sparkle:deltas>.
+        /// Applying those needs Sparkle's BinaryDelta tool, so we ignore them
+        /// and always install the item's full archive.
+        private var insideDeltas = false
 
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
                     qualifiedName: String?, attributes: [String: String]) {
             currentElement = name
             buffer = ""
             if name == "item" { current = Latest(version: "") }
-            if name == "enclosure", var item = current {
+            if name == "sparkle:deltas" { insideDeltas = true }
+            if name == "enclosure", !insideDeltas, attributes["sparkle:deltaFrom"] == nil, var item = current {
                 if let v = attributes["sparkle:version"], item.version.isEmpty { item.version = v }
                 if let sv = attributes["sparkle:shortVersionString"], item.shortVersion == nil { item.shortVersion = sv }
                 if let url = attributes["url"] { item.enclosureURL = url }
@@ -131,6 +136,7 @@ enum AppcastParser {
         func parser(_ parser: XMLParser, foundCharacters string: String) { buffer += string }
 
         func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
+            if name == "sparkle:deltas" { insideDeltas = false }
             guard var item = current else { return }
             let text = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
             switch name {
