@@ -1,18 +1,17 @@
 import Foundation
 
 /// Detects Sparkle-based apps (SUFeedURL in Info.plist), fetches their appcast,
-/// and compares versions. Install action: if the app has a matching Homebrew cask
-/// we hand off to `brew install --cask --force`; otherwise we open the app's page
-/// (or the appcast enclosure's release page). Driving each app's own embedded
-/// Sparkle for in-place install is a planned follow-up — replacing another app's
-/// bundle without Sparkle's signature verification is deliberately out of scope.
+/// and compares versions. Updates install in place via SparkleInstaller, which
+/// verifies the download against the app's own SUPublicEDKey before replacing
+/// anything. Apps whose feed carries no signature stay "Get…" (open the release
+/// page) — an unverifiable bundle replacement is never worth it.
 struct SparkleSource: UpdateSource {
     let id = "sparkle"
     let displayName = "Sparkle apps"
 
     func detect() async throws -> [UpdateItem] {
         let fm = FileManager.default
-        var candidates: [(name: String, version: String, feed: URL)] = []
+        var candidates: [(name: String, path: String, version: String, feed: URL)] = []
 
         for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
             guard let entries = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir),
@@ -26,14 +25,14 @@ struct SparkleSource: UpdateSource {
                       let installed = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
                 else { continue }
                 let name = (appURL.lastPathComponent as NSString).deletingPathExtension
-                candidates.append((name, installed, feed))
+                candidates.append((name, appURL.path, installed, feed))
             }
         }
 
         // Fetch appcasts concurrently; ignore individual feed failures.
         return await withTaskGroup(of: UpdateItem?.self) { group in
             for c in candidates {
-                group.addTask { await checkAppcast(name: c.name, installed: c.version, feed: c.feed) }
+                group.addTask { await checkAppcast(name: c.name, appPath: c.path, installed: c.version, feed: c.feed) }
             }
             var items: [UpdateItem] = []
             for await item in group { if let item { items.append(item) } }
@@ -41,7 +40,7 @@ struct SparkleSource: UpdateSource {
         }
     }
 
-    private func checkAppcast(name: String, installed: String, feed: URL) async -> UpdateItem? {
+    private func checkAppcast(name: String, appPath: String, installed: String, feed: URL) async -> UpdateItem? {
         guard let (data, response) = try? await URLSession.shared.data(from: feed),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let latest = AppcastParser.latestVersion(from: data)
@@ -49,17 +48,42 @@ struct SparkleSource: UpdateSource {
 
         let latestVersion = latest.shortVersion ?? latest.version
         guard isNewerVersion(latestVersion, than: installed) else { return nil }
+
+        // Installable in place only when we can verify the download: the app
+        // must carry an SUPublicEDKey and the appcast must carry a signature.
+        // Otherwise fall back to opening the release page.
+        let installable = SparkleInstaller.plan(appPath: appPath, latest: latest) != nil
         return UpdateItem(sourceID: id, name: name,
                           installedVersion: installed,
                           latestVersion: latestVersion,
                           url: latest.link ?? feed.absoluteString,
-                          caveat: "Opens the app's release page — use the app's own \"Check for Updates…\" to install in place.",
-                          installToken: "",
-                          scriptedInstall: false)
+                          caveat: installable
+                            ? "Verified against the app's own signing key before installing; the app quits and relaunches."
+                            : "This app's feed isn't signed, so it can't be verified — opens the release page instead.",
+                          installToken: installable ? appPath : "",
+                          scriptedInstall: installable)
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
-        // Not scripted; the UI opens item.url. Nothing to do here.
+        let appPath = item.installToken
+        guard !appPath.isEmpty else { return }   // "Get…" rows just open item.url
+
+        // Re-fetch the appcast so we install exactly what we verify right now.
+        progress("Fetching update details…")
+        guard let data = FileManager.default.contents(
+                atPath: appPath + "/Contents/Info.plist"),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let feedString = plist["SUFeedURL"] as? String,
+              let feed = URL(string: feedString)
+        else { throw UpdateScoutError.parseFailure("feed URL for \(item.name)") }
+
+        let (feedData, response) = try await URLSession.shared.data(from: feed)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let latest = AppcastParser.latestVersion(from: feedData),
+              let plan = SparkleInstaller.plan(appPath: appPath, latest: latest)
+        else { throw UpdateScoutError.parseFailure("appcast for \(item.name)") }
+
+        try await SparkleInstaller.install(plan, progress: progress)
     }
 }
 
@@ -69,6 +93,11 @@ enum AppcastParser {
         var version: String
         var shortVersion: String?
         var link: String?
+        /// Download URL of the update archive.
+        var enclosureURL: String?
+        /// Base64 Ed25519 signature of the archive's bytes, verified against
+        /// the target app's SUPublicEDKey before anything is installed.
+        var edSignature: String?
     }
 
     static func latestVersion(from data: Data) -> Latest? {
@@ -93,6 +122,8 @@ enum AppcastParser {
             if name == "enclosure", var item = current {
                 if let v = attributes["sparkle:version"], item.version.isEmpty { item.version = v }
                 if let sv = attributes["sparkle:shortVersionString"], item.shortVersion == nil { item.shortVersion = sv }
+                if let url = attributes["url"] { item.enclosureURL = url }
+                if let sig = attributes["sparkle:edSignature"] { item.edSignature = sig }
                 current = item
             }
         }
