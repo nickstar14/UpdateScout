@@ -69,9 +69,16 @@ struct UpdateRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(item.name).fontWeight(.medium)
+                    HStack(spacing: 5) {
+                        Text(item.name).fontWeight(.medium)
+                        if item.isMajorUpgrade {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2).foregroundStyle(.orange)
+                        }
+                    }
                     Text("\(item.installedVersion) → \(item.latestVersion)")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(item.isMajorUpgrade ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 }
                 Spacer()
                 if controller.installing[item.id] != nil {
@@ -103,11 +110,20 @@ struct UpdateRow: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-            } else if let caveat = item.caveat {
-                Label(caveat, systemImage: "info.circle")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                if let jump = item.majorUpgradeSummary {
+                    Label("Major version change (\(jump)). For paid apps this is often a separate purchase, not a free update — check the vendor's terms before updating.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let caveat = item.caveat {
+                    Label(caveat, systemImage: "info.circle")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             if let error = controller.installErrors[item.id] {
                 Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3)

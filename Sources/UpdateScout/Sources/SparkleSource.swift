@@ -44,7 +44,7 @@ struct SparkleSource: UpdateSource {
     }
 
     private func checkAppcast(name: String, appPath: String, installed: String, feed: URL) async -> UpdateItem? {
-        guard let (data, response) = try? await URLSession.shared.data(from: feed),
+        guard let (data, response) = try? await Net.fetch(feed),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let latest = AppcastParser.latestVersion(from: data)
         else { return nil }
@@ -99,7 +99,7 @@ struct SparkleSource: UpdateSource {
               let feed = URL(string: feedString)
         else { throw UpdateScoutError.parseFailure("feed URL for \(item.name)") }
 
-        let (feedData, response) = try await URLSession.shared.data(from: feed)
+        let (feedData, response) = try await Net.fetch(feed)
         guard (response as? HTTPURLResponse)?.statusCode == 200,
               let latest = AppcastParser.latestVersion(from: feedData),
               let plan = SparkleInstaller.plan(appPath: appPath, latest: latest)

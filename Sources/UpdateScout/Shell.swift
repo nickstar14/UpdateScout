@@ -156,3 +156,22 @@ enum Askpass {
         return dir.path
     }
 }
+
+/// Networking for version checks. These must never read from the local HTTP
+/// cache: appcasts and the cask API send `Cache-Control: max-age=300`, so a
+/// cached copy makes a just-published update invisible for minutes (or longer,
+/// if the cache entry lingers) — the update simply never shows up.
+enum Net {
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
+
+    static func fetch(_ url: URL) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        return try await session.data(for: request)
+    }
+}

@@ -25,7 +25,7 @@ enum CaskIndex {
         }
         if data == nil {
             let url = URL(string: "https://formulae.brew.sh/api/cask.json")!
-            let (downloaded, response) = try await URLSession.shared.data(from: url)
+            let (downloaded, response) = try await Net.fetch(url)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 // Fall back to a stale cache if we're offline.
                 if let stale = fm.contents(atPath: cacheURL.path) { return try parse(stale) }

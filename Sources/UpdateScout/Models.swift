@@ -83,3 +83,35 @@ func isNewerVersion(_ remote: String, than local: String) -> Bool {
     }
     return false
 }
+
+extension UpdateItem {
+    /// True when the major version number increases (6.x → 8.x). For commercial
+    /// apps that usually means a separate purchase rather than a free update,
+    /// so the UI flags it before the user clicks Update.
+    var isMajorUpgrade: Bool {
+        // Free/system sources don't have paid major upgrades: Homebrew formulae
+        // are open source, and macOS updates come with the OS.
+        if sourceID == "macos" { return false }
+        if sourceID == "homebrew" && !installToken.hasPrefix("cask:") { return false }
+
+        func major(_ s: String) -> Int? {
+            let front = s.split(whereSeparator: { $0 == "," || $0 == "_" }).first.map(String.init) ?? s
+            return Int(front.split(separator: ".").first ?? "")
+        }
+        guard let new = major(latestVersion), let old = major(installedVersion),
+              old > 0, new > old,
+              // Build-number-style versions (Teams' 26106.x) aren't marketing
+              // majors — a jump there says nothing about licensing.
+              old < 1000
+        else { return false }
+        return true
+    }
+
+    /// Short "6 → 8" description of the major jump, for the warning text.
+    var majorUpgradeSummary: String? {
+        guard isMajorUpgrade else { return nil }
+        let old = installedVersion.split(separator: ".").first.map(String.init) ?? installedVersion
+        let new = latestVersion.split(separator: ".").first.map(String.init) ?? latestVersion
+        return "\(old) → \(new)"
+    }
+}

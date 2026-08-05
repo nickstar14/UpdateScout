@@ -92,7 +92,7 @@ struct CustomSource: UpdateSource {
 
     private func remoteVersion(of entry: Entry) async -> String? {
         guard let url = URL(string: entry.remoteURL),
-              let (data, response) = try? await URLSession.shared.data(from: url),
+              let (data, response) = try? await Net.fetch(url),
               (response as? HTTPURLResponse)?.statusCode == 200
         else { return nil }
 
