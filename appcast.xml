@@ -6,6 +6,16 @@
         <description>UpdateScout release feed</description>
         <language>en</language>
         <item>
+            <title>Version 1.2.2</title>
+            <pubDate>Wed, 05 Aug 2026 00:27:51 -0500</pubDate>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v1.2.2/UpdateScout-1.2.2.zip"
+                sparkle:version="7"
+                sparkle:shortVersionString="1.2.2"
+                sparkle:edSignature="Zo5VUvx2zF4dTI2Zo5aCY+Z9ReJ9Q6mJyosMbB/4sjNWVXoNmL1/B/7Qulwx9bMHIN32fvZyn5iXkUOtlH88Aw==" length="2743517"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.2.1</title>
             <pubDate>Wed, 05 Aug 2026 00:11:42 -0500</pubDate>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
