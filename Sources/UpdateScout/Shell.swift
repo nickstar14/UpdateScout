@@ -115,10 +115,12 @@ enum Shell {
     /// through our own askpass dialog (AskpassDialog) and — unlike the
     /// osascript route — sets the real SUDO_UID/SUDO_USER environment that
     /// tools like mas rely on. Callers pass pre-quoted, trusted commands only.
-    static func runPrivileged(_ command: String, tag: String? = nil) async throws -> Result {
+    static func runPrivileged(_ command: String, tag: String? = nil,
+                              lineHandler: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         // (Refronting after the auth dialog is handled via the distributed
         // notification the askpass process posts when it closes.)
-        return try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command], tag: tag)
+        return try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command],
+                             tag: tag, lineHandler: lineHandler)
     }
 }
 

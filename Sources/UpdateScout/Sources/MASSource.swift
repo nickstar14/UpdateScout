@@ -44,7 +44,30 @@ struct MASSource: UpdateSource {
             // Re-run under real sudo instead — it sets SUDO_UID/SUDO_USER
             // properly so mas still operates on this user's account.
             progress("Authorizing — enter your password, then the install runs…")
-            let priv = try await Shell.runPrivileged("'\(mas)' upgrade \(item.installToken)", tag: "install")
+
+            // mas prints almost nothing while a multi-gigabyte app downloads, so
+            // drive a heartbeat that shows elapsed time. It stands down whenever
+            // mas does emit something real.
+            let tracker = ProgressTracker()
+            let heartbeat = Task {
+                let start = Date()
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(3))
+                    if Task.isCancelled { break }
+                    guard tracker.quietFor(seconds: 3) else { continue }
+                    let secs = Int(Date().timeIntervalSince(start))
+                    progress("Installing… \(secs / 60)m \(secs % 60)s (large apps take a while)")
+                }
+            }
+            defer { heartbeat.cancel() }
+
+            let priv = try await Shell.runPrivileged(
+                "'\(mas)' upgrade \(item.installToken)", tag: "install") { line in
+                    let text = line.trimmingCharacters(in: .whitespaces)
+                    guard !text.isEmpty else { return }
+                    tracker.noteOutput()
+                    progress(text)
+                }
             if priv.combined.contains("No installed apps with ADAM ID") { return }
             guard priv.status == 0 else {
                 throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken) (admin)", output: priv.combined)
@@ -52,5 +75,21 @@ struct MASSource: UpdateSource {
             return
         }
         throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken)", output: result.combined)
+    }
+}
+
+/// Tracks when a subprocess last printed something, so a heartbeat can fill
+/// long silences without stomping on real output.
+final class ProgressTracker: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = Date.distantPast
+
+    func noteOutput() {
+        lock.lock(); last = Date(); lock.unlock()
+    }
+
+    func quietFor(seconds: TimeInterval) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return Date().timeIntervalSince(last) >= seconds
     }
 }
