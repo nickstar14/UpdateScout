@@ -71,7 +71,13 @@ enum SparkleInstaller {
         let newApp = try await unpack(archive: archive, into: unpackDir)
 
         // 4. Validate the new bundle's own code signature and signing identity.
+        // Strip extended attributes first: unpacking can leave quarantine flags
+        // and AppleDouble/Finder-info detritus, which makes codesign fail with
+        // "resource fork, Finder information, or similar detritus not allowed"
+        // even though the signature itself is fine. Signatures cover file
+        // contents, not xattrs, so clearing them doesn't weaken this check.
         progress("Checking code signature…")
+        _ = try? await Shell.run("/usr/bin/xattr", ["-cr", newApp.path])
         let verify = try await Shell.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path])
         guard verify.status == 0 else {
             throw UpdateScoutError.commandFailed("codesign --verify", output: verify.combined)

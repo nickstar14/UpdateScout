@@ -11,10 +11,7 @@ struct ComponentsSource: UpdateSource {
 
     func detect() async throws -> [UpdateItem] {
         let casks = try await CaskIndex.load()
-        var byName: [String: CaskIndex.CaskInfo] = [:]
-        for cask in casks {
-            for n in cask.appNames { byName[n.lowercased()] = cask }
-        }
+        let byName = CaskIndex.byAppName(casks)
 
         var components = halPlugins() + legacyKexts()
         components += await systemExtensions()

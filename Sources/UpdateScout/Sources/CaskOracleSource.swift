@@ -17,11 +17,9 @@ struct CaskOracleSource: UpdateSource {
         let installedCasksResult = try? await Shell.run(brew, ["list", "--cask", "-1"])
         let brewManaged = Set((installedCasksResult?.stdout ?? "").split(separator: "\n").map(String.init))
 
-        // Index casks by lowercase app filename and by human name.
-        var byName: [String: CaskIndex.CaskInfo] = [:]
-        for cask in casks {
-            for n in cask.appNames { byName[n.lowercased()] = cask }
-        }
+        // Index casks by lowercase app filename and by human name (stable
+        // casks only — see CaskIndex.byAppName).
+        let byName = CaskIndex.byAppName(casks)
 
         var items: [UpdateItem] = []
         let fm = FileManager.default

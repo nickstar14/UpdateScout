@@ -67,3 +67,21 @@ enum CaskIndex {
         return casks
     }
 }
+
+extension CaskIndex {
+    /// Casks whose token carries an @-suffix track prerelease channels
+    /// (cloudflare-warp@beta, firefox@nightly). They share the same app name as
+    /// the stable cask, so a naive name index can match them and offer a beta as
+    /// an "update" — and Homebrew then refuses the install because the two casks
+    /// conflict. Never match against these.
+    static func isPrerelease(_ token: String) -> Bool { token.contains("@") }
+
+    /// App name (lowercased) → stable cask.
+    static func byAppName(_ casks: [CaskInfo]) -> [String: CaskInfo] {
+        var map: [String: CaskInfo] = [:]
+        for cask in casks where !isPrerelease(cask.token) {
+            for name in cask.appNames { map[name.lowercased()] = cask }
+        }
+        return map
+    }
+}
