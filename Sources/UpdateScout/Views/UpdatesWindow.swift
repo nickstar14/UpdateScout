@@ -125,7 +125,7 @@ struct UpdatesView: View {
 
     @ViewBuilder
     private var updateList: some View {
-        if controller.visibleItems.isEmpty {
+        if controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(.secondary)
                 Text("Nothing to do — check back later.")
@@ -144,8 +144,32 @@ struct UpdatesView: View {
                                 .padding(.horizontal, 8)
                         }
                     }
+                    leftoverSection
                 }
                 .padding(.bottom, 16)
+            }
+        }
+    }
+
+    /// Third-party kexts sitting in /Library/Extensions that macOS isn't
+    /// loading — leftovers from old installers, offered for removal.
+    @ViewBuilder
+    private var leftoverSection: some View {
+        let leftovers = controller.visibleLeftovers
+        if !leftovers.isEmpty {
+            HStack(spacing: 6) {
+                Text("Leftover drivers")
+                    .font(.subheadline).bold().foregroundStyle(.secondary)
+                Text("not loaded — safe to remove")
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 20).padding(.top, 16)
+            Text("These kernel extensions are on disk but the kernel isn't using them, typically left behind by an old printer, dock, or drive-enclosure installer. Removing them frees the clutter and avoids surprises on major macOS upgrades.")
+                .font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20).padding(.bottom, 2)
+            ForEach(leftovers) { kext in
+                LeftoverRow(kext: kext).padding(.horizontal, 8)
             }
         }
     }

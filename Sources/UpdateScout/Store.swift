@@ -13,6 +13,22 @@ struct Store {
         var notified: Set<String> = []
         /// Per-source error messages from the last check.
         var sourceErrors: [String: String] = [:]
+        /// Third-party kexts on disk that the kernel isn't loading — offered
+        /// for removal rather than update.
+        var leftoverKexts: [KextBundle] = []
+
+        init() {}
+
+        // Hand-rolled so state files written before a field existed still load.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            lastCheck = try c.decodeIfPresent(Date.self, forKey: .lastCheck)
+            items = try c.decodeIfPresent([UpdateItem].self, forKey: .items) ?? []
+            dismissed = try c.decodeIfPresent(Set<String>.self, forKey: .dismissed) ?? []
+            notified = try c.decodeIfPresent(Set<String>.self, forKey: .notified) ?? []
+            sourceErrors = try c.decodeIfPresent([String: String].self, forKey: .sourceErrors) ?? [:]
+            leftoverKexts = try c.decodeIfPresent([KextBundle].self, forKey: .leftoverKexts) ?? []
+        }
     }
 
     static var supportDirectory: URL {

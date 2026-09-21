@@ -20,6 +20,12 @@ final class UpdateController: ObservableObject {
     var visibleItems: [UpdateItem] {
         state.items.filter { !state.dismissed.contains($0.id) }
     }
+    var visibleLeftovers: [KextBundle] {
+        state.leftoverKexts.filter { !state.dismissed.contains($0.id) }
+    }
+    /// Leftover id → progress text while a removal is in flight.
+    @Published var removing: [String: String] = [:]
+    @Published var removeErrors: [String: String] = [:]
     var badgeCount: Int { visibleItems.count }
 
     private var enabledSources: [any UpdateSource] {
@@ -32,8 +38,10 @@ final class UpdateController: ObservableObject {
         guard !isChecking else { return }
         isChecking = true
         Task {
-            let (items, errors) = await Self.runDetection(sources: enabledSources)
-            apply(items: items, errors: errors)
+            async let detection = Self.runDetection(sources: enabledSources)
+            async let leftovers = KextInventory.partition().leftover
+            let (items, errors) = await detection
+            apply(items: items, errors: errors, leftovers: await leftovers)
             isChecking = false
         }
     }
@@ -69,14 +77,15 @@ final class UpdateController: ObservableObject {
         }
     }
 
-    private func apply(items: [UpdateItem], errors: [String: String]) {
+    private func apply(items: [UpdateItem], errors: [String: String], leftovers: [KextBundle]) {
         var s = state
         s.items = items
         s.sourceErrors = errors
+        s.leftoverKexts = leftovers
         s.lastCheck = Date()
         // Prune dismissals/notifications for items that no longer exist,
         // so a future re-appearance notifies again.
-        let ids = Set(items.map(\.id))
+        let ids = Set(items.map(\.id)).union(leftovers.map(\.id))
         s.dismissed.formIntersection(ids)
         s.notified.formIntersection(ids)
 
@@ -168,6 +177,38 @@ final class UpdateController: ObservableObject {
     func dismiss(_ item: UpdateItem) {
         state.dismissed.insert(item.id)
         Store.save(state)
+    }
+
+    // MARK: - Leftover kexts
+
+    func dismissLeftover(_ kext: KextBundle) {
+        state.dismissed.insert(kext.id)
+        Store.save(state)
+    }
+
+    /// Delete a leftover kext (admin prompt). Runs through the install queue's
+    /// serialisation implicitly by being quick; there's nothing to download.
+    func removeLeftover(_ kext: KextBundle) {
+        guard removing[kext.id] == nil else { return }
+        removing[kext.id] = "Starting…"
+        removeErrors[kext.id] = nil
+        Task {
+            do {
+                try await KextInventory.remove(kext) { line in
+                    Task { @MainActor in
+                        if self.removing[kext.id] != nil { self.removing[kext.id] = line }
+                    }
+                }
+                removing[kext.id] = nil
+                var s = state
+                s.leftoverKexts.removeAll { $0.id == kext.id }
+                state = s
+                Store.save(s)
+            } catch {
+                removing[kext.id] = nil
+                removeErrors[kext.id] = error.localizedDescription
+            }
+        }
     }
 
     /// Re-read state from disk (a background check may have updated it).

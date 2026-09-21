@@ -19,12 +19,15 @@ struct Main {
         let semaphore = DispatchSemaphore(value: 0)
         Task {
             let sources = UpdateController.allSources.filter { !Prefs.disabledSources.contains($0.id) }
-            let (items, errors) = await UpdateController.runDetection(sources: sources)
+            async let detection = UpdateController.runDetection(sources: sources)
+            async let leftovers = KextInventory.partition().leftover
+            let (items, errors) = await detection
             var s = Store.load()
             s.items = items
             s.sourceErrors = errors
+            s.leftoverKexts = await leftovers
             s.lastCheck = Date()
-            let ids = Set(items.map(\.id))
+            let ids = Set(items.map(\.id)).union(s.leftoverKexts.map(\.id))
             s.dismissed.formIntersection(ids)
             s.notified.formIntersection(ids)
             let fresh = items.filter { !s.notified.contains($0.id) && !s.dismissed.contains($0.id) }

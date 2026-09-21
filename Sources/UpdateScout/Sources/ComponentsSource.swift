@@ -13,7 +13,8 @@ struct ComponentsSource: UpdateSource {
         let casks = try await CaskIndex.load()
         let byName = CaskIndex.byAppName(casks)
 
-        var components = halPlugins() + legacyKexts()
+        var components = halPlugins()
+        components += await legacyKexts()
         components += await systemExtensions()
 
         var items: [UpdateItem] = []
@@ -27,7 +28,8 @@ struct ComponentsSource: UpdateSource {
                                     installedVersion: comp.version,
                                     latestVersion: cask.version,
                                     url: cask.homepage ?? "https://formulae.brew.sh/cask/\(cask.token)",
-                                    caveat: "Driver/extension component — updates via Homebrew cask \"\(cask.token)\".",
+                                    caveat: (comp.path.map { "Found at \($0). " } ?? "")
+                                        + "Updates via Homebrew cask \"\(cask.token)\".",
                                     installToken: cask.token))
         }
         return items
@@ -46,7 +48,13 @@ struct ComponentsSource: UpdateSource {
 
     // MARK: - Component scans
 
-    private struct Component { let name: String; let version: String }
+    private struct Component {
+        let name: String
+        let version: String
+        let bundleID: String?
+        /// Where the component lives on disk (nil for system extensions).
+        let path: String?
+    }
 
     /// Bundle-style components (HAL drivers, kexts): name from the bundle
     /// filename, version from its Info.plist.
@@ -61,19 +69,30 @@ struct ComponentsSource: UpdateSource {
                   let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                   let version = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
             else { return nil }
+            let bundleID = plist["CFBundleIdentifier"] as? String
             // Skip Apple's own components — those update through softwareupdate.
-            if (plist["CFBundleIdentifier"] as? String)?.hasPrefix("com.apple.") == true { return nil }
+            if bundleID?.hasPrefix("com.apple.") == true { return nil }
             return Component(name: (url.lastPathComponent as NSString).deletingPathExtension,
-                             version: version)
+                             version: version, bundleID: bundleID, path: url.path)
         }
     }
 
+    /// HAL plug-ins are loaded by coreaudiod simply by being in the folder, so
+    /// presence on disk means in use.
     private func halPlugins() -> [Component] {
         bundleComponents(in: "/Library/Audio/Plug-Ins/HAL", extensions: ["driver", "plugin"])
     }
 
-    private func legacyKexts() -> [Component] {
-        bundleComponents(in: "/Library/Extensions", extensions: ["kext"])
+    /// Legacy kexts are different: /Library/Extensions is full of leftovers from
+    /// old installers (printer drivers, enclosure software) that macOS never
+    /// loads — on Apple silicon it can't without reduced security. A kext that
+    /// isn't loaded isn't a driver in use, and offering to "update" it would be
+    /// misleading, so only loaded ones are reported.
+    private func legacyKexts() async -> [Component] {
+        // Unloaded leftovers are surfaced separately for removal (KextInventory).
+        await KextInventory.partition().loaded.map {
+            Component(name: $0.name, version: $0.version, bundleID: $0.bundleID, path: $0.path)
+        }
     }
 
     /// Third-party DriverKit / network / endpoint system extensions.
@@ -86,7 +105,8 @@ struct ComponentsSource: UpdateSource {
         for line in result.stdout.split(separator: "\n") {
             guard line.contains("[activated"), !line.contains("com.apple."),
                   let m = line.firstMatch(of: pattern) else { continue }
-            comps.append(Component(name: String(m.name), version: String(m.version)))
+            comps.append(Component(name: String(m.name), version: String(m.version),
+                                   bundleID: nil, path: nil))
         }
         return comps
     }

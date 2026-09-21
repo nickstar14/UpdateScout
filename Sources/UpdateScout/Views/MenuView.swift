@@ -32,7 +32,10 @@ struct MenuView: View {
                         Text("^[\(controller.badgeCount) update](inflect: true) available")
                             .font(.title3.weight(.semibold))
                     }
-                    Text("Click here to view")
+                    let leftovers = controller.visibleLeftovers.count
+                    Text(leftovers > 0
+                         ? "Click here to view · ^[\(leftovers) leftover driver](inflect: true) to remove"
+                         : "Click here to view")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -126,6 +129,60 @@ struct UpdateRow: View {
                 }
             }
             if let error = controller.installErrors[item.id] {
+                Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 5)
+    }
+}
+
+/// One leftover-kext row: name, version, path, and a Remove button.
+struct LeftoverRow: View {
+    @EnvironmentObject var controller: UpdateController
+    let kext: KextBundle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(kext.name).fontWeight(.medium)
+                    HStack(spacing: 6) {
+                        Text("v\(kext.version)")
+                        if let modified = kext.modified {
+                            Text("· installed \(modified.formatted(.dateTime.month(.abbreviated).year()))")
+                        }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if controller.removing[kext.id] != nil {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button("Remove", role: .destructive) { controller.removeLeftover(kext) }
+                        .controlSize(.small)
+                    Menu {
+                        Button("Ignore this one") { controller.dismissLeftover(kext) }
+                        Button("Show in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: kext.path)])
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .frame(width: 22)
+                }
+            }
+            if let progress = controller.removing[kext.id] {
+                Text(progress)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Label(kext.path, systemImage: "folder")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let error = controller.removeErrors[kext.id] {
                 Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3)
             }
         }
