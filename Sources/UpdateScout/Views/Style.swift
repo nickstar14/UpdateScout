@@ -7,7 +7,7 @@ struct SourceStyle {
 
     static func forSource(_ id: String) -> SourceStyle {
         switch id {
-        case "homebrew":   SourceStyle(symbol: "mug.fill",             color: .orange)
+        case "homebrew":   SourceStyle(symbol: "mug.fill",             color: .brown)
         case "mas":        SourceStyle(symbol: "bag.fill",             color: .blue)
         case "macos":      SourceStyle(symbol: "apple.logo",           color: .primary)
         case "caskOracle": SourceStyle(symbol: "shippingbox.fill",     color: .teal)

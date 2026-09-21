@@ -50,7 +50,7 @@ struct CardSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 190, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(nsColor: .controlBackgroundColor).opacity(dimmed ? 0.35 : 0.55))
@@ -101,22 +101,24 @@ struct UpdateCard: View {
             }
             .padding(.top, 4)
 
-            Text(item.name)
-                .font(.callout.weight(.semibold))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity)
-                .frame(height: 34, alignment: .top)
+            VStack(spacing: 3) {
+                Text(item.name)
+                    .font(.callout.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 4) {
-                Text(item.installedVersion).foregroundStyle(.secondary)
-                Image(systemName: "arrow.right").font(.system(size: 8)).foregroundStyle(.tertiary)
-                Text(item.latestVersion).foregroundStyle(style.color).fontWeight(.medium)
+                HStack(spacing: 4) {
+                    Text(item.installedVersion).foregroundStyle(.secondary)
+                    Image(systemName: "arrow.right").font(.system(size: 8)).foregroundStyle(.tertiary)
+                    Text(item.latestVersion).foregroundStyle(style.color).fontWeight(.medium)
+                }
+                .font(.caption2.monospacedDigit())
+                .lineLimit(1).minimumScaleFactor(0.7)
             }
-            .font(.caption2.monospacedDigit())
-            .lineLimit(1).minimumScaleFactor(0.7)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 6)
 
             if let progress {
                 VStack(spacing: 4) {
@@ -195,13 +197,13 @@ struct LeftoverCard: View {
             Text(kext.name)
                 .font(.callout.weight(.semibold))
                 .multilineTextAlignment(.center).lineLimit(2)
-                .frame(maxWidth: .infinity).frame(height: 34, alignment: .top)
+                .frame(maxWidth: .infinity).fixedSize(horizontal: false, vertical: true)
 
             Text(kext.modified.map { "v\(kext.version) · \($0.formatted(.dateTime.month(.abbreviated).year()))" }
                  ?? "v\(kext.version)")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 6)
 
             if let progress = controller.removing[kext.id] {
                 VStack(spacing: 4) {
@@ -249,9 +251,9 @@ struct HiddenCard: View {
             Text(name)
                 .font(.callout.weight(.semibold))
                 .multilineTextAlignment(.center).lineLimit(2)
-                .frame(maxWidth: .infinity).frame(height: 34, alignment: .top)
+                .frame(maxWidth: .infinity).fixedSize(horizontal: false, vertical: true)
             Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            Spacer(minLength: 0)
+            Spacer(minLength: 6)
             Button {
                 controller.unhide(id: id)
             } label: {

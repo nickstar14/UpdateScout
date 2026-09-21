@@ -110,18 +110,20 @@ struct UpdatesView: View {
     @ViewBuilder
     private var statusBanner: some View {
         let count = controller.visibleItems.count
-        let tint: Color = count == 0 ? .green : .orange
+        let leftovers = controller.visibleLeftovers.count
+        let upToDate = count == 0
+        let tint: Color = upToDate ? .green : .orange
         HStack(spacing: 12) {
-            Image(systemName: count == 0 ? "checkmark.seal.fill" : "arrow.down.circle.fill")
+            Image(systemName: upToDate ? "checkmark.circle.fill" : "arrow.down.circle.fill")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 40, height: 40)
                 .background(tint.opacity(0.15), in: Circle())
+                .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 1) {
-                Text(count == 0 ? "Everything is up to date"
-                                : "^[\(count) update](inflect: true) available")
+                Text(upToDate ? "Everything is up to date"
+                              : "^[\(count) update](inflect: true) available")
                     .font(.title2.weight(.semibold))
-                let leftovers = controller.visibleLeftovers.count
                 if leftovers > 0 {
                     Text("^[\(leftovers) leftover driver](inflect: true) can be removed")
                         .font(.caption).foregroundStyle(.secondary)
