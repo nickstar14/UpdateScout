@@ -69,7 +69,11 @@ struct CustomSource: UpdateSource {
                                         url: entry.downloadPage ?? entry.remoteURL,
                                         caveat: scripted ? entry.notes : "Opens the vendor download page.",
                                         installToken: String(index),
-                                        scriptedInstall: scripted))
+                                        scriptedInstall: scripted,
+                                        appPath: entry.installedPlist.flatMap { plist in
+                                            let r = plist.range(of: "/Contents/Info.plist")
+                                            return r.map { String(plist[..<$0.lowerBound]) }
+                                        }))
             }
         }
         return items

@@ -33,22 +33,62 @@ struct HomebrewSource: UpdateSource {
         }
         let outdated = try JSONDecoder().decode(Outdated.self, from: data)
 
+        // Project homepages (one call for everything): a better "info page"
+        // than formulae.brew.sh, and lets GitHubNotes find changelogs.
+        let info = await info(brew: brew,
+                              formulae: outdated.formulae.map(\.name),
+                              casks: outdated.casks.map(\.name))
+
         var items: [UpdateItem] = []
         for f in outdated.formulae {
             items.append(UpdateItem(sourceID: id, name: f.name,
                                     installedVersion: f.installed_versions.last ?? "?",
                                     latestVersion: f.current_version,
-                                    url: "https://formulae.brew.sh/formula/\(f.name)",
+                                    url: info[f.name]?.homepage ?? "https://formulae.brew.sh/formula/\(f.name)",
                                     installToken: "formula:\(f.name)"))
         }
         for c in outdated.casks {
             items.append(UpdateItem(sourceID: id, name: c.name,
                                     installedVersion: c.installed_versions.last ?? "?",
                                     latestVersion: c.current_version,
-                                    url: "https://formulae.brew.sh/cask/\(c.name)",
-                                    installToken: "cask:\(c.name)"))
+                                    url: info[c.name]?.homepage ?? "https://formulae.brew.sh/cask/\(c.name)",
+                                    installToken: "cask:\(c.name)",
+                                    appPath: info[c.name]?.appName.flatMap {
+                                        AppLocator.find(named: ($0 as NSString).deletingPathExtension)
+                                    }))
         }
         return items
+    }
+
+    private struct Info { var homepage: String?; var appName: String? }
+
+    /// Homepage and installed .app name for each outdated item, from one
+    /// `brew info` call per kind.
+    private func info(brew: String, formulae: [String], casks: [String]) async -> [String: Info] {
+        var map: [String: Info] = [:]
+        func collect(_ args: [String], key: String, nameKey: String) async {
+            guard let result = try? await Shell.run(brew, args), result.status == 0,
+                  let data = result.stdout.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let entries = json[key] as? [[String: Any]] else { return }
+            for e in entries {
+                guard let name = e[nameKey] as? String else { continue }
+                var appName: String?
+                for artifact in (e["artifacts"] as? [[String: Any]]) ?? [] {
+                    if let apps = artifact["app"] as? [Any], let first = apps.first as? String {
+                        appName = first; break
+                    }
+                }
+                map[name] = Info(homepage: e["homepage"] as? String, appName: appName)
+            }
+        }
+        if !formulae.isEmpty {
+            await collect(["info", "--json=v2", "--formula"] + formulae, key: "formulae", nameKey: "name")
+        }
+        if !casks.isEmpty {
+            await collect(["info", "--json=v2", "--cask"] + casks, key: "casks", nameKey: "token")
+        }
+        return map
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {

@@ -51,6 +51,11 @@ struct UpdateScoutApp: App {
         DispatchQueue.main.async {
             Appearance.apply(Prefs.appearance)
             if Prefs.showDockIcon { NSApp.setActivationPolicy(.regular) }
+            // `open UpdateScout.app --args --open-window` shows the status
+            // window straight away (handy for screenshots and testing).
+            if CommandLine.arguments.contains("--open-window") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { UpdatesWindow.shared.show() }
+            }
         }
         // When the askpass dialog closes, bring the status window back to the
         // front (the auth prompt pushes us behind other apps).

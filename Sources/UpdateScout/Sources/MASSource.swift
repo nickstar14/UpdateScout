@@ -22,9 +22,32 @@ struct MASSource: UpdateSource {
                                     installedVersion: String(m.3),
                                     latestVersion: String(m.4),
                                     url: "macappstore://showUpdatesPage",
-                                    installToken: String(m.1)))
+                                    installToken: String(m.1),
+                                    appPath: AppLocator.find(named: String(m.2))))
         }
-        return items
+        // Enrich with "What's New" from Apple's public lookup API, concurrently.
+        // Best effort: a lookup failure just leaves the notes empty.
+        return await withTaskGroup(of: UpdateItem.self) { group in
+            for item in items {
+                group.addTask { await Self.withReleaseNotes(item) }
+            }
+            var enriched: [UpdateItem] = []
+            for await item in group { enriched.append(item) }
+            return enriched.sorted { $0.name < $1.name }
+        }
+    }
+
+    private static func withReleaseNotes(_ item: UpdateItem) async -> UpdateItem {
+        let storefront = Locale.current.region?.identifier.lowercased() ?? "us"
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(item.installToken)&country=\(storefront)"),
+              let (data, _) = try? await Net.fetch(url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let app = (json["results"] as? [[String: Any]])?.first
+        else { return item }
+        var copy = item
+        copy.releaseNotes = app["releaseNotes"] as? String
+        copy.releaseNotesURL = app["trackViewUrl"] as? String
+        return copy
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {

@@ -73,7 +73,8 @@ struct UpdatesView: View {
         HStack(spacing: 12) {
             Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                 .font(.system(size: 30))
-                .foregroundStyle(.tint)
+                .foregroundStyle(.white, Color.accentColor)
+                .symbolRenderingMode(.palette)
             VStack(alignment: .leading, spacing: 1) {
                 Text("UpdateScout").font(.title3).bold()
                 if let lastCheck = controller.state.lastCheck {
@@ -88,13 +89,17 @@ struct UpdatesView: View {
                     Text("Checking…").font(.caption).foregroundStyle(.secondary)
                 }
             } else {
-                Button("Check Now") { controller.checkNow() }
-                    .buttonStyle(.borderedProminent)
+                Button {
+                    controller.checkNow()
+                } label: {
+                    Label("Check Now", systemImage: "arrow.clockwise")
+                }
+                .glassProminent(.accentColor)
             }
             Button { SettingsWindow.shared.show() } label: {
-                Image(systemName: "gearshape").font(.title3)
+                Image(systemName: "gearshape.fill")
             }
-            .buttonStyle(.plain).foregroundStyle(.secondary)
+            .glass()
             .help("Settings")
         }
         .padding(.horizontal, 20)
@@ -105,16 +110,31 @@ struct UpdatesView: View {
     @ViewBuilder
     private var statusBanner: some View {
         let count = controller.visibleItems.count
-        HStack(spacing: 10) {
-            Image(systemName: count == 0 ? "checkmark.seal.fill" : "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90")
-                .font(.title2)
-                .foregroundStyle(count == 0 ? .green : .orange)
-            Text(count == 0 ? "Everything is up to date"
-                            : "^[\(count) update](inflect: true) available")
-                .font(.title2.weight(.semibold))
+        let tint: Color = count == 0 ? .green : .orange
+        HStack(spacing: 12) {
+            Image(systemName: count == 0 ? "checkmark.seal.fill" : "arrow.down.circle.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 40, height: 40)
+                .background(tint.opacity(0.15), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(count == 0 ? "Everything is up to date"
+                                : "^[\(count) update](inflect: true) available")
+                    .font(.title2.weight(.semibold))
+                let leftovers = controller.visibleLeftovers.count
+                if leftovers > 0 {
+                    Text("^[\(leftovers) leftover driver](inflect: true) can be removed")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Spacer()
             if count > 0 && controller.visibleItems.contains(where: { $0.scriptedInstall }) {
-                Button("Update All") { controller.updateAll() }
+                Button {
+                    controller.updateAll()
+                } label: {
+                    Label("Update All", systemImage: "arrow.down.to.line")
+                }
+                .glassProminent(.orange)
             }
         }
         .padding(.horizontal, 20)
@@ -123,9 +143,13 @@ struct UpdatesView: View {
 
     // MARK: Content
 
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 12)]
+
     @ViewBuilder
     private var updateList: some View {
-        if controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty {
+        let nothingToDo = controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty
+        let hiddenCount = controller.hiddenItems.count + controller.hiddenLeftovers.count
+        if nothingToDo && hiddenCount == 0 {
             VStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(.secondary)
                 Text("Nothing to do — check back later.")
@@ -134,21 +158,39 @@ struct UpdatesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(grouped, id: \.source.id) { group in
-                        Text(group.source.displayName)
-                            .font(.subheadline).bold().foregroundStyle(.secondary)
-                            .padding(.horizontal, 20).padding(.top, 12)
-                        ForEach(group.items) { item in
-                            UpdateRow(item: item)
-                                .padding(.horizontal, 8)
+                        let style = SourceStyle.forSource(group.source.id)
+                        sectionHeader(title: group.source.displayName, symbol: style.symbol,
+                                      color: style.color, count: group.items.count)
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(group.items) { item in UpdateCard(item: item) }
                         }
+                        .padding(.horizontal, 20)
                     }
                     leftoverSection
+                    hiddenSection
                 }
-                .padding(.bottom, 16)
+                .padding(.vertical, 12)
             }
         }
+    }
+
+    private func sectionHeader(title: String, symbol: String, color: Color, count: Int,
+                               subtitle: String? = nil) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol).foregroundStyle(color)
+            Text(title).foregroundStyle(.secondary)
+            Text("\(count)")
+                .font(.caption2).foregroundStyle(color)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(color.opacity(0.14), in: Capsule())
+            if let subtitle {
+                Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.tertiary)
+            }
+        }
+        .font(.subheadline.bold())
+        .padding(.horizontal, 20).padding(.top, 10)
     }
 
     /// Third-party kexts sitting in /Library/Extensions that macOS isn't
@@ -157,19 +199,62 @@ struct UpdatesView: View {
     private var leftoverSection: some View {
         let leftovers = controller.visibleLeftovers
         if !leftovers.isEmpty {
-            HStack(spacing: 6) {
-                Text("Leftover drivers")
-                    .font(.subheadline).bold().foregroundStyle(.secondary)
-                Text("not loaded — safe to remove")
-                    .font(.caption).foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 20).padding(.top, 16)
-            Text("These kernel extensions are on disk but the kernel isn't using them, typically left behind by an old printer, dock, or drive-enclosure installer. Removing them frees the clutter and avoids surprises on major macOS upgrades.")
+            sectionHeader(title: "Leftover drivers", symbol: "trash.slash.fill", color: .red,
+                          count: leftovers.count, subtitle: "not loaded — safe to remove")
+            Text("On disk but the kernel isn't using them — typically left behind by an old printer, dock, or drive-enclosure installer.")
                 .font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20).padding(.bottom, 2)
-            ForEach(leftovers) { kext in
-                LeftoverRow(kext: kext).padding(.horizontal, 8)
+                .padding(.horizontal, 20)
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    @AppStorage("showHidden") private var showHidden = false
+
+    /// Everything the user chose to ignore, collapsed by default.
+    @ViewBuilder
+    private var hiddenSection: some View {
+        let items = controller.hiddenItems
+        let kexts = controller.hiddenLeftovers
+        let total = items.count + kexts.count
+        if total > 0 {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showHidden.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showHidden ? "chevron.down" : "chevron.right")
+                        .font(.caption.bold()).frame(width: 10)
+                    Image(systemName: "eye.slash.fill").foregroundStyle(.secondary)
+                    Text("Hidden").foregroundStyle(.secondary)
+                    Text("\(total)")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                    Spacer()
+                }
+                .font(.subheadline.bold())
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20).padding(.top, 14)
+
+            if showHidden {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(items) { item in
+                        HiddenCard(id: item.id, name: item.name,
+                                   detail: "\(item.installedVersion) → \(item.latestVersion)",
+                                   appPath: item.appPath,
+                                   style: SourceStyle.forSource(item.sourceID))
+                    }
+                    ForEach(kexts) { kext in
+                        HiddenCard(id: kext.id, name: kext.name, detail: "v\(kext.version) · leftover driver",
+                                   appPath: nil, style: SourceStyle(symbol: "trash.slash.fill", color: .red))
+                    }
+                }
+                .padding(.horizontal, 20)
             }
         }
     }

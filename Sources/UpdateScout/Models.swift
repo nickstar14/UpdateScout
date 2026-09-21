@@ -20,9 +20,17 @@ struct UpdateItem: Identifiable, Codable, Hashable {
     let installToken: String
     /// If false, the "Update" button opens `url` instead of running anything.
     let scriptedInstall: Bool
+    /// Release notes for the new version, when the source publishes them
+    /// (Sparkle appcast description, App Store "What's New"). May be HTML.
+    var releaseNotes: String? = nil
+    /// A page with the full notes, when the source only links to them.
+    var releaseNotesURL: String? = nil
+    /// The installed .app bundle, when known — used for the icon.
+    var appPath: String? = nil
 
     init(sourceID: String, name: String, installedVersion: String, latestVersion: String,
-         url: String? = nil, caveat: String? = nil, installToken: String, scriptedInstall: Bool = true) {
+         url: String? = nil, caveat: String? = nil, installToken: String, scriptedInstall: Bool = true,
+         releaseNotes: String? = nil, releaseNotesURL: String? = nil, appPath: String? = nil) {
         self.sourceID = sourceID
         self.name = name
         self.installedVersion = installedVersion
@@ -31,6 +39,22 @@ struct UpdateItem: Identifiable, Codable, Hashable {
         self.caveat = caveat
         self.installToken = installToken
         self.scriptedInstall = scriptedInstall
+        self.releaseNotes = releaseNotes
+        self.releaseNotesURL = releaseNotesURL
+        self.appPath = appPath
+    }
+}
+
+/// Finds an installed .app by its display name, in the usual places.
+enum AppLocator {
+    static func find(named name: String) -> String? {
+        let dirs = ["/Applications", "/System/Applications", "/System/Applications/Utilities",
+                    NSHomeDirectory() + "/Applications"]
+        for dir in dirs {
+            let path = dir + "/" + name + ".app"
+            if FileManager.default.fileExists(atPath: path) { return path }
+        }
+        return nil
     }
 }
 

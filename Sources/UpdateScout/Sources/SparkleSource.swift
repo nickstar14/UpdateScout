@@ -62,7 +62,9 @@ struct SparkleSource: UpdateSource {
                               url: latest.link ?? feed.absoluteString,
                               caveat: "Opens UpdateScout's own updater.",
                               installToken: Self.selfUpdateToken,
-                              scriptedInstall: true)
+                              scriptedInstall: true,
+                              releaseNotes: latest.notes, releaseNotesURL: latest.notesLink,
+                              appPath: appPath)
         }
 
         // Installable in place only when we can verify the download: the app
@@ -77,7 +79,9 @@ struct SparkleSource: UpdateSource {
                             ? "Verified against the app's own signing key before installing; the app quits and relaunches."
                             : "This app's feed isn't signed, so it can't be verified — opens the release page instead.",
                           installToken: installable ? appPath : "",
-                          scriptedInstall: installable)
+                          scriptedInstall: installable,
+                          releaseNotes: latest.notes, releaseNotesURL: latest.notesLink,
+                          appPath: appPath)
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
@@ -120,6 +124,10 @@ enum AppcastParser {
         /// Base64 Ed25519 signature of the archive's bytes, verified against
         /// the target app's SUPublicEDKey before anything is installed.
         var edSignature: String?
+        /// Release notes: inline <description> (usually HTML) and/or a
+        /// <sparkle:releaseNotesLink> page.
+        var notes: String?
+        var notesLink: String?
     }
 
     static func latestVersion(from data: Data) -> Latest? {
@@ -157,6 +165,12 @@ enum AppcastParser {
 
         func parser(_ parser: XMLParser, foundCharacters string: String) { buffer += string }
 
+        /// Release notes are normally shipped as <![CDATA[ …html… ]]>, which
+        /// arrives here rather than through foundCharacters.
+        func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+            buffer += String(data: CDATABlock, encoding: .utf8) ?? ""
+        }
+
         func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
             if name == "sparkle:deltas" { insideDeltas = false }
             guard var item = current else { return }
@@ -165,6 +179,8 @@ enum AppcastParser {
             case "sparkle:version": item.version = text
             case "sparkle:shortVersionString": item.shortVersion = text
             case "link": if item.link == nil { item.link = text }
+            case "description": if !text.isEmpty { item.notes = text }
+            case "sparkle:releaseNotesLink": if !text.isEmpty { item.notesLink = text }
             case "item":
                 if !item.version.isEmpty || item.shortVersion != nil {
                     let candidate = item

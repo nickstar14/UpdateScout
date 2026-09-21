@@ -23,6 +23,18 @@ final class UpdateController: ObservableObject {
     var visibleLeftovers: [KextBundle] {
         state.leftoverKexts.filter { !state.dismissed.contains($0.id) }
     }
+    /// Items the user chose to ignore — still tracked so they can be brought back.
+    var hiddenItems: [UpdateItem] {
+        state.items.filter { state.dismissed.contains($0.id) }
+    }
+    var hiddenLeftovers: [KextBundle] {
+        state.leftoverKexts.filter { state.dismissed.contains($0.id) }
+    }
+
+    func unhide(id: String) {
+        state.dismissed.remove(id)
+        Store.save(state)
+    }
     /// Leftover id → progress text while a removal is in flight.
     @Published var removing: [String: String] = [:]
     @Published var removeErrors: [String: String] = [:]
@@ -73,6 +85,8 @@ final class UpdateController: ObservableObject {
             let coveredTokens = Set(items.filter { $0.sourceID != "components" }.map(\.installToken))
             items.removeAll { $0.sourceID == "components" && coveredTokens.contains($0.installToken) }
             items.sort { ($0.sourceID, $0.name.lowercased()) < ($1.sourceID, $1.name.lowercased()) }
+            // Fill in changelogs for items whose source has none (Homebrew).
+            items = await GitHubNotes.enrich(items)
             return (items, errors)
         }
     }

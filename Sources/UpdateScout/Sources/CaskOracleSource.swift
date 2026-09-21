@@ -44,7 +44,8 @@ struct CaskOracleSource: UpdateSource {
                                         latestVersion: cask.version,
                                         url: cask.homepage ?? "https://formulae.brew.sh/cask/\(cask.token)",
                                         caveat: "Installs via Homebrew — this app will become Homebrew-managed (cask \"\(cask.token)\").",
-                                        installToken: cask.token))
+                                        installToken: cask.token,
+                                        appPath: appURL.path))
             }
         }
         return items
