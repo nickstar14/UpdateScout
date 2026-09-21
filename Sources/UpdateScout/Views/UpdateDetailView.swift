@@ -91,7 +91,7 @@ struct UpdateDetailView: View {
                 .frame(maxHeight: 220)
             } else {
                 Text(item.releaseNotesURL != nil
-                     ? "This vendor publishes notes on the web — use the link below."
+                     ? "This vendor publishes notes on the web — use the Release notes button below."
                      : "No release notes are published for this update. Homebrew formulae and cask updates don't carry changelogs; the project page usually does.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -100,12 +100,22 @@ struct UpdateDetailView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             if let notesURL = item.releaseNotesURL.flatMap(URL.init(string:)) {
-                Link("Full release notes", destination: notesURL).font(.callout)
+                Button {
+                    NSWorkspace.shared.open(notesURL)
+                } label: {
+                    Label("Release notes", systemImage: "doc.text")
+                }
+                .glass()
             }
             if let url = item.url.flatMap(URL.init(string:)) {
-                Link("Info page", destination: url).font(.callout)
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("Info page", systemImage: "safari")
+                }
+                .glass()
             }
             Spacer()
             Button("Close") { dismiss() }.glass()

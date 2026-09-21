@@ -55,12 +55,19 @@ struct HomebrewSource: UpdateSource {
                                     installToken: "cask:\(c.name)",
                                     appPath: info[c.name]?.appName.flatMap {
                                         AppLocator.find(named: ($0 as NSString).deletingPathExtension)
-                                    }))
+                                    } ?? info[c.name]?.deletedApp ?? AppLocator.findUnique(prefix: c.name)))
         }
         return items
     }
 
-    private struct Info { var homepage: String?; var appName: String? }
+    private struct Info {
+        var homepage: String?
+        /// The .app the cask installs (app-artifact casks).
+        var appName: String?
+        /// For pkg casks: an existing /Applications/*.app named in the
+        /// uninstall stanza's delete list, if any.
+        var deletedApp: String?
+    }
 
     /// Homepage and installed .app name for each outdated item, from one
     /// `brew info` call per kind.
@@ -74,12 +81,21 @@ struct HomebrewSource: UpdateSource {
             for e in entries {
                 guard let name = e[nameKey] as? String else { continue }
                 var appName: String?
+                var deletedApp: String?
                 for artifact in (e["artifacts"] as? [[String: Any]]) ?? [] {
                     if let apps = artifact["app"] as? [Any], let first = apps.first as? String {
-                        appName = first; break
+                        appName = first
+                    }
+                    for stanza in (artifact["uninstall"] as? [[String: Any]]) ?? [] {
+                        let paths = (stanza["delete"] as? [String]) ?? (stanza["delete"] as? String).map { [$0] } ?? []
+                        if let hit = paths.first(where: {
+                            $0.hasPrefix("/Applications/") && $0.hasSuffix(".app")
+                                && FileManager.default.fileExists(atPath: $0) }) {
+                            deletedApp = hit
+                        }
                     }
                 }
-                map[name] = Info(homepage: e["homepage"] as? String, appName: appName)
+                map[name] = Info(homepage: e["homepage"] as? String, appName: appName, deletedApp: deletedApp)
             }
         }
         if !formulae.isEmpty {

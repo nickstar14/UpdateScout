@@ -43,6 +43,7 @@ struct Main {
 }
 
 struct UpdateScoutApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var controller = UpdateController.shared
 
     init() {

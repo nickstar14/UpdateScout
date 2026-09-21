@@ -84,6 +84,19 @@ final class UpdateController: ObservableObject {
             // or a brew cask — same cask token means the same update.
             let coveredTokens = Set(items.filter { $0.sourceID != "components" }.map(\.installToken))
             items.removeAll { $0.sourceID == "components" && coveredTokens.contains($0.installToken) }
+            // Several sources can describe the same installed app (a Homebrew-
+            // managed cask and a custom_sources entry pointing at the same
+            // bundle). Keep one row per app, preferring the source that
+            // actually manages the install.
+            let priority = ["homebrew": 0, "mas": 1, "caskOracle": 2, "sparkle": 3, "custom": 4, "components": 5]
+            var seenApps: [String: Int] = [:]
+            items.sort { (priority[$0.sourceID] ?? 9) < (priority[$1.sourceID] ?? 9) }
+            items = items.filter { item in
+                guard let app = item.appPath else { return true }
+                if seenApps[app] != nil { return false }
+                seenApps[app] = 1
+                return true
+            }
             items.sort { ($0.sourceID, $0.name.lowercased()) < ($1.sourceID, $1.name.lowercased()) }
             // Fill in changelogs for items whose source has none (Homebrew).
             items = await GitHubNotes.enrich(items)

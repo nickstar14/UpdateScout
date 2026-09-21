@@ -56,6 +56,28 @@ enum AppLocator {
         }
         return nil
     }
+
+    /// Last resort for pkg-based casks with no app artifact: the one app in
+    /// /Applications whose normalised name starts with the cask token
+    /// ("displaylink" → "DisplayLink Manager.app"). Requires a *unique* match
+    /// so it can't attach the wrong app.
+    static func findUnique(prefix token: String) -> String? {
+        func norm(_ s: String) -> String {
+            s.lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let key = norm(token)
+        guard key.count >= 4 else { return nil }
+        let fm = FileManager.default
+        var hits: [String] = []
+        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
+            for entry in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
+                if norm((entry as NSString).deletingPathExtension).hasPrefix(key) {
+                    hits.append(dir + "/" + entry)
+                }
+            }
+        }
+        return hits.count == 1 ? hits[0] : nil
+    }
 }
 
 /// A detector for one kind of update source.
