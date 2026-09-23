@@ -6,5 +6,6 @@
       <stop offset="1" stop-color="#BFD4F5"/>
     </radialGradient>
   </defs>
-  <circle cx="512" cy="512" r="196" fill="url(#lens)"/>
+  <circle cx="512.0" cy="512.0" r="196.0" fill="url(#lens)"/>
+
 </svg>

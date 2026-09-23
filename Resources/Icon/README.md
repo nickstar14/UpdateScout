@@ -24,9 +24,19 @@ passes per layer. Stacking them in order reproduces the flat artwork.
   resize the lens, resize all three together or the glint will drift.
 - Checked at 16/32/64/128 pt: the ring-and-dot silhouette stays readable.
 
+## Corner rounding
+
+Every corner is rounded: the arcs use round line caps, and the arrowheads
+(both on the ring and inside the lens) are filled *and* stroked in their own
+colour with a round line join — SVG has no corner radius for polygons. The
+stroke grows a shape by half its width all round, so the triangle geometry is
+inset by that amount to keep the finished size unchanged. `ROUND_RING` and
+`ROUND_ARROW` in the generator control how soft the corners are.
+
 ## Regenerating
 
-The geometry is computed rather than hand-drawn. The generator lives in the
-repo history for this commit — arcs are defined by angle pairs and the
-arrowheads are derived from the tangent at each arc's end, so the two halves
-stay symmetric if you change the radius or stroke weight.
+    python3 Resources/Icon/generate.py
+
+The geometry is computed rather than hand-drawn: arcs are defined by angle
+pairs and each arrowhead is derived from the tangent at its arc's end, so the
+two halves stay symmetric if you change the radius or stroke weight.
