@@ -51,19 +51,20 @@ extension View {
 struct WarningBadge: View {
     let title: String
     let message: String
+    var symbol: String = "exclamationmark.triangle.fill"
     var color: Color = .orange
     @State private var showing = false
 
     var body: some View {
         Button { showing.toggle() } label: {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: symbol)
                 .foregroundStyle(color)
         }
         .buttonStyle(.plain)
         .help(message)
         .popover(isPresented: $showing, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                Label(title, systemImage: "exclamationmark.triangle.fill")
+                Label(title, systemImage: symbol)
                     .font(.headline).foregroundStyle(color)
                 Text(message).font(.callout)
                     .fixedSize(horizontal: false, vertical: true)

@@ -27,13 +27,10 @@ struct MASSource: UpdateSource {
                                     installToken: String(m.1),
                                     appPath: AppLocator.find(named: String(m.2))))
         }
-        // `mas outdated` reads the App Store's cached update list, which often
-        // lags what the App Store app itself shows. Cross-check every installed
-        // App Store app against Apple's catalogue and add anything the store
-        // says is newer. Strictly-newer only: the catalogue can also lag
-        // behind installed builds (Apple's own apps), and that must not flag.
+        // mas can't see iPhone/iPad apps running on Apple silicon at all, so
+        // check those against Apple's catalogue separately.
         let known = Set(items.map(\.installToken))
-        items += await Self.catalogueOutdated(mas: mas, excluding: known)
+        items += await Self.iosAppsOutdated(excluding: known)
 
         // Enrich with "What's New" from Apple's public lookup API, concurrently.
         // Best effort: a lookup failure just leaves the notes empty.
@@ -47,67 +44,61 @@ struct MASSource: UpdateSource {
         }
     }
 
-    private static func catalogueOutdated(mas: String, excluding known: Set<String>) async -> [UpdateItem] {
-        guard let listed = try? await Shell.run(mas, ["list"]), listed.status == 0 else { return [] }
-        struct Installed { let id: String; let name: String; let version: String }
-        let pattern = #/^\s*(\d+)\s+(.+?)\s+\(([^)]*)\)\s*$/#
-        let macApps: [Installed] = listed.stdout.split(separator: "\n").compactMap { line in
-            guard let m = line.firstMatch(of: pattern) else { return nil }
-            return Installed(id: String(m.1), name: String(m.2), version: String(m.3))
-        }
-        // iPhone/iPad apps running on Apple silicon are App Store apps too, but
-        // mas doesn't list them at all. They ship as a wrapper bundle whose
-        // iTunesMetadata.plist carries the store id and version.
-        var iosApps: [Installed] = []
+    /// iPhone/iPad apps running on this Mac. They ship as a wrapper bundle
+    /// whose iTunesMetadata.plist carries the store id and the *iOS* version —
+    /// the same number the catalogue reports, so the comparison is sound.
+    ///
+    /// Mac App Store apps deliberately aren't cross-checked this way: Apple's
+    /// lookup API exposes one `version` per store id, and for an app published
+    /// universally (Canva, the iWork apps) that's the iOS version, which has
+    /// nothing to do with the installed Mac build's numbering. Comparing them
+    /// invents updates that don't exist, so Mac apps rely on `mas outdated`.
+    private static func iosAppsOutdated(excluding known: Set<String>) async -> [UpdateItem] {
+        struct Wrapped { let id: String; let name: String; let version: String; let path: String }
+        var apps: [Wrapped] = []
         for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
             for entry in (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                let meta = "\(dir)/\(entry)/Wrapper/iTunesMetadata.plist"
-                guard let data = FileManager.default.contents(atPath: meta),
+                let path = "\(dir)/\(entry)"
+                guard let data = FileManager.default.contents(atPath: path + "/Wrapper/iTunesMetadata.plist"),
                       let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                       let version = plist["bundleShortVersionString"] as? String else { continue }
                 let id = (plist["itemId"] as? NSNumber)?.stringValue ?? (plist["itemId"] as? String) ?? ""
-                guard !id.isEmpty else { continue }
-                // Store names are marketing-length ("Shop: All your favorite
-                // brands"); keep the part before the tagline separator.
-                let full = (plist["itemName"] as? String) ?? (entry as NSString).deletingPathExtension
-                let name = full.components(separatedBy: [":"]).first?
+                guard !id.isEmpty, !known.contains(id) else { continue }
+                // Use the store's name so it matches what the App Store shows
+                // ("Vocal Remover", not the bundle's "Musiclab"), minus the
+                // marketing tagline ("Shop: All your favorite brands" → "Shop").
+                let bundleName = (entry as NSString).deletingPathExtension
+                let storeName = (plist["itemName"] as? String)?
+                    .components(separatedBy: ":").first?
                     .components(separatedBy: " - ").first?
-                    .trimmingCharacters(in: .whitespaces) ?? full
-                iosApps.append(Installed(id: id, name: name, version: version))
+                    .trimmingCharacters(in: .whitespaces)
+                let name = (storeName?.isEmpty == false ? storeName! : bundleName)
+                apps.append(Wrapped(id: id, name: name, version: version, path: path))
             }
         }
-        let iosIDs = Set(iosApps.map(\.id))
-        let installed = macApps + iosApps
-        guard !installed.isEmpty else { return [] }
+        guard !apps.isEmpty else { return [] }
 
-        // One batched lookup for everything (the API accepts many ids per call).
         let storefront = Locale.current.region?.identifier.lowercased() ?? "us"
+        let ids = apps.map(\.id).joined(separator: ",")
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(ids)&country=\(storefront)"),
+              let (data, _) = try? await Net.fetch(url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else { return [] }
         var storeVersions: [String: String] = [:]
-        for chunk in stride(from: 0, to: installed.count, by: 100).map({ Array(installed[$0..<min($0 + 100, installed.count)]) }) {
-            let ids = chunk.map(\.id).joined(separator: ",")
-            guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(ids)&country=\(storefront)"),
-                  let (data, _) = try? await Net.fetch(url),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let results = json["results"] as? [[String: Any]] else { continue }
-            for r in results {
-                if let id = r["trackId"] as? Int, let v = r["version"] as? String { storeVersions[String(id)] = v }
-            }
+        for r in results {
+            if let id = r["trackId"] as? Int, let v = r["version"] as? String { storeVersions[String(id)] = v }
         }
 
-        return installed.compactMap { app in
-            guard !known.contains(app.id),
-                  let store = storeVersions[app.id],
-                  isNewerVersion(store, than: app.version) else { return nil }
-            let isIOS = iosIDs.contains(app.id)
+        return apps.compactMap { app in
+            guard let store = storeVersions[app.id], isNewerVersion(store, than: app.version) else { return nil }
             return UpdateItem(sourceID: "mas", name: app.name,
                               installedVersion: app.version, latestVersion: store,
                               url: "macappstore://showUpdatesPage",
-                              caveat: isIOS
-                                ? "iPhone/iPad app running on your Mac — mas can't update these, so Get… opens the App Store's Updates page."
-                                : "The App Store catalogue lists this update but mas hasn't caught up yet — Update tries mas first, then opens the App Store's Updates page for you to finish.",
+                              caveat: "iPhone or iPad app running on your Mac. These can only be updated in the App Store — the button opens its Updates page.",
                               installToken: app.id,
-                              scriptedInstall: !isIOS,
-                              appPath: AppLocator.find(named: app.name) ?? Self.wrapperApp(id: app.id))
+                              scriptedInstall: false,
+                              appPath: app.path,
+                              isIOSApp: true)
         }
     }
 

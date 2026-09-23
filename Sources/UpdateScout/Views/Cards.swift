@@ -84,6 +84,11 @@ struct UpdateCard: View {
                 AppIconView(appPath: item.appPath, style: style)
                 // Warnings sit on the icon's corner instead of as orange prose.
                 HStack(spacing: 2) {
+                    if item.isIOSApp {
+                        WarningBadge(title: "iPhone / iPad app",
+                                     message: "This is an iOS app running on your Mac. mas and Homebrew can't update these — the button opens the App Store's Updates page, where you can update it.",
+                                     symbol: "iphone.gen3", color: .blue)
+                    }
                     if let jump = item.majorUpgradeSummary {
                         WarningBadge(
                             title: "Major version change (\(jump))",
@@ -144,7 +149,7 @@ struct UpdateCard: View {
                         UpdateDetailView(item: item).environmentObject(controller)
                     }
 
-                    Button(item.scriptedInstall ? "Update" : "Get…") { controller.update(item) }
+                    Button(item.actionLabel) { controller.update(item) }
                         .glassProminent(style.color)
                         .controlSize(.small)
                         .frame(maxWidth: .infinity)

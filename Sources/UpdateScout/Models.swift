@@ -27,10 +27,14 @@ struct UpdateItem: Identifiable, Codable, Hashable {
     var releaseNotesURL: String? = nil
     /// The installed .app bundle, when known — used for the icon.
     var appPath: String? = nil
+    /// An iPhone/iPad app running on Apple silicon. Only the App Store can
+    /// update these, so the UI says so rather than offering a generic button.
+    var isIOSApp: Bool = false
 
     init(sourceID: String, name: String, installedVersion: String, latestVersion: String,
          url: String? = nil, caveat: String? = nil, installToken: String, scriptedInstall: Bool = true,
-         releaseNotes: String? = nil, releaseNotesURL: String? = nil, appPath: String? = nil) {
+         releaseNotes: String? = nil, releaseNotesURL: String? = nil, appPath: String? = nil,
+         isIOSApp: Bool = false) {
         self.sourceID = sourceID
         self.name = name
         self.installedVersion = installedVersion
@@ -42,6 +46,21 @@ struct UpdateItem: Identifiable, Codable, Hashable {
         self.releaseNotes = releaseNotes
         self.releaseNotesURL = releaseNotesURL
         self.appPath = appPath
+        self.isIOSApp = isIOSApp
+    }
+
+    /// What the action button should say.
+    var actionLabel: String {
+        if scriptedInstall { return "Update" }
+        return sourceID == "mas" ? "App Store" : "Get…"
+    }
+    var actionLabelLong: String {
+        if scriptedInstall { return "Update" }
+        return sourceID == "mas" ? "Open in App Store" : "Open download page"
+    }
+    var actionSymbol: String {
+        if scriptedInstall { return "arrow.down.circle" }
+        return sourceID == "mas" ? "arrow.up.forward.app" : "safari"
     }
 }
 

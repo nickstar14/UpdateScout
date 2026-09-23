@@ -36,7 +36,7 @@ struct SystemUpdateSource: UpdateSource {
                     }
                 }
                 items.append(UpdateItem(sourceID: id, name: title,
-                                        installedVersion: "installed",
+                                        installedVersion: Self.currentOSVersion,
                                         latestVersion: version.isEmpty ? label : version,
                                         url: nil,
                                         caveat: restart ? "Requires a restart to finish installing." : "Requires an administrator password.",
@@ -45,6 +45,15 @@ struct SystemUpdateSource: UpdateSource {
             }
         }
         return items
+    }
+
+    /// The running macOS version, so rows read "27.1 → 27.2" rather than a
+    /// placeholder.
+    private static var currentOSVersion: String {
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        return v.patchVersion > 0
+            ? "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+            : "\(v.majorVersion).\(v.minorVersion)"
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {

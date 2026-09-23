@@ -120,8 +120,10 @@ struct UpdateDetailView: View {
             Spacer()
             Button("Close") { dismiss() }.glass()
             if controller.installing[item.id] == nil {
-                Button(item.scriptedInstall ? "Update" : "Get…") {
+                Button {
                     controller.update(item); dismiss()
+                } label: {
+                    Label(item.actionLabelLong, systemImage: item.actionSymbol)
                 }
                 .glassProminent(style.color)
             }

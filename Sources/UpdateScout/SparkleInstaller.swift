@@ -109,15 +109,7 @@ enum SparkleInstaller {
         }
 
         progress("Installing…")
-        // Move the old bundle aside first so we can roll back on failure.
-        let backup = workDir.appendingPathComponent("previous.app")
-        try fm.moveItem(at: plan.appURL, to: backup)
-        do {
-            try fm.moveItem(at: newApp, to: plan.appURL)
-        } catch {
-            try? fm.moveItem(at: backup, to: plan.appURL)   // roll back
-            throw error
-        }
+        try await swap(newApp: newApp, into: plan.appURL, workDir: workDir, progress: progress)
         // Clear the download quarantine flag so the app opens normally; its own
         // signature was already verified above.
         _ = try? await Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", plan.appURL.path])
@@ -127,6 +119,53 @@ enum SparkleInstaller {
             let config = NSWorkspace.OpenConfiguration()
             config.activates = false
             _ = try? await NSWorkspace.shared.openApplication(at: plan.appURL, configuration: config)
+        }
+    }
+
+    /// Replace the installed bundle with the verified new one.
+    ///
+    /// The plain user-level move covers apps the user owns. Apps installed by a
+    /// pkg are often root-owned (AppCleaner, most vendor installers), and macOS
+    /// also protects app bundles behind App Management — both surface as
+    /// "couldn't be moved because you don't have permission". In that case redo
+    /// the swap with admin rights, through the same password dialog the rest of
+    /// the app uses, preserving the original owner so the app stays as it was.
+    private static func swap(newApp: URL, into target: URL, workDir: URL,
+                             progress: @escaping @Sendable (String) -> Void) async throws {
+        let fm = FileManager.default
+        let backup = workDir.appendingPathComponent("previous.app")
+        do {
+            try fm.moveItem(at: target, to: backup)
+            do {
+                try fm.moveItem(at: newApp, to: target)
+                return
+            } catch {
+                try? fm.moveItem(at: backup, to: target)   // roll back
+                throw error
+            }
+        } catch {
+            progress("Needs your password to replace this app…")
+            let attrs = try? fm.attributesOfItem(atPath: target.path)
+            let owner = (attrs?[.ownerAccountName] as? String) ?? NSUserName()
+            let group = (attrs?[.groupOwnerAccountName] as? String) ?? "staff"
+            func q(_ path: String) -> String {
+                "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+            }
+            // Move aside, move in, restore ownership; roll back on any failure.
+            let command = """
+            /bin/mv \(q(target.path)) \(q(backup.path)) && \
+            { /bin/mv \(q(newApp.path)) \(q(target.path)) && \
+              /usr/sbin/chown -R \(owner):\(group) \(q(target.path)); } || \
+            { /bin/mv \(q(backup.path)) \(q(target.path)); exit 1; }
+            """
+            let result = try await Shell.runPrivileged(command, tag: "install")
+            guard result.status == 0, fm.fileExists(atPath: target.path) else {
+                throw UpdateScoutError.commandFailed(
+                    "replace \(target.lastPathComponent)",
+                    output: result.combined.isEmpty
+                        ? "The app could not be replaced, even with administrator rights. Nothing was changed."
+                        : result.combined)
+            }
         }
     }
 
