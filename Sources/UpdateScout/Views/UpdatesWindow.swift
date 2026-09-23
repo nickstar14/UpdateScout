@@ -19,6 +19,13 @@ final class UpdatesWindow {
     static let shared = UpdatesWindow()
     private var window: NSWindow?
 
+    /// Frame of the status window when it's on screen — other windows centre
+    /// on it rather than on the display.
+    var visibleFrame: NSRect? {
+        guard let window, window.isVisible else { return nil }
+        return window.frame
+    }
+
     func show() {
         NSApp.activate(ignoringOtherApps: true)
         if window == nil {

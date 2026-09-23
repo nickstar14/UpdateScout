@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="lensClip"><circle cx="512" cy="512" r="196"/></clipPath>
+  </defs>
+  <g clip-path="url(#lensClip)" fill="#FFFFFF">
+    <ellipse cx="428" cy="404" rx="74" ry="30" transform="rotate(-38 428 404)" opacity="0.75"/>
+    <ellipse cx="392" cy="452" rx="30" ry="14" transform="rotate(-38 392 452)" opacity="0.45"/>
+  </g>
+</svg>

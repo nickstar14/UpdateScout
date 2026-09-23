@@ -86,6 +86,22 @@ final class SettingsWindow {
         }
         let wasVisible = window?.isVisible ?? false
         window?.makeKeyAndOrderFront(nil)
-        if !wasVisible { window?.centerExactly() }
+        // Settings belongs to the status window, so centre it there; fall back
+        // to the screen centre when that window isn't open.
+        if !wasVisible {
+            if let parent = UpdatesWindow.shared.visibleFrame, let w = window {
+                var origin = NSPoint(x: parent.midX - w.frame.width / 2,
+                                     y: parent.midY - w.frame.height / 2)
+                // Keep it fully on screen if the status window sits near an edge.
+                if let screen = w.screen ?? NSScreen.main {
+                    let vf = screen.visibleFrame
+                    origin.x = min(max(origin.x, vf.minX), vf.maxX - w.frame.width)
+                    origin.y = min(max(origin.y, vf.minY), vf.maxY - w.frame.height)
+                }
+                w.setFrameOrigin(origin)
+            } else {
+                window?.centerExactly()
+            }
+        }
     }
 }
