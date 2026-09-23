@@ -86,15 +86,15 @@ ring = svg(
     f'    <path d="{head(BOT_B)}"/>\n'
     '  </g>\n')
 
-# 3 — lens ---------------------------------------------------------------------
+# 3 — lens: a filled disc with a soft halo, matching the app's status badge ----
 lens = svg(
+    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R + 34:.0f}" fill="#3DDC6E" opacity="0.20"/>\n'
     f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R:.0f}" fill="url(#lens)"/>\n',
     '  <defs>\n'
-    '    <radialGradient id="lens" cx="0.35" cy="0.3" r="0.85">\n'
-    '      <stop offset="0" stop-color="#FFFFFF"/>\n'
-    '      <stop offset="0.6" stop-color="#E8F1FF"/>\n'
-    '      <stop offset="1" stop-color="#BFD4F5"/>\n'
-    '    </radialGradient>\n'
+    '    <linearGradient id="lens" x1="0" y1="0" x2="0" y2="1">\n'
+    '      <stop offset="0" stop-color="#45D976"/>\n'
+    '      <stop offset="1" stop-color="#159C4A"/>\n'
+    '    </linearGradient>\n'
     '  </defs>\n')
 
 # 5 — download arrow (topmost) -------------------------------------------------
@@ -114,8 +114,8 @@ arrow = svg(
     '  </g>\n',
     '  <defs>\n'
     '    <linearGradient id="arrow" x1="0" y1="0" x2="0" y2="1">\n'
-    '      <stop offset="0" stop-color="#4BE07B"/>\n'
-    '      <stop offset="1" stop-color="#16A34A"/>\n'
+    '      <stop offset="0" stop-color="#FFFFFF"/>\n'
+    '      <stop offset="1" stop-color="#EFFFF4"/>\n'
     '    </linearGradient>\n'
     '  </defs>\n')
 
@@ -123,9 +123,9 @@ arrow = svg(
 glint = svg(
     '  <g clip-path="url(#lensClip)" fill="#FFFFFF">\n'
     '    <ellipse cx="428" cy="404" rx="74" ry="30" '
-    'transform="rotate(-38 428 404)" opacity="0.75"/>\n'
+    'transform="rotate(-38 428 404)" opacity="0.30"/>\n'
     '    <ellipse cx="392" cy="452" rx="30" ry="14" '
-    'transform="rotate(-38 392 452)" opacity="0.45"/>\n'
+    'transform="rotate(-38 392 452)" opacity="0.18"/>\n'
     '  </g>\n',
     '  <defs>\n'
     f'    <clipPath id="lensClip"><circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R:.0f}"/></clipPath>\n'

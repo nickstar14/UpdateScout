@@ -16,6 +16,22 @@
     {
       "layers" : [
         {
+          "blend-mode" : "hard-light",
+          "image-name" : "05-arrow.svg",
+          "name" : "05-arrow",
+          "opacity" : 1
+        },
+        {
+          "hidden" : false,
+          "image-name" : "03-lens 2.svg",
+          "name" : "03-lens 2",
+          "opacity" : 0.5
+        },
+        {
+          "image-name" : "02-ring 2.svg",
+          "name" : "02-ring 2"
+        },
+        {
           "image-name" : "01-backdrop.svg",
           "name" : "01-backdrop"
         }
