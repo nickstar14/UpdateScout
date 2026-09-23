@@ -97,7 +97,7 @@ lens = svg(
     '    </radialGradient>\n'
     '  </defs>\n')
 
-# 4 — download arrow -----------------------------------------------------------
+# 5 — download arrow (topmost) -------------------------------------------------
 SHAFT_W = 58.0
 TOP_Y = C - 118
 MID_Y = C + 6
@@ -105,15 +105,21 @@ WING = 104.0 - ROUND_ARROW / 2          # inset for the rounding stroke
 TIP_Y = C + 120 - ROUND_ARROW / 2
 SHOULDER_Y = MID_Y - 34 + ROUND_ARROW / 2
 arrow = svg(
-    f'  <g fill="#1E3E8F" stroke="#1E3E8F" stroke-width="{ROUND_ARROW}" '
+    f'  <g fill="url(#arrow)" stroke="url(#arrow)" stroke-width="{ROUND_ARROW}" '
     'stroke-linejoin="round" stroke-linecap="round">\n'
     f'    <rect x="{C - SHAFT_W / 2:.1f}" y="{TOP_Y:.1f}" width="{SHAFT_W:.0f}" '
     f'height="{MID_Y - TOP_Y:.1f}" rx="{SHAFT_W / 2:.0f}" stroke="none"/>\n'
     f'    <path d="M {C - WING:.1f} {SHOULDER_Y:.1f} L {C:.0f} {TIP_Y:.1f} '
     f'L {C + WING:.1f} {SHOULDER_Y:.1f} Z"/>\n'
-    '  </g>\n')
+    '  </g>\n',
+    '  <defs>\n'
+    '    <linearGradient id="arrow" x1="0" y1="0" x2="0" y2="1">\n'
+    '      <stop offset="0" stop-color="#4BE07B"/>\n'
+    '      <stop offset="1" stop-color="#16A34A"/>\n'
+    '    </linearGradient>\n'
+    '  </defs>\n')
 
-# 5 — specular glint -----------------------------------------------------------
+# 4 — specular glint (below the arrow, so it reads as shine on the glass) ------
 glint = svg(
     '  <g clip-path="url(#lensClip)" fill="#FFFFFF">\n'
     '    <ellipse cx="428" cy="404" rx="74" ry="30" '
@@ -126,7 +132,7 @@ glint = svg(
     '  </defs>\n')
 
 for name, data in [("01-backdrop.svg", backdrop), ("02-ring.svg", ring),
-                   ("03-lens.svg", lens), ("04-arrow.svg", arrow),
-                   ("05-glint.svg", glint)]:
+                   ("03-lens.svg", lens), ("04-glint.svg", glint),
+                   ("05-arrow.svg", arrow)]:
     (OUT / name).write_text(data)
     print("wrote", name)

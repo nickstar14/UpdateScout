@@ -16,22 +16,6 @@
     {
       "layers" : [
         {
-          "blend-mode" : "overlay",
-          "image-name" : "04-arrow.svg",
-          "name" : "04-arrow"
-        },
-        {
-          "hidden" : true,
-          "image-name" : "03-lens.svg",
-          "name" : "03-lens"
-        },
-        {
-          "fill" : "automatic",
-          "glass" : true,
-          "image-name" : "02-ring.svg",
-          "name" : "02-ring"
-        },
-        {
           "image-name" : "01-backdrop.svg",
           "name" : "01-backdrop"
         }
