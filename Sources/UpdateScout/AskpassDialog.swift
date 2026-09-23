@@ -44,6 +44,13 @@ enum AskpassDialog {
         alert.window.initialFirstResponder = secureField
 
         app.activate(ignoringOtherApps: true)
+        // initialFirstResponder alone doesn't always land (the alert can hand
+        // focus to its default button), leaving no blinking caret. This block
+        // runs once runModal's run loop starts, so it claims focus reliably.
+        DispatchQueue.main.async {
+            alert.window.makeFirstResponder(secureField)
+            secureField.currentEditor()?.selectedRange = NSRange(location: 0, length: 0)
+        }
         let response = alert.runModal()
         withExtendedLifetime(toggler) {}
 
@@ -62,17 +69,26 @@ enum AskpassDialog {
 
     /// A key glyph inside a tinted circle, like macOS's own auth prompts.
     private static func circularKeyIcon() -> NSImage {
+        // A tinted disc with a white glyph. An accent-on-faint-accent key
+        // disappeared against both light and dark dialog backgrounds, so the
+        // contrast here is fixed rather than inherited from the appearance.
         NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
-            NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
-            NSBezierPath(ovalIn: rect).fill()
-            let config = NSImage.SymbolConfiguration(pointSize: 30, weight: .medium)
-                .applying(.init(hierarchicalColor: .controlAccentColor))
+            let disc = rect.insetBy(dx: 1, dy: 1)
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(ovalIn: disc).fill()
+            NSColor.white.withAlphaComponent(0.25).setStroke()
+            let ring = NSBezierPath(ovalIn: disc.insetBy(dx: 0.75, dy: 0.75))
+            ring.lineWidth = 1.5
+            ring.stroke()
+
+            let config = NSImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
             if let symbol = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Key")?
                 .withSymbolConfiguration(config) {
-                let s = symbol.size
-                symbol.draw(in: NSRect(x: (rect.width - s.width) / 2,
-                                       y: (rect.height - s.height) / 2,
-                                       width: s.width, height: s.height))
+                let size = symbol.size
+                symbol.draw(in: NSRect(x: (rect.width - size.width) / 2,
+                                       y: (rect.height - size.height) / 2,
+                                       width: size.width, height: size.height))
             }
             return true
         }

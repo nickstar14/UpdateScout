@@ -34,7 +34,7 @@ final class UpdatesWindow {
             w.isMovableByWindowBackground = true
             w.isReleasedWhenClosed = false
             w.setContentSize(NSSize(width: 560, height: 640))
-            w.minSize = NSSize(width: 460, height: 380)
+            w.minSize = NSSize(width: 380, height: 380)
             window = w
         }
         let wasVisible = window?.isVisible ?? false
@@ -61,7 +61,7 @@ struct UpdatesView: View {
             updateList
             errorSummary
         }
-        .frame(minWidth: 460, minHeight: 380)
+        .frame(minWidth: 380, minHeight: 380)
         .background(GlassBackground())
         .onAppear { controller.reloadFromDisk() }
     }
@@ -145,7 +145,11 @@ struct UpdatesView: View {
 
     // MARK: Content
 
-    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 12)]
+    /// Tiles keep a fixed size; widening the window fits more per row rather
+    /// than stretching them. `.adaptive` with equal min/max does exactly that.
+    private static let tileWidth: CGFloat = 152
+    private let columns = [GridItem(.adaptive(minimum: tileWidth, maximum: tileWidth),
+                                    spacing: 12, alignment: .top)]
 
     @ViewBuilder
     private var updateList: some View {
@@ -168,6 +172,7 @@ struct UpdatesView: View {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(group.items) { item in UpdateCard(item: item) }
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
                     }
                     leftoverSection
@@ -210,6 +215,7 @@ struct UpdatesView: View {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
         }
     }
@@ -256,6 +262,7 @@ struct UpdatesView: View {
                                    appPath: nil, style: SourceStyle(symbol: "trash.slash.fill", color: .red))
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
             }
         }

@@ -50,7 +50,7 @@ struct CardSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 150, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(nsColor: .controlBackgroundColor).opacity(dimmed ? 0.35 : 0.55))
