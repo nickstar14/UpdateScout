@@ -6,6 +6,17 @@
         <description>UpdateScout release feed</description>
         <language>en</language>
         <item>
+            <title>Version 1.7.2</title>
+            <pubDate>Thu, 24 Sep 2026 15:42:11 -0500</pubDate>
+            <description><![CDATA[<ul><li>The <b>Repair</b> button is now text only, so its label is no longer cut off to "Re…" on the narrow update cards.</li></ul>]]></description>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v1.7.2/UpdateScout-1.7.2.zip"
+                sparkle:version="23"
+                sparkle:shortVersionString="1.7.2"
+                sparkle:edSignature="aWJoJ2C+8zovs+OlgrUN8Wmva8fUh52BAZ3hW5vSSv6hPmV7YX7BBfGs4qWbEKq32ueOuqVKgJcj0PFk2EpNCg==" length="3870208"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.7.1</title>
             <pubDate>Thu, 24 Sep 2026 15:07:16 -0500</pubDate>
             <description><![CDATA[<h2>Repair for stuck Homebrew upgrades</h2>
