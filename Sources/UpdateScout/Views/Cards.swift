@@ -150,11 +150,9 @@ struct UpdateCard: View {
                     }
 
                     if controller.repairable[item.id] != nil {
-                        Button {
-                            controller.repair(item)
-                        } label: {
-                            Label("Repair", systemImage: "wrench.and.screwdriver")
-                        }
+                        // Text only: on a card this narrow the icon
+                        // truncated the label to "Re…".
+                        Button("Repair") { controller.repair(item) }
                         .glassProminent(.orange)
                         .controlSize(.small)
                         .frame(maxWidth: .infinity)
