@@ -6,6 +6,39 @@
         <description>UpdateScout release feed</description>
         <language>en</language>
         <item>
+            <title>Version 1.7.0</title>
+            <pubDate>Thu, 24 Sep 2026 14:58:50 -0500</pubDate>
+            <description><![CDATA[<h2>A new look</h2>
+<ul>
+<li><b>New app icon</b>, built in Icon Composer and rendered natively with Liquid Glass (no more grey legacy frame in the Dock).</li>
+<li><b>Frosted title sheet</b> across the top of the window, with the logo, version, settings and Check Now.</li>
+<li><b>Sections are floating panels</b> that roll smoothly open and closed. Each has its own <i>Update</i> button, and remembers whether you collapsed it.</li>
+<li>Cards keep a fixed size and reflow with the window; the default window fits three across.</li>
+</ul>
+<h2>Updates</h2>
+<ul>
+<li><b>macOS updates open Software Update</b> in System Settings instead of installing directly.</li>
+<li><b>App Store:</b> apps UpdateScout can update keep their own cards; only the ones that need the App Store are grouped into a single <i>Open App Store</i> card.</li>
+<li>Check for updates as often as every 5 minutes.</li>
+</ul>
+<h2>Settings</h2>
+<ul>
+<li>Version and <i>Check for Updates</i> at the top of Settings, which now opens centred on the main window.</li>
+<li>New <b>Glass</b> slider from Clear to Opaque, and a smooth crossfade when switching light and dark.</li>
+</ul>
+<h2>Fixes</h2>
+<ul>
+<li>Collapsing a section near the bottom no longer makes the list jump.</li>
+<li>Sharper logos, a clearer password dialog, and readable section counts in dark mode.</li>
+</ul>]]></description>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v1.7.0/UpdateScout-1.7.0.zip"
+                sparkle:version="21"
+                sparkle:shortVersionString="1.7.0"
+                sparkle:edSignature="Lm+kPVLJX2AaafZwh6jgwz2M2o3GQjhrhEv6LVcTxHptV19Cpey8GEfn8y26DQ5MlNktAf/3ClKWjhrEe9F7Cg==" length="3856372"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.6.3</title>
             <pubDate>Wed, 23 Sep 2026 14:22:14 -0500</pubDate>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
