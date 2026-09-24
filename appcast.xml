@@ -6,6 +6,22 @@
         <description>UpdateScout release feed</description>
         <language>en</language>
         <item>
+            <title>Version 1.7.1</title>
+            <pubDate>Thu, 24 Sep 2026 15:07:16 -0500</pubDate>
+            <description><![CDATA[<h2>Repair for stuck Homebrew upgrades</h2>
+<p>If a Homebrew cask upgrade was ever interrupted, Homebrew leaves the old version in a leftover <code>.upgrading</code> folder, and every later update fails with "It seems there is already an App at…".</p>
+<ul>
+<li>UpdateScout now recognises this and explains it in plain English.</li>
+<li>The failed card shows a <b>Repair</b> button. It moves the leftover folder to the <b>Trash</b> (recoverable, never deleted) and reinstalls the app cleanly.</li>
+</ul>]]></description>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v1.7.1/UpdateScout-1.7.1.zip"
+                sparkle:version="22"
+                sparkle:shortVersionString="1.7.1"
+                sparkle:edSignature="e4XOhmthLGBWOPMk1ITGfPTodX7RwpEF2XUd9gzjvnrSsxLiyC7CrysT+pjCEulEbC0Fnf/oQNyTn/DvVJC7CA==" length="3870939"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.7.0</title>
             <pubDate>Thu, 24 Sep 2026 14:58:50 -0500</pubDate>
             <description><![CDATA[<h2>A new look</h2>
