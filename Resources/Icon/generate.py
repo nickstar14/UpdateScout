@@ -86,18 +86,31 @@ ring = svg(
     f'    <path d="{head(BOT_B)}"/>\n'
     '  </g>\n')
 
-# 3 — lens: a filled disc with a soft halo, matching the app's status badge ----
-lens = svg(
-    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R + 34:.0f}" fill="#3DDC6E" opacity="0.20"/>\n'
-    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R:.0f}" fill="url(#lens)"/>\n',
+# 3/4/5 — the badge, as three concentric layers so each can take its own
+# depth in Icon Composer: a near-outline at the edge, a faint middle wash, and
+# the solid disc at the centre. Same treatment the app's status badge uses.
+DISC_R = LENS_R                 # 196 — solid centre
+MID_R = LENS_R + 36             # 232 — faint wash
+OUT_R = LENS_R + 70             # 266 — outline
+OUT_STROKE = 9.0
+
+halo_outline = svg(
+    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{OUT_R:.0f}" fill="none" '
+    f'stroke="#5FE68A" stroke-width="{OUT_STROKE:.0f}" opacity="0.55"/>\n')
+
+halo_soft = svg(
+    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{MID_R:.0f}" fill="#3DDC6E" opacity="0.20"/>\n')
+
+disc = svg(
+    f'  <circle cx="{C:.0f}" cy="{C:.0f}" r="{DISC_R:.0f}" fill="url(#disc)"/>\n',
     '  <defs>\n'
-    '    <linearGradient id="lens" x1="0" y1="0" x2="0" y2="1">\n'
+    '    <linearGradient id="disc" x1="0" y1="0" x2="0" y2="1">\n'
     '      <stop offset="0" stop-color="#45D976"/>\n'
     '      <stop offset="1" stop-color="#159C4A"/>\n'
     '    </linearGradient>\n'
     '  </defs>\n')
 
-# 5 — download arrow (topmost) -------------------------------------------------
+# 7 — download arrow (topmost) -------------------------------------------------
 SHAFT_W = 58.0
 TOP_Y = C - 118
 MID_Y = C + 6
@@ -119,7 +132,7 @@ arrow = svg(
     '    </linearGradient>\n'
     '  </defs>\n')
 
-# 4 — specular glint (below the arrow, so it reads as shine on the glass) ------
+# 6 — specular glint, clipped to the solid disc -------------------------------
 glint = svg(
     '  <g clip-path="url(#lensClip)" fill="#FFFFFF">\n'
     '    <ellipse cx="428" cy="404" rx="74" ry="30" '
@@ -128,11 +141,17 @@ glint = svg(
     'transform="rotate(-38 392 452)" opacity="0.18"/>\n'
     '  </g>\n',
     '  <defs>\n'
-    f'    <clipPath id="lensClip"><circle cx="{C:.0f}" cy="{C:.0f}" r="{LENS_R:.0f}"/></clipPath>\n'
+    f'    <clipPath id="lensClip"><circle cx="{C:.0f}" cy="{C:.0f}" r="{DISC_R:.0f}"/></clipPath>\n'
     '  </defs>\n')
 
-for name, data in [("01-backdrop.svg", backdrop), ("02-ring.svg", ring),
-                   ("03-lens.svg", lens), ("04-glint.svg", glint),
-                   ("05-arrow.svg", arrow)]:
+# The ring's arrowheads reach inward to r≈226, so they would cut across the
+# badge's outer two rings. Painting the badge first lets the white ring pass
+# cleanly over them, which reads as the badge sitting behind the ring.
+for name, data in [("01-backdrop.svg", backdrop),
+                   ("02-badge-outline.svg", halo_outline),
+                   ("03-badge-wash.svg", halo_soft),
+                   ("04-badge-disc.svg", disc),
+                   ("05-ring.svg", ring),
+                   ("06-glint.svg", glint), ("07-arrow.svg", arrow)]:
     (OUT / name).write_text(data)
     print("wrote", name)

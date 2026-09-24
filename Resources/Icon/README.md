@@ -7,10 +7,12 @@ passes per layer. Stacking them in order reproduces the flat artwork.
 | Order | File | What it is | Suggested treatment in Icon Composer |
 |---|---|---|---|
 | 1 | `01-backdrop.svg` | Blue→violet gradient fill | **Background.** Icon Composer masks it to the icon shape; no depth needed. |
-| 2 | `02-ring.svg` | The update ring — two arcs with arrowheads | Bottom foreground layer. A little depth/shadow so it lifts off the backdrop. |
-| 3 | `03-lens.svg` | Filled green disc with a soft halo — the same badge shape the app's status banner uses | Middle layer. Give this the **glass/translucency** pass; the halo ring is separate geometry so it can stay flat. |
-| 4 | `04-glint.svg` | Specular highlight, clipped to the lens | Sits on the glass. Minimal depth. Reduce or drop it if Icon Composer's own specular pass already gives enough shine — two highlights can fight. |
-| 5 | `05-arrow.svg` | White download arrow | **Topmost.** Give it the most elevation so it floats *above* the glass and casts a shadow onto the lens, rather than looking embedded in it. |
+| 2 | `02-badge-outline.svg` | Outermost ring — a thin green outline (r 266) | Flat, or the faintest depth. It's the outer edge of the badge's glow. |
+| 3 | `03-badge-wash.svg` | Middle ring — a very faint green wash (r 232) | Slight depth. Keep it soft; it's the transition between outline and disc. |
+| 4 | `04-badge-disc.svg` | Inner solid green disc (r 196) | The **glass/translucency** pass belongs here — it's the solid body of the badge. |
+| 5 | `05-ring.svg` | The update ring — two arcs with arrowheads | Sits *above* the badge rings (see note below). Give it depth so it lifts off the backdrop. |
+| 6 | `06-glint.svg` | Specular highlight, clipped to the disc | On the disc's surface. Minimal depth. Reduce or drop it if Icon Composer's own specular pass is enough — two highlights can fight. |
+| 7 | `07-arrow.svg` | White download arrow | **Topmost.** Most elevation, so it floats above the glass and casts a shadow onto the disc. |
 
 ## Notes
 
@@ -22,9 +24,13 @@ passes per layer. Stacking them in order reproduces the flat artwork.
   grid safe area, so the squircle mask never clips the arrowheads.
 - Layers 3 and 4 share the same 196 pt lens circle centred at (512, 512); if
   you resize the lens, resize both or the glint will drift.
-- The centre mirrors the app's own status badge: a filled disc with a soft
-  halo and a white arrow. Disc `#45D976` → `#159C4A`, halo `#3DDC6E` at 20%.
-  Changing the badge colour is two stops and the halo fill in the generator.
+- The centre mirrors the app's own status badge, built as three concentric
+  layers: solid disc (`#45D976` → `#159C4A`), a 20% wash, and a 55% outline.
+  Each is its own file so Icon Composer can give them different depths.
+- **The badge is painted before the update ring on purpose.** The ring's
+  arrowheads reach inward to r≈226, so they would cut across the outer two
+  badge rings; drawing the ring last lets it pass cleanly over them and reads
+  as the badge sitting behind. Keep that order if you re-import.
 - The white arrow reads against the green disc, and the disc separates it from
   the white ring, so nothing merges at small sizes.
 - Checked at 16/32/64/128 pt: the silhouette stays readable.
