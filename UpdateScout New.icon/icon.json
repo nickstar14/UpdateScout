@@ -16,14 +16,32 @@
     {
       "layers" : [
         {
-          "blend-mode" : "plus-darker",
+          "blend-mode" : "hard-light",
+          "hidden" : false,
           "image-name" : "05-arrow 2.svg",
-          "name" : "05-arrow 2"
+          "name" : "05-arrow 2",
+          "opacity" : 0.95
+        },
+        {
+          "image-name" : "04-badge-disc 2.svg",
+          "name" : "04-badge-disc 2",
+          "opacity" : 0.95
+        },
+        {
+          "image-name" : "03-badge-wash.svg",
+          "name" : "03-badge-wash"
+        },
+        {
+          "fill" : "none",
+          "hidden" : true,
+          "image-name" : "02-badge-outline.svg",
+          "name" : "02-badge-outline",
+          "opacity" : 0.5
         },
         {
           "blend-mode" : "normal",
           "glass" : true,
-          "hidden" : false,
+          "hidden" : true,
           "image-name" : "03-lens 3.svg",
           "name" : "03-lens 3",
           "opacity" : 0.75,
@@ -54,7 +72,7 @@
           "hidden" : false,
           "image-name" : "02-ring 2.svg",
           "name" : "02-ring 2",
-          "opacity" : 0.75,
+          "opacity" : 0.95,
           "position" : {
             "scale" : 1.15,
             "translation-in-points" : [

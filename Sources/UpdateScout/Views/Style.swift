@@ -74,3 +74,21 @@ struct WarningBadge: View {
         }
     }
 }
+
+/// Shared surface colours. The system window background is near-black in dark
+/// mode and near-white in light; both make the glass look flat and harsh, so
+/// these sit closer to mid-grey while still reading as light or dark.
+enum Theme {
+    static let wash = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(calibratedWhite: 0.22, alpha: 1)
+            : NSColor(calibratedWhite: 0.80, alpha: 1)
+    })
+
+    /// Card / settings-pane fill, so both surfaces match.
+    static let card = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(calibratedWhite: 0.30, alpha: 0.55)
+            : NSColor(calibratedWhite: 0.98, alpha: 0.55)
+    })
+}

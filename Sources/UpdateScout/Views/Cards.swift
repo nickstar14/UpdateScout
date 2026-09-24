@@ -53,7 +53,7 @@ struct CardSurface: ViewModifier {
             .frame(maxWidth: .infinity, minHeight: 150, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(dimmed ? 0.35 : 0.55))
+                    .fill(Theme.card.opacity(dimmed ? 0.6 : 1))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -267,5 +267,57 @@ struct HiddenCard: View {
             .glass().controlSize(.small)
         }
         .cardSurface(dimmed: true)
+    }
+}
+
+/// One card standing in for every App Store item UpdateScout can't install
+/// itself (iPhone/iPad apps, and anything mas refuses). A per-app card would
+/// show an Update button that can't do the job, so these collapse into a
+/// single hand-off to the App Store.
+struct AppStoreHandoffCard: View {
+    let items: [UpdateItem]
+
+    private var appStoreIcon: NSImage? {
+        IconCache.shared.icon(forApp: "/System/Applications/App Store.app")
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Group {
+                if let icon = appStoreIcon {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                } else {
+                    Image(systemName: "bag.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.blue)
+                        .background(Color.blue.opacity(0.14),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+            .frame(width: 56, height: 56)
+            .padding(.top, 4)
+
+            VStack(spacing: 3) {
+                Text("^[\(items.count) app update](inflect: true)")
+                    .font(.callout.weight(.semibold))
+                    .multilineTextAlignment(.center).lineLimit(2)
+                    .frame(maxWidth: .infinity).fixedSize(horizontal: false, vertical: true)
+                Text(items.map(\.name).joined(separator: ", "))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 6)
+
+            Button {
+                NSWorkspace.shared.open(URL(string: "macappstore://showUpdatesPage")!)
+            } label: {
+                Text("Open App Store").frame(maxWidth: .infinity)
+            }
+            .glassProminent(.blue).controlSize(.small)
+        }
+        .cardSurface()
+        .help("These can only be updated in the App Store: " + items.map(\.name).joined(separator: ", "))
     }
 }

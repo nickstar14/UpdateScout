@@ -201,6 +201,14 @@ final class UpdateController: ObservableObject {
         }
     }
 
+    /// Queue every installable update from one source.
+    func updateAll(sourceID: String) {
+        for item in visibleItems
+        where item.sourceID == sourceID && item.scriptedInstall && installing[item.id] == nil {
+            update(item)
+        }
+    }
+
     func dismiss(_ item: UpdateItem) {
         state.dismissed.insert(item.id)
         Store.save(state)

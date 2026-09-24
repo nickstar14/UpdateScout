@@ -77,41 +77,44 @@ struct UpdatesView: View {
 
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(.white, Color.accentColor)
-                .symbolRenderingMode(.palette)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("UpdateScout").font(.title3).bold()
-                if let lastCheck = controller.state.lastCheck {
-                    Text("Last checked \(lastCheck.formatted(.relative(presentation: .named)))")
-                        .font(.caption).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().frame(width: 38, height: 38)
+            HStack(spacing: 8) {
+                Text("UpdateScout").font(.title.weight(.semibold))
+                Button { SettingsWindow.shared.show() } label: {
+                    Image(systemName: "gearshape.fill").font(.body)
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Settings")
             }
             Spacer()
-            if controller.isChecking {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Checking…").font(.caption).foregroundStyle(.secondary)
+            // Check Now, with the last-checked time beneath it.
+            VStack(alignment: .trailing, spacing: 3) {
+                if controller.isChecking {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Checking…").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(height: 26)
+                } else {
+                    Button {
+                        controller.checkNow()
+                    } label: {
+                        Label("Check Now", systemImage: "arrow.clockwise")
+                    }
+                    .glassProminent(.accentColor)
                 }
-            } else {
-                Button {
-                    controller.checkNow()
-                } label: {
-                    Label("Check Now", systemImage: "arrow.clockwise")
+                if let lastCheck = controller.state.lastCheck {
+                    Text("Checked \(lastCheck.formatted(.relative(presentation: .named)))")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
-                .glassProminent(.accentColor)
             }
-            Button { SettingsWindow.shared.show() } label: {
-                Image(systemName: "gearshape.fill")
-            }
-            .glass()
-            .help("Settings")
         }
         .padding(.horizontal, 20)
         .padding(.top, 34)   // clear the transparent titlebar's traffic lights
-        .padding(.bottom, 30)
+        .padding(.bottom, 24)
     }
 
     @ViewBuilder
@@ -175,9 +178,17 @@ struct UpdatesView: View {
                     ForEach(grouped, id: \.source.id) { group in
                         let style = SourceStyle.forSource(group.source.id)
                         sectionHeader(title: group.source.displayName, symbol: style.symbol,
-                                      color: style.color, count: group.items.count)
+                                      color: style.color, count: group.items.count,
+                                      sourceID: group.source.id, items: group.items)
                         LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(group.items) { item in UpdateCard(item: item) }
+                            // Apps the App Store has to update itself collapse
+                            // into one hand-off card — individual cards would
+                            // offer a button that can't do anything.
+                            let handoff = group.items.filter { !$0.scriptedInstall && $0.sourceID == "mas" }
+                            ForEach(group.items.filter { !handoff.contains($0) }) { item in
+                                UpdateCard(item: item)
+                            }
+                            if !handoff.isEmpty { AppStoreHandoffCard(items: handoff) }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
@@ -191,7 +202,9 @@ struct UpdatesView: View {
     }
 
     private func sectionHeader(title: String, symbol: String, color: Color, count: Int,
-                               subtitle: String? = nil) -> some View {
+                               subtitle: String? = nil,
+                               sourceID: String? = nil,
+                               items: [UpdateItem] = []) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol).foregroundStyle(color)
             Text(title).foregroundStyle(.secondary)
@@ -201,6 +214,19 @@ struct UpdatesView: View {
                 .background(color.opacity(0.14), in: Capsule())
             if let subtitle {
                 Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.tertiary)
+            }
+            Spacer()
+            // Update everything in just this section.
+            if let sourceID, items.contains(where: { $0.scriptedInstall }) {
+                let pending = items.filter { $0.scriptedInstall }.count
+                Button {
+                    controller.updateAll(sourceID: sourceID)
+                } label: {
+                    Text(pending > 1 ? "Update all \(pending)" : "Update")
+                        .font(.caption)
+                }
+                .glass().controlSize(.small)
+                .help("Update every \(title) item")
             }
         }
         .font(.subheadline.bold())
@@ -310,7 +336,7 @@ struct GlassBackground: View {
                 Rectangle().fill(.ultraThinMaterial)
             }
             Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(glassStyle.washOpacity))
+                .fill(Theme.wash.opacity(glassStyle.washOpacity))
                 .animation(.easeInOut(duration: 0.25), value: glassStyleRaw)
         }
         .ignoresSafeArea()

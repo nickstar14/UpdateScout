@@ -57,6 +57,12 @@ struct UpdateScoutApp: App {
             if CommandLine.arguments.contains("--open-window") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { UpdatesWindow.shared.show() }
             }
+            // `--open-settings` also opens the status window first, so the
+            // centring path being exercised is the real one.
+            if CommandLine.arguments.contains("--open-settings") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { UpdatesWindow.shared.show() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { SettingsWindow.shared.show() }
+            }
         }
         // When the askpass dialog closes, bring the status window back to the
         // front (the auth prompt pushes us behind other apps).

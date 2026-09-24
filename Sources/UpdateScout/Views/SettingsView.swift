@@ -17,13 +17,26 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // In-content title, same treatment as the status window header;
             // fixed above the form so scrolling never runs into the titlebar.
-            HStack {
-                Text("Settings").font(.title3).bold()
+            HStack(spacing: 12) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable().frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("UpdateScout").font(.title2.weight(.semibold))
+                    Text("Version \(SelfUpdater.version)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
+                Button {
+                    SelfUpdater.checkForUpdates()
+                } label: {
+                    Label("Check for Updates", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .glass().controlSize(.small)
             }
             .padding(.horizontal, 20)
             .padding(.top, 34)   // clear the traffic lights
-            .padding(.bottom, 6)
+            .padding(.bottom, 10)
             settingsForm
         }
         .frame(width: 400, height: 640)
@@ -133,15 +146,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("About") {
-                HStack {
-                    Text("UpdateScout \(SelfUpdater.version)")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Check for App Updates…") { SelfUpdater.checkForUpdates() }
-                }
-            }
-
             Section {
                 Text("There is no unified API for third-party driver updates on macOS — vendors like DisplayLink ship their own installers with no auto-update. UpdateScout uses Homebrew's cask database as a version oracle for those, and the custom-sources file for anything without a cask.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -149,6 +153,11 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)   // let the glass show through
+        // Match the update cards so both surfaces read as the same material.
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Theme.card)
+        )
     }
 }
 

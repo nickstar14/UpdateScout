@@ -82,26 +82,29 @@ final class SettingsWindow {
             w.backgroundColor = .clear
             w.isMovableByWindowBackground = true
             w.isReleasedWhenClosed = false
+            // Adopt SwiftUI's intrinsic size now. Without this the window
+            // frame is still zero-sized when we centre it, so the maths put
+            // its *origin* at the parent's centre instead of its middle.
+            w.setContentSize(hosting.view.fittingSize)
             window = w
         }
         let wasVisible = window?.isVisible ?? false
         window?.makeKeyAndOrderFront(nil)
-        // Settings belongs to the status window, so centre it there; fall back
-        // to the screen centre when that window isn't open.
-        if !wasVisible {
-            if let parent = UpdatesWindow.shared.visibleFrame, let w = window {
-                var origin = NSPoint(x: parent.midX - w.frame.width / 2,
-                                     y: parent.midY - w.frame.height / 2)
-                // Keep it fully on screen if the status window sits near an edge.
-                if let screen = w.screen ?? NSScreen.main {
-                    let vf = screen.visibleFrame
-                    origin.x = min(max(origin.x, vf.minX), vf.maxX - w.frame.width)
-                    origin.y = min(max(origin.y, vf.minY), vf.maxY - w.frame.height)
-                }
-                w.setFrameOrigin(origin)
-            } else {
-                window?.centerExactly()
-            }
+        guard !wasVisible, let w = window else { return }
+        Self.centre(w, on: UpdatesWindow.shared.visibleFrame)
+    }
+
+    /// Centre on the status window when it's open, else on the screen, kept
+    /// fully on-screen either way.
+    private static func centre(_ w: NSWindow, on parent: NSRect?) {
+        guard let parent else { w.centerExactly(); return }
+        var origin = NSPoint(x: parent.midX - w.frame.width / 2,
+                             y: parent.midY - w.frame.height / 2)
+        if let screen = w.screen ?? NSScreen.main {
+            let vf = screen.visibleFrame
+            origin.x = min(max(origin.x, vf.minX), vf.maxX - w.frame.width)
+            origin.y = min(max(origin.y, vf.minY), vf.maxY - w.frame.height)
         }
+        w.setFrameOrigin(origin)
     }
 }
