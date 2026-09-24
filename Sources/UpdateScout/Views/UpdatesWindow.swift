@@ -225,7 +225,7 @@ struct UpdatesView: View {
         let id = sourceID ?? title
         let isCollapsed = collapsed.contains(id)
         return HStack(spacing: 6) {
-            // The whole title area toggles the section.
+            // Everything left of the Update button toggles the section.
             Button { toggleCollapsed(id) } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
@@ -234,26 +234,23 @@ struct UpdatesView: View {
                         .frame(width: 10)
                     Image(systemName: symbol).foregroundStyle(color)
                     Text(title).foregroundStyle(.primary)
+                    // Number in the primary text colour, source colour in the
+                    // pill: coloured digits on a same-colour pill vanished in
+                    // dark mode (App Store blue) and would in light (Sparkle yellow).
                     Text("\(count)")
-                        .font(.caption2).foregroundStyle(color)
+                        .font(.caption2).foregroundStyle(.primary)
                         .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(color.opacity(0.18), in: Capsule())
+                        .background(color.opacity(0.32), in: Capsule())
                     if let subtitle {
                         Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.secondary)
                     }
+                    Spacer(minLength: 0)
                 }
-                // Grey text straight on the glass got lost over some
-                // backgrounds; a filled, outlined capsule keeps the header
-                // legible in both light and dark.
-                .padding(.leading, 8).padding(.trailing, 10).padding(.vertical, 4)
-                .background(Theme.card, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
-                .contentShape(Capsule())
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help(isCollapsed ? "Show \(title)" : "Hide \(title)")
 
-            // Update everything in just this section, right beside its name.
             if let sourceID, items.contains(where: { $0.scriptedInstall }) {
                 let pending = items.filter { $0.scriptedInstall }.count
                 Button {
@@ -263,10 +260,16 @@ struct UpdatesView: View {
                         .font(.caption)
                 }
                 .glass().controlSize(.small)
-                .padding(.leading, 4)
+                // Match the header bar's capsule; the default small glass shape
+                // is a rounded rectangle with visibly tighter corners.
+                .buttonBorderShape(.capsule)
             }
-            Spacer()
         }
+        // A full-width outlined bar: keeps the title legible on any glass
+        // tint and doubles as the divider between sections.
+        .padding(.leading, 10).padding(.trailing, 5).padding(.vertical, 5)
+        .background(Theme.card, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
         .font(.subheadline.bold())
         .padding(.horizontal, 20).padding(.top, 10)
     }
@@ -318,6 +321,9 @@ struct UpdatesView: View {
                 }
                 .font(.subheadline.bold())
                 .contentShape(Rectangle())
+                .padding(.leading, 10).padding(.trailing, 10).padding(.vertical, 5)
+                .background(Theme.card, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20).padding(.top, 14)

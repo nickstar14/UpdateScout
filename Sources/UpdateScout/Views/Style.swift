@@ -9,7 +9,10 @@ struct SourceStyle {
         switch id {
         case "homebrew":   SourceStyle(symbol: "mug.fill",             color: .brown)
         case "mas":        SourceStyle(symbol: "bag.fill",             color: .blue)
-        case "macos":      SourceStyle(symbol: "apple.logo",           color: .primary)
+        // Graphite rather than .primary: primary is solid black in light mode,
+        // which made the Update button far heavier than every other card. One
+        // fixed graphite was too dim on dark cards, so it shifts per theme.
+        case "macos":      SourceStyle(symbol: "apple.logo", color: Theme.graphite)
         case "caskOracle": SourceStyle(symbol: "shippingbox.fill",     color: .teal)
         case "components": SourceStyle(symbol: "cpu.fill",             color: .purple)
         case "sparkle":    SourceStyle(symbol: "sparkles",             color: .yellow)
@@ -83,6 +86,14 @@ enum Theme {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(calibratedWhite: 0.30, alpha: 1)
             : NSColor(calibratedWhite: 0.72, alpha: 1)
+    })
+
+    /// Mid-tone blue-grey for macOS items: deep enough to carry white button
+    /// text in light mode, bright enough to read on dark cards.
+    static let graphite = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.62, green: 0.67, blue: 0.76, alpha: 1)
+            : NSColor(srgbRed: 0.40, green: 0.44, blue: 0.52, alpha: 1)
     })
 
     /// Card / settings-pane fill, so both surfaces match.
