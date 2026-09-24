@@ -4,7 +4,7 @@ import ServiceManagement
 struct SettingsView: View {
     @EnvironmentObject var controller: UpdateController
     @StateObject private var deps = DependencyManager()
-    @State private var intervalHours = Prefs.checkIntervalHours
+    @State private var intervalMinutes = Prefs.checkIntervalMinutes
     @State private var disabled = Prefs.disabledSources
     @State private var agentInstalled = LaunchAgent.isInstalled
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -82,15 +82,17 @@ struct SettingsView: View {
                     }
                 Toggle("Check for updates in the background", isOn: $agentInstalled)
                     .onChange(of: agentInstalled) { _, on in
-                        do { on ? try LaunchAgent.install(intervalHours: intervalHours) : try LaunchAgent.uninstall() }
+                        do { on ? try LaunchAgent.install(intervalMinutes: intervalMinutes) : try LaunchAgent.uninstall() }
                         catch { agentError = error.localizedDescription; agentInstalled = LaunchAgent.isInstalled }
                     }
-                Picker("Check every", selection: $intervalHours) {
-                    ForEach([1, 3, 6, 12, 24], id: \.self) { Text("\($0) hour\($0 == 1 ? "" : "s")").tag($0) }
+                Picker("Check every", selection: $intervalMinutes) {
+                    ForEach(Prefs.checkIntervalChoices, id: \.self) {
+                        Text(Prefs.intervalLabel($0)).tag($0)
+                    }
                 }
-                .onChange(of: intervalHours) { _, hours in
-                    Prefs.checkIntervalHours = hours
-                    if agentInstalled { try? LaunchAgent.install(intervalHours: hours) }
+                .onChange(of: intervalMinutes) { _, minutes in
+                    Prefs.checkIntervalMinutes = minutes
+                    if agentInstalled { try? LaunchAgent.install(intervalMinutes: minutes) }
                 }
                 if let agentError {
                     Text(agentError).font(.caption).foregroundStyle(.red)
@@ -181,12 +183,12 @@ enum LaunchAgent {
 
     static var isInstalled: Bool { FileManager.default.fileExists(atPath: plistURL.path) }
 
-    static func install(intervalHours: Int) throws {
+    static func install(intervalMinutes: Int) throws {
         guard let exe = Bundle.main.executablePath else { return }
         let plist: [String: Any] = [
             "Label": label,
             "ProgramArguments": [exe, "--background-check"],
-            "StartInterval": intervalHours * 3600,
+            "StartInterval": max(5, intervalMinutes) * 60,
             "RunAtLoad": true,
             "ProcessType": "Background",
         ]

@@ -229,20 +229,26 @@ struct UpdatesView: View {
             Button { toggleCollapsed(id) } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
-                        .font(.caption2.bold()).foregroundStyle(.tertiary)
+                        .font(.caption2.bold()).foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                         .frame(width: 10)
                     Image(systemName: symbol).foregroundStyle(color)
-                    Text(title).foregroundStyle(.secondary)
+                    Text(title).foregroundStyle(.primary)
                     Text("\(count)")
                         .font(.caption2).foregroundStyle(color)
                         .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(color.opacity(0.14), in: Capsule())
+                        .background(color.opacity(0.18), in: Capsule())
                     if let subtitle {
-                        Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.tertiary)
+                        Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.secondary)
                     }
                 }
-                .contentShape(Rectangle())
+                // Grey text straight on the glass got lost over some
+                // backgrounds; a filled, outlined capsule keeps the header
+                // legible in both light and dark.
+                .padding(.leading, 8).padding(.trailing, 10).padding(.vertical, 4)
+                .background(Theme.card, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .help(isCollapsed ? "Show \(title)" : "Hide \(title)")

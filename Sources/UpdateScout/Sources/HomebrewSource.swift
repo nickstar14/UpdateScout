@@ -10,8 +10,16 @@ struct HomebrewSource: UpdateSource {
         guard let brew = Self.brewPath else {
             throw UpdateScoutError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
-        // Refresh brew's own metadata first so "outdated" is against current data.
-        _ = try? await Shell.run(brew, ["update", "--quiet"])
+        // Refresh brew's own metadata first so "outdated" is against current
+        // data. Background checks can run every few minutes, and brew's
+        // formula data changes on the order of hours, so they refresh at most
+        // every 30 minutes; a manual Check Now always refreshes.
+        let background = CommandLine.arguments.contains("--background-check")
+        let last = UserDefaults.standard.object(forKey: "lastBrewUpdate") as? Date ?? .distantPast
+        if !background || Date().timeIntervalSince(last) > 30 * 60 {
+            _ = try? await Shell.run(brew, ["update", "--quiet"])
+            UserDefaults.standard.set(Date(), forKey: "lastBrewUpdate")
+        }
         let result = try await Shell.run(brew, ["outdated", "--json=v2"])
         guard result.status == 0, let data = result.stdout.data(using: .utf8) else {
             throw UpdateScoutError.commandFailed("brew outdated", output: result.combined)

@@ -69,9 +69,25 @@ enum Prefs {
         set { UserDefaults.standard.set(Array(newValue), forKey: "disabledSources") }
     }
 
-    static var checkIntervalHours: Int {
-        get { max(1, UserDefaults.standard.object(forKey: "checkIntervalHours") as? Int ?? 6) }
-        set { UserDefaults.standard.set(newValue, forKey: "checkIntervalHours") }
+    /// Choices for the background check interval, in minutes.
+    static let checkIntervalChoices = [5, 15, 30, 45, 60, 180, 360, 720, 1440]
+
+    /// Background check interval in minutes. Falls back to the older
+    /// hours-based setting so an existing choice carries over.
+    static var checkIntervalMinutes: Int {
+        get {
+            let d = UserDefaults.standard
+            if let minutes = d.object(forKey: "checkIntervalMinutes") as? Int { return max(5, minutes) }
+            if let hours = d.object(forKey: "checkIntervalHours") as? Int { return max(1, hours) * 60 }
+            return 360
+        }
+        set { UserDefaults.standard.set(newValue, forKey: "checkIntervalMinutes") }
+    }
+
+    static func intervalLabel(_ minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) minutes" }
+        let hours = minutes / 60
+        return hours == 1 ? "1 hour" : "\(hours) hours"
     }
 
     static var showDockIcon: Bool {

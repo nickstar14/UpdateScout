@@ -67,28 +67,42 @@ enum AskpassDialog {
         exit(1) // sudo treats a non-zero askpass exit as "cancelled"
     }
 
-    /// A key glyph inside a tinted circle, like macOS's own auth prompts.
+    /// A key badge in the same style as the main window's "N updates
+    /// available" badge — a faint halo ring around a solid disc — coloured with
+    /// the app icon's blue-to-violet gradient so the prompt is recognisably
+    /// UpdateScout's. The white glyph keeps contrast on any background.
     private static func circularKeyIcon() -> NSImage {
-        // A tinted disc with a white glyph. An accent-on-faint-accent key
-        // disappeared against both light and dark dialog backgrounds, so the
-        // contrast here is fixed rather than inherited from the appearance.
         NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
-            let disc = rect.insetBy(dx: 1, dy: 1)
-            NSColor.controlAccentColor.setFill()
-            NSBezierPath(ovalIn: disc).fill()
-            NSColor.white.withAlphaComponent(0.25).setStroke()
-            let ring = NSBezierPath(ovalIn: disc.insetBy(dx: 0.75, dy: 0.75))
-            ring.lineWidth = 1.5
-            ring.stroke()
+            // The app icon's blue-to-violet, weighted toward violet: indigo by
+            // the middle so the violet reads across the lower half of the disc.
+            guard let gradient = NSGradient(
+                colors: [
+                    NSColor(srgbRed: 0.31, green: 0.55, blue: 1.00, alpha: 1),   // #4F8DFF blue
+                    NSColor(srgbRed: 0.36, green: 0.36, blue: 0.90, alpha: 1),   // #5C5CE6 indigo
+                    NSColor(srgbRed: 0.48, green: 0.21, blue: 0.82, alpha: 1),   // #7A35D1 violet
+                ],
+                atLocations: [0.0, 0.42, 1.0],
+                colorSpace: .sRGB) else { return false }
 
-            let config = NSImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
+            // Faint outer halo — the gradient at low opacity, like the badge's
+            // `tint.opacity(0.15)` backing circle.
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current?.cgContext.setAlpha(0.22)
+            gradient.draw(in: NSBezierPath(ovalIn: rect), angle: -90)
+            NSGraphicsContext.restoreGraphicsState()
+
+            // Solid inner disc.
+            let disc = rect.insetBy(dx: 9, dy: 9)
+            gradient.draw(in: NSBezierPath(ovalIn: disc), angle: -90)
+
+            // White key.
+            let config = NSImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
                 .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-            if let symbol = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Key")?
+            if let key = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Password")?
                 .withSymbolConfiguration(config) {
-                let size = symbol.size
-                symbol.draw(in: NSRect(x: (rect.width - size.width) / 2,
-                                       y: (rect.height - size.height) / 2,
-                                       width: size.width, height: size.height))
+                let size = key.size
+                key.draw(in: NSRect(x: disc.midX - size.width / 2, y: disc.midY - size.height / 2,
+                                    width: size.width, height: size.height))
             }
             return true
         }
