@@ -50,6 +50,7 @@ struct UpdateScoutApp: App {
         Notifier.requestPermission()
         CustomSource.seedIfMissing()
         DispatchQueue.main.async {
+            Prefs.migrateGlassTint()
             Appearance.apply(Prefs.appearance)
             if Prefs.showDockIcon { NSApp.setActivationPolicy(.regular) }
             // `open UpdateScout.app --args --open-window` shows the status

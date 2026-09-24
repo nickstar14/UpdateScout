@@ -79,6 +79,16 @@ enum Prefs {
         set { UserDefaults.standard.set(newValue, forKey: "showDockIcon") }
     }
 
+    /// How much light/dark tint sits under the glass: 0 is untinted Liquid
+    /// Glass, 1 fully opaque. Seeded from the old Clear/Regular/Tinted choice.
+    static let glassTintKey = "glassTint"
+    static func migrateGlassTint() {
+        let d = UserDefaults.standard
+        guard d.object(forKey: glassTintKey) == nil else { return }
+        let old = GlassStyle.from(d.string(forKey: "glassStyle") ?? "regular")
+        d.set(old.washOpacity, forKey: glassTintKey)
+    }
+
     static var appearance: Appearance {
         get { Appearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "") ?? .system }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: "appearance") }
@@ -98,26 +108,24 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Switch appearance, crossfading each visible window from its old look to
+    /// its new one. A `CATransition` fade is captured by Core Animation from
+    /// the live layer tree, so it works on glass windows — unlike a bitmap
+    /// snapshot, and without the fade-out/fade-in "disappear" of animating the
+    /// window's alpha.
     @MainActor static func apply(_ value: Appearance, animated: Bool = false) {
-        guard animated else { return set(value) }
-        // AppKit can't crossfade an appearance change, and snapshotting glass
-        // windows produces garbage. Fade fully out, switch while invisible
-        // (so the instant repaint is never seen), and ease back in.
-        let windows = NSApp.windows.filter { $0.isVisible }
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            windows.forEach { $0.animator().alphaValue = 0 }
-        }, completionHandler: {
-            set(value)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.3
-                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    windows.forEach { $0.animator().alphaValue = 1 }
-                }
+        if animated {
+            for window in NSApp.windows where window.isVisible {
+                guard let view = window.contentView?.superview ?? window.contentView else { continue }
+                view.wantsLayer = true
+                let fade = CATransition()
+                fade.type = .fade
+                fade.duration = 0.4
+                fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                view.layer?.add(fade, forKey: "appearanceCrossfade")
             }
-        })
+        }
+        set(value)
     }
 }
 
@@ -129,9 +137,9 @@ enum GlassStyle: String, CaseIterable, Identifiable {
     /// Opacity of the window-background wash layered under the glass.
     var washOpacity: Double {
         switch self {
-        case .clear: 0.35
-        case .regular: 0.7
-        case .tinted: 0.92
+        case .clear: 0.12
+        case .regular: 0.35
+        case .tinted: 0.65
         }
     }
     /// Accepts the pre-rename stored values ("middle"/"frosted") too.

@@ -52,6 +52,14 @@ final class UpdatesWindow {
 
 struct UpdatesView: View {
     @EnvironmentObject var controller: UpdateController
+    /// Comma-separated ids of collapsed sections, remembered between launches.
+    @AppStorage("collapsedSections") private var collapsedRaw = ""
+    private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
+    private func toggleCollapsed(_ id: String) {
+        var set = collapsed
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        withAnimation(.easeInOut(duration: 0.2)) { collapsedRaw = set.sorted().joined(separator: ",") }
+    }
 
     private var grouped: [(source: any UpdateSource, items: [UpdateItem])] {
         UpdateController.allSources.compactMap { source in
@@ -78,16 +86,22 @@ struct UpdatesView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 38, height: 38)
-            HStack(spacing: 8) {
-                Text("UpdateScout").font(.title.weight(.semibold))
-                Button { SettingsWindow.shared.show() } label: {
-                    Image(systemName: "gearshape.fill").font(.body)
+            // Logo centred against a two-line block (name + version), the same
+            // arrangement as the Settings header.
+            HStack(alignment: .center, spacing: 12) {
+                AppLogo(size: 44)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 8) {
+                        Text("UpdateScout").font(.title.weight(.semibold))
+                        Button { SettingsWindow.shared.show() } label: {
+                            Image(systemName: "gearshape.fill")
+                        }
+                        .glass()
+                        .help("Settings")
+                    }
+                    Text("Version \(SelfUpdater.version)")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Settings")
             }
             Spacer()
             // Check Now, with the last-checked time beneath it.
@@ -180,6 +194,7 @@ struct UpdatesView: View {
                         sectionHeader(title: group.source.displayName, symbol: style.symbol,
                                       color: style.color, count: group.items.count,
                                       sourceID: group.source.id, items: group.items)
+                        if !collapsed.contains(group.source.id) {
                         LazyVGrid(columns: columns, spacing: 12) {
                             // Apps the App Store has to update itself collapse
                             // into one hand-off card — individual cards would
@@ -192,6 +207,8 @@ struct UpdatesView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
+                        .transition(.opacity)
+                        }
                     }
                     leftoverSection
                     hiddenSection
@@ -205,29 +222,44 @@ struct UpdatesView: View {
                                subtitle: String? = nil,
                                sourceID: String? = nil,
                                items: [UpdateItem] = []) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol).foregroundStyle(color)
-            Text(title).foregroundStyle(.secondary)
-            Text("\(count)")
-                .font(.caption2).foregroundStyle(color)
-                .padding(.horizontal, 6).padding(.vertical, 1)
-                .background(color.opacity(0.14), in: Capsule())
-            if let subtitle {
-                Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.tertiary)
+        let id = sourceID ?? title
+        let isCollapsed = collapsed.contains(id)
+        return HStack(spacing: 6) {
+            // The whole title area toggles the section.
+            Button { toggleCollapsed(id) } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.bold()).foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                        .frame(width: 10)
+                    Image(systemName: symbol).foregroundStyle(color)
+                    Text(title).foregroundStyle(.secondary)
+                    Text("\(count)")
+                        .font(.caption2).foregroundStyle(color)
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(color.opacity(0.14), in: Capsule())
+                    if let subtitle {
+                        Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            Spacer()
-            // Update everything in just this section.
+            .buttonStyle(.plain)
+            .help(isCollapsed ? "Show \(title)" : "Hide \(title)")
+
+            // Update everything in just this section, right beside its name.
             if let sourceID, items.contains(where: { $0.scriptedInstall }) {
                 let pending = items.filter { $0.scriptedInstall }.count
                 Button {
                     controller.updateAll(sourceID: sourceID)
                 } label: {
-                    Text(pending > 1 ? "Update all \(pending)" : "Update")
+                    Text(pending > 1 ? "Update all \(title)" : "Update \(title)")
                         .font(.caption)
                 }
                 .glass().controlSize(.small)
-                .help("Update every \(title) item")
+                .padding(.leading, 4)
             }
+            Spacer()
         }
         .font(.subheadline.bold())
         .padding(.horizontal, 20).padding(.top, 10)
@@ -241,15 +273,17 @@ struct UpdatesView: View {
         if !leftovers.isEmpty {
             sectionHeader(title: "Leftover drivers", symbol: "trash.slash.fill", color: .red,
                           count: leftovers.count, subtitle: "not loaded — safe to remove")
-            Text("On disk but the kernel isn't using them — typically left behind by an old printer, dock, or drive-enclosure installer.")
-                .font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !collapsed.contains("Leftover drivers") {
+                Text("On disk but the kernel isn't using them — typically left behind by an old printer, dock, or drive-enclosure installer.")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
+                }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
         }
     }
 
@@ -325,8 +359,7 @@ struct UpdatesView: View {
 /// drawing our own on top reads as fake white lines.
 struct GlassBackground: View {
     static let cornerRadius: CGFloat = 16
-    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.regular.rawValue
-    private var glassStyle: GlassStyle { GlassStyle.from(glassStyleRaw) }
+    @AppStorage(Prefs.glassTintKey) private var tint: Double = 0.35
 
     var body: some View {
         ZStack {
@@ -335,9 +368,10 @@ struct GlassBackground: View {
             } else {
                 Rectangle().fill(.ultraThinMaterial)
             }
+            // 0 leaves the system's Liquid Glass untouched; higher values lay
+            // an increasingly opaque light/dark wash over it.
             Rectangle()
-                .fill(Theme.wash.opacity(glassStyle.washOpacity))
-                .animation(.easeInOut(duration: 0.25), value: glassStyleRaw)
+                .fill(Theme.wash.opacity(tint * 0.9))
         }
         .ignoresSafeArea()
     }

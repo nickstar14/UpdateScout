@@ -81,8 +81,8 @@ struct WarningBadge: View {
 enum Theme {
     static let wash = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(calibratedWhite: 0.22, alpha: 1)
-            : NSColor(calibratedWhite: 0.80, alpha: 1)
+            ? NSColor(calibratedWhite: 0.30, alpha: 1)
+            : NSColor(calibratedWhite: 0.72, alpha: 1)
     })
 
     /// Card / settings-pane fill, so both surfaces match.
@@ -91,4 +91,45 @@ enum Theme {
             ? NSColor(calibratedWhite: 0.30, alpha: 0.55)
             : NSColor(calibratedWhite: 0.98, alpha: 0.55)
     })
+}
+
+/// The app's own icon, rendered at the exact backing-pixel size it's shown at.
+/// `Image(nsImage:).resizable()` can pick a small representation and scale it
+/// up, which is what made the header logo look soft and pixelated.
+struct AppLogo: View {
+    var size: CGFloat
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        Image(nsImage: Self.rendered(points: size, scale: scale))
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+    }
+
+    @MainActor private static var cache: [String: NSImage] = [:]
+
+    @MainActor static func rendered(points: CGFloat, scale: CGFloat) -> NSImage {
+        let key = "\(points)@\(scale)"
+        if let hit = cache[key] { return hit }
+        let px = Int((points * scale).rounded())
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                         isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0) else {
+            return NSApp.applicationIconImage
+        }
+        rep.size = NSSize(width: points, height: points)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        // Drawing into a rect this size makes NSImage pick its best
+        // representation for the destination instead of a small one.
+        NSApp.applicationIconImage.draw(in: NSRect(x: 0, y: 0, width: points, height: points))
+        NSGraphicsContext.restoreGraphicsState()
+        let image = NSImage(size: NSSize(width: points, height: points))
+        image.addRepresentation(rep)
+        cache[key] = image
+        return image
+    }
 }

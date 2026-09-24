@@ -25,7 +25,16 @@ vtool -set-build-version macos 15.0 "$SDK_VERSION" -replace \
       -output "$APP/Contents/MacOS/UpdateScout" "$APP/Contents/MacOS/UpdateScout"
 /usr/libexec/PlistBuddy -c "Add :DTSDKName string macosx$SDK_VERSION" "$APP/Contents/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :DTPlatformVersion string $SDK_VERSION" "$APP/Contents/Info.plist" 2>/dev/null || true
-cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Compile the Icon Composer source. On macOS 26+ the system renders the
+# layered Assets.car icon natively with Liquid Glass; a bare .icns is treated
+# as a legacy icon and drawn inside a grey squircle frame. actool also emits a
+# flattened AppIcon.icns as the fallback for older macOS.
+xcrun actool Resources/AppIcon.icon \
+    --compile "$APP/Contents/Resources" \
+    --platform macosx --minimum-deployment-target 15.0 \
+    --app-icon AppIcon \
+    --output-partial-info-plist "$(mktemp)" \
+    --errors --warnings >/dev/null
 
 # Embed Sparkle (the executable links it via @executable_path/../Frameworks).
 SPARKLE=$(find .build/artifacts/sparkle -name Sparkle.framework -path "*macos*" | head -1)

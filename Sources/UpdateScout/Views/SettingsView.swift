@@ -10,7 +10,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
-    @AppStorage("glassStyle") private var glassStyleRaw = GlassStyle.regular.rawValue
+    @AppStorage(Prefs.glassTintKey) private var glassTint: Double = 0.35
     @State private var showDockIcon = Prefs.showDockIcon
 
     var body: some View {
@@ -18,8 +18,7 @@ struct SettingsView: View {
             // In-content title, same treatment as the status window header;
             // fixed above the form so scrolling never runs into the titlebar.
             HStack(spacing: 12) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable().frame(width: 44, height: 44)
+                AppLogo(size: 44)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("UpdateScout").font(.title2.weight(.semibold))
                     Text("Version \(SelfUpdater.version)")
@@ -109,12 +108,22 @@ struct SettingsView: View {
                     Prefs.appearance = value
                     Appearance.apply(value, animated: true)
                 }
-                Picker("Window glass", selection: $glassStyleRaw) {
-                    ForEach(GlassStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Glass")
+                    Slider(value: $glassTint, in: 0...1) {
+                        EmptyView()
+                    } minimumValueLabel: {
+                        Text("Clear").font(.caption).foregroundStyle(.secondary)
+                    } maximumValueLabel: {
+                        Text("Opaque").font(.caption).foregroundStyle(.secondary)
+                    }
+                    // Otherwise the grouped Form reserves a label column and the
+                    // slider gets squeezed into the right half of the row.
+                    .labelsHidden()
+                    Text("Clear is the system's Liquid Glass with no tint; toward Opaque adds a light or dark wash to match the theme.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .pickerStyle(.segmented)
-                Text("Glass affects the status window, not the menu bar bubble.")
-                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show icon in Dock", isOn: $showDockIcon)
                     .onChange(of: showDockIcon) { _, on in
                         Prefs.showDockIcon = on
