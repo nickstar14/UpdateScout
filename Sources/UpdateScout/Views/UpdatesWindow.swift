@@ -40,8 +40,10 @@ final class UpdatesWindow {
             w.backgroundColor = .clear
             w.isMovableByWindowBackground = true
             w.isReleasedWhenClosed = false
-            w.setContentSize(NSSize(width: 560, height: 640))
-            w.minSize = NSSize(width: 380, height: 380)
+            // Exactly three tiles across; tall enough for two expanded
+            // sections plus the Hidden bar.
+            w.setContentSize(NSSize(width: UpdatesView.idealWidth(columns: 3), height: 720))
+            w.minSize = NSSize(width: UpdatesView.minimumWidth, height: 380)
             window = w
         }
         let wasVisible = window?.isVisible ?? false
@@ -54,13 +56,68 @@ struct UpdatesView: View {
     @EnvironmentObject var controller: UpdateController
     /// Comma-separated ids of collapsed sections, remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
-    /// True while the list is scrolled to its end — see the scroll anchor below.
-    @State private var scrolledToBottom = false
+    /// The section roll animation, shared by every collapse/expand path.
+    static let rollDuration: Double = 0.38
+    static let roll = Animation.smooth(duration: rollDuration)
+
+    /// Scroll bookkeeping that must not re-render the view on every scroll
+    /// frame, so it lives in a reference type rather than @State values.
+    @MainActor final class ScrollState {
+        var geometry: ScrollGeometry?
+        /// Each section's expanded content height — what collapsing removes.
+        var contentHeights: [String: CGFloat] = [:]
+    }
+    @State private var scrollState = ScrollState()
+    @State private var scrollPosition = ScrollPosition(edge: .top)
+    /// Temporary bottom padding that holds the content height during a
+    /// collapse — see `setSection`.
+    @State private var scrollSlack: CGFloat = 0
+
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
+
     private func toggleCollapsed(_ id: String) {
         var set = collapsed
-        if set.contains(id) { set.remove(id) } else { set.insert(id) }
-        withAnimation(.smooth(duration: 0.38)) { collapsedRaw = set.sorted().joined(separator: ",") }
+        let collapsing = !set.contains(id)
+        if collapsing { set.insert(id) } else { set.remove(id) }
+        setSection(id, collapsing: collapsing) { collapsedRaw = set.sorted().joined(separator: ",") }
+    }
+
+    /// Run a collapse or expand so the whole list moves as one animation.
+    ///
+    /// Collapsing near the end of the list shrinks the content under the
+    /// scroll position; the scroll view would then snap back to its new end
+    /// *instantly*, before the roll animation ran — the "jump". So: hold the
+    /// content height with temporary bottom slack (nothing to snap to), animate
+    /// the scroll to its new resting place in the same animation as the roll,
+    /// and drop the slack once both have finished.
+    private func setSection(_ id: String, collapsing: Bool, apply: @escaping () -> Void) {
+        guard collapsing, let geo = scrollState.geometry,
+              let removed = scrollState.contentHeights[id], removed > 0 else {
+            withAnimation(Self.roll) { apply() }
+            return
+        }
+        let minOffset = -geo.contentInsets.top
+        let newMax = max(minOffset,
+                         geo.contentSize.height - removed + geo.contentInsets.bottom - geo.containerSize.height)
+        let offset = geo.contentOffset.y
+        guard offset > newMax + 0.5 else {
+            withAnimation(Self.roll) { apply() }
+            return
+        }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { scrollSlack = offset - newMax }
+        // Next runloop turn: in the same turn SwiftUI merges the instant
+        // transaction with the animated one and the roll doesn't animate.
+        DispatchQueue.main.async {
+            withAnimation(Self.roll) {
+                apply()
+                scrollPosition.scrollTo(y: newMax)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.rollDuration + 0.1) {
+                withTransaction(instant) { scrollSlack = 0 }
+            }
+        }
     }
 
     private var grouped: [(source: any UpdateSource, items: [UpdateItem])] {
@@ -70,20 +127,27 @@ struct UpdatesView: View {
         }
     }
 
+    /// Measured height of the title sheet, so the list can start below it.
+    @State private var sheetHeight: CGFloat = 190
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header and status banner sit on a frosted title sheet; its
-            // rounded bottom edge replaces the old divider line.
-            VStack(spacing: 0) {
-                header
-                statusBanner
+            // The list runs all the way up *under* the frosted title sheet,
+            // with a top margin the height of the sheet: cards start below it
+            // but scroll up behind it and frost through, instead of being
+            // clipped at a hard line just short of its edge.
+            ZStack(alignment: .top) {
+                updateList
+                VStack(spacing: 0) {
+                    header
+                    statusBanner
+                }
+                .background { TitleSheet() }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sheetHeight = $0 }
             }
-            .background { TitleSheet() }
-            .padding(.bottom, 8)
-            updateList
             errorSummary
         }
-        .frame(minWidth: 380, minHeight: 380)
+        .frame(minWidth: Self.minimumWidth, minHeight: 380)
         .background(GlassBackground())
         .onAppear { controller.reloadFromDisk() }
     }
@@ -100,6 +164,7 @@ struct UpdatesView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 8) {
                         Text("UpdateScout").font(.title.weight(.semibold))
+                            .lineLimit(1).fixedSize()
                         Button { SettingsWindow.shared.show() } label: {
                             Image(systemName: "gearshape.fill")
                         }
@@ -134,7 +199,7 @@ struct UpdatesView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 34)   // clear the transparent titlebar's traffic lights
+        .padding(.top, 28)   // just clears the traffic lights, which end at y = 24
         .padding(.bottom, 24)
     }
 
@@ -155,6 +220,7 @@ struct UpdatesView: View {
                 Text(upToDate ? "Everything is up to date"
                               : "^[\(count) update](inflect: true) available")
                     .font(.title2.weight(.semibold))
+                    .lineLimit(1)
                 if leftovers > 0 {
                     Text("^[\(leftovers) leftover driver](inflect: true) can be removed")
                         .font(.caption).foregroundStyle(.secondary)
@@ -178,9 +244,26 @@ struct UpdatesView: View {
 
     /// Tiles keep a fixed size; widening the window fits more per row rather
     /// than stretching them. `.adaptive` with equal min/max does exactly that.
-    private static let tileWidth: CGFloat = 152
+    static let tileWidth: CGFloat = 152
+    /// Narrowest the window may go: wide enough that the header, status banner
+    /// and section headers never wrap, while still allowing two columns.
+    static let minimumWidth: CGFloat = 450
+    static let tileSpacing: CGFloat = 12
+    /// Section panel padding: inside the outline, and between panel and window.
+    static let panelInset: CGFloat = 10
+    static let panelMargin: CGFloat = 16
     private let columns = [GridItem(.adaptive(minimum: tileWidth, maximum: tileWidth),
-                                    spacing: 12, alignment: .top)]
+                                    spacing: tileSpacing, alignment: .top)]
+
+    /// Window width that fits exactly `n` tiles per row with no leftover. When
+    /// scroll bars are set to always show, the scroller takes real width, so
+    /// add it — otherwise the exact fit would drop to one column fewer.
+    static func idealWidth(columns n: Int) -> CGFloat {
+        let tiles = CGFloat(n) * tileWidth + CGFloat(n - 1) * tileSpacing
+        let scroller = NSScroller.preferredScrollerStyle == .legacy
+            ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        return tiles + 2 * panelInset + 2 * panelMargin + scroller
+    }
 
     @ViewBuilder
     private var updateList: some View {
@@ -193,6 +276,7 @@ struct UpdatesView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, sheetHeight)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -218,26 +302,19 @@ struct UpdatesView: View {
                     leftoverSection
                     hiddenSection
                 }
-                .padding(.vertical, 12)
+                .padding(.top, 10).padding(.bottom, 12 + scrollSlack)
                 // Collapse state lives in @AppStorage, whose updates arrive
                 // outside any withAnimation transaction — so animate on the
                 // value itself. On the whole list, so the sections below slide
                 // up and down with the one that's rolling.
-                .animation(.smooth(duration: 0.38), value: collapsedRaw)
-                .animation(.smooth(duration: 0.38), value: showHidden)
+                .animation(Self.roll, value: collapsedRaw)
+                .animation(Self.roll, value: showHidden)
             }
-            // Which edge stays put when the content's height changes. Normally
-            // the top, so expanding pushes things down. But at the very end of
-            // the list, collapsing the last section would shrink the content
-            // under the scroll position and snap it to the new end; anchoring
-            // to the bottom there makes everything above glide down instead,
-            // and expanding it grows up into view rather than off-screen.
-            .defaultScrollAnchor(scrolledToBottom ? .bottom : .top, for: .sizeChanges)
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentSize.height > geo.containerSize.height
-                    && geo.contentOffset.y + geo.containerSize.height >= geo.contentSize.height - 24
-            } action: { _, atBottom in
-                scrolledToBottom = atBottom
+            .scrollPosition($scrollPosition)
+            .contentMargins(.top, sheetHeight, for: .scrollContent)
+            .contentMargins(.top, sheetHeight, for: .scrollIndicators)
+            .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, geo in
+                scrollState.geometry = geo
             }
         }
     }
@@ -259,17 +336,20 @@ struct UpdatesView: View {
             content()
                 .frame(maxWidth: .infinity)
                 // Room below the header band's fade before the first cards.
-                .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
+                .padding(.horizontal, Self.panelInset).padding(.top, 14).padding(.bottom, 12)
                 // Keep the natural height even while the frame is shrunk, so
                 // the clip uncovers the cards instead of squashing them.
                 .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    scrollState.contentHeights[id] = height
+                }
                 .frame(height: isExpanded ? nil : 0, alignment: .top)
                 .clipped()
                 .allowsHitTesting(isExpanded)
                 .accessibilityHidden(!isExpanded)
         }
         .modifier(SectionPanel())
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Self.panelMargin)
     }
 
     private func sectionHeader(title: String, symbol: String, color: Color, count: Int,
@@ -299,6 +379,17 @@ struct UpdatesView: View {
                 // Match the panel's capsule ends; the default small glass shape
                 // is a rounded rectangle with visibly tighter corners.
                 .buttonBorderShape(.capsule)
+            } else if sourceID == "macos", !items.isEmpty {
+                // macOS installs happen in System Settings, but the section
+                // still gets the same pill button as every other source.
+                Button {
+                    if let url = URL(string: SystemUpdateSource.settingsURL) { NSWorkspace.shared.open(url) }
+                } label: {
+                    Text("Update macOS").font(.caption)
+                }
+                .glass().controlSize(.small)
+                .buttonBorderShape(.capsule)
+                .help("Opens Software Update in System Settings")
             }
         }
         .padding(.leading, 10).padding(.trailing, 5)
@@ -364,7 +455,8 @@ struct UpdatesView: View {
         if total > 0 {
             section(id: "Hidden", expanded: showHidden) {
                 Button {
-                    withAnimation(.smooth(duration: 0.38)) { showHidden.toggle() }
+                    let collapsing = showHidden
+                    setSection("Hidden", collapsing: collapsing) { showHidden.toggle() }
                 } label: {
                     headerLabel(symbol: "eye.slash.fill", color: .secondary, title: "Hidden",
                                 count: total, subtitle: nil, expanded: showHidden)

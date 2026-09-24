@@ -155,30 +155,53 @@ struct SectionPanel: ViewModifier {
     static var radius: CGFloat { headerHeight / 2 }
 
     /// How far below the pill's edge the header band takes to fade out.
-    static let fadeLength: CGFloat = 10
+    static let fadeLength: CGFloat = 28
+    /// Tint carried through the whole section under the header.
+    static let bodyTint: Double = 0.2
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+        let band = Self.headerHeight + Self.fadeLength
         content
             .background(alignment: .top) {
-                // A fixed-height band: solid down to exactly where the
-                // collapsed pill ends, then a short fade. Collapsed, the clip
-                // cuts it at that edge, so the pill is fully solid; expanded,
-                // the fade shows just below the header. Because it doesn't
-                // depend on the panel's height, it animates cleanly while the
-                // section rolls — a height-relative gradient jumped to its
-                // final stops mid-animation.
-                LinearGradient(stops: [
-                    .init(color: Theme.card, location: 0),
-                    .init(color: Theme.card, location: Self.headerHeight / (Self.headerHeight + Self.fadeLength)),
-                    .init(color: Theme.card.opacity(0), location: 1),
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: Self.headerHeight + Self.fadeLength)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .clipShape(shape)
+                ZStack(alignment: .top) {
+                    // A faint tint through the whole section, so the pill and
+                    // the area under it read as one surface opening up rather
+                    // than a pill sitting above a hole.
+                    shape.fill(Theme.card.opacity(Self.bodyTint))
+                    // Solid to exactly where the collapsed pill ends, then an
+                    // eased fade down into the faint tint. Fixed height (not
+                    // relative to the panel), so it doesn't shift while the
+                    // section rolls; collapsed, the clip cuts it at the pill
+                    // edge and the pill is fully solid.
+                    LinearGradient(stops: [
+                        .init(color: Theme.card, location: 0),
+                        .init(color: Theme.card, location: Self.headerHeight / band),
+                        .init(color: Theme.card.opacity(0.72), location: (Self.headerHeight + 5) / band),
+                        .init(color: Theme.card.opacity(0.4), location: (Self.headerHeight + 12) / band),
+                        .init(color: Theme.card.opacity(0.14), location: (Self.headerHeight + 20) / band),
+                        .init(color: Theme.card.opacity(0), location: 1),
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: band)
+                    // Drawn over a Color.clear that takes exactly the panel's
+                    // size, so the clip really is the panel. (A `.frame(maxHeight:
+                    // .infinity)` wrapper grows to fit its 60 pt child instead,
+                    // which left the fade hanging below a collapsed pill.)
+                    .modifier(PinnedTop())
+                    .clipShape(shape)
+                }
             }
             .overlay(shape.strokeBorder(Color.primary.opacity(0.22)))
             .background { OuterShadow(shape: shape) }
+    }
+}
+
+/// Lays content out at its own size, pinned to the top of a container that
+/// takes exactly the proposed size — so anything clipped afterwards is clipped
+/// to the container, not to the (possibly taller) content.
+private struct PinnedTop: ViewModifier {
+    func body(content: Content) -> some View {
+        Color.clear.overlay(alignment: .top) { content }
     }
 }
 
@@ -193,20 +216,21 @@ private struct OuterShadow<S: Shape>: View {
         shape
             .fill(Color.black)
             .shadow(color: .black.opacity(0.22), radius: 9, y: 4)
-            .mask {
-                // An even-odd path — a big rectangle with exactly this shape
-                // cut out. (Padding a rectangle and overlaying the shape made
-                // the hole as large as the padded frame, hiding the shadow.)
-                GeometryReader { geo in
-                    let bounds = CGRect(origin: .zero, size: geo.size)
-                    Path { path in
-                        path.addRect(bounds.insetBy(dx: -40, dy: -40))
-                        path.addPath(shape.path(in: bounds))
-                    }
-                    .fill(style: FillStyle(eoFill: true))
-                }
-            }
+            .mask { Outside(base: shape).fill(style: FillStyle(eoFill: true)) }
             .allowsHitTesting(false)
+    }
+
+    /// Everything around a shape: a generous rectangle with the shape cut out.
+    /// A Shape (not a GeometryReader), so SwiftUI redraws it with the animated
+    /// frame on every animation frame; a GeometryReader jumped straight to the
+    /// final size mid-animation and let the black caster show through.
+    private struct Outside: Shape {
+        let base: S
+        func path(in rect: CGRect) -> Path {
+            var path = Path(rect.insetBy(dx: -40, dy: -40))
+            path.addPath(base.path(in: rect))
+            return path
+        }
     }
 }
 
@@ -227,8 +251,11 @@ struct TitleSheet: View {
             } else {
                 shape.fill(.ultraThickMaterial)
             }
-            // A touch more frost than the window around it.
-            shape.fill(Theme.card.opacity(0.7))
+            // A heavy frost: a blur layer plus a strong tint, so the header
+            // reads as a solid sheet. Content scrolling up simply disappears
+            // beneath it, which is intended.
+            shape.fill(.thinMaterial)
+            shape.fill(Theme.card.opacity(0.9))
         }
         .overlay(shape.strokeBorder(Color.primary.opacity(0.14)))
         .background { OuterShadow(shape: shape) }

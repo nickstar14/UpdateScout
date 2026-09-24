@@ -35,17 +35,26 @@ struct SystemUpdateSource: UpdateSource {
                     default: break
                     }
                 }
+                // macOS installs are handed to System Settings rather than run
+                // with `softwareupdate -i`: Settings handles the download,
+                // restart scheduling and progress, and is the supported path.
                 items.append(UpdateItem(sourceID: id, name: title,
                                         installedVersion: Self.currentOSVersion,
                                         latestVersion: version.isEmpty ? label : version,
-                                        url: nil,
-                                        caveat: restart ? "Requires a restart to finish installing." : "Requires an administrator password.",
-                                        installToken: label))
+                                        url: Self.settingsURL,
+                                        caveat: restart
+                                            ? "Requires a restart. Opens Software Update in System Settings to install."
+                                            : "Opens Software Update in System Settings to install.",
+                                        installToken: label,
+                                        scriptedInstall: false))
                 currentLabel = nil
             }
         }
         return items
     }
+
+    /// System Settings → General → Software Update.
+    static let settingsURL = "x-apple.systempreferences:com.apple.Software-Update-Settings.extension"
 
     /// The running macOS version, so rows read "27.1 → 27.2" rather than a
     /// placeholder.

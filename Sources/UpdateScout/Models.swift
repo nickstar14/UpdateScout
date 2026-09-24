@@ -52,15 +52,27 @@ struct UpdateItem: Identifiable, Codable, Hashable {
     /// What the action button should say.
     var actionLabel: String {
         if scriptedInstall { return "Update" }
-        return sourceID == "mas" ? "App Store" : "Get…"
+        switch sourceID {
+        case "mas": return "App Store"
+        case "macos": return "Settings"
+        default: return "Get…"
+        }
     }
     var actionLabelLong: String {
         if scriptedInstall { return "Update" }
-        return sourceID == "mas" ? "Open in App Store" : "Open download page"
+        switch sourceID {
+        case "mas": return "Open in App Store"
+        case "macos": return "Open Software Update"
+        default: return "Open download page"
+        }
     }
     var actionSymbol: String {
         if scriptedInstall { return "arrow.down.circle" }
-        return sourceID == "mas" ? "arrow.up.forward.app" : "safari"
+        switch sourceID {
+        case "mas": return "arrow.up.forward.app"
+        case "macos": return "gearshape"
+        default: return "safari"
+        }
     }
 }
 
