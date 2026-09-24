@@ -144,3 +144,37 @@ struct AppLogo: View {
         return image
     }
 }
+
+/// A section's container. The corner radius is half the header's height, so a
+/// collapsed section is exactly a capsule — the header pill. Expanded, the
+/// header keeps its solid fill, which then fades out quickly so the cards sit
+/// on clear glass, while a firmer outline traces the whole section to show
+/// what belongs to it.
+struct SectionPanel: ViewModifier {
+    static let headerHeight: CGFloat = 32
+    static var radius: CGFloat { headerHeight / 2 }
+    /// How far below the header the fill takes to fade to clear.
+    static let fadeLength: CGFloat = 36
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+        content
+            .background {
+                GeometryReader { geo in
+                    let total = geo.size.height
+                    if total <= Self.headerHeight + 1 {
+                        // Collapsed: a plain solid pill, no fade at the edge.
+                        shape.fill(Theme.card)
+                    } else {
+                        shape.fill(LinearGradient(stops: [
+                            .init(color: Theme.card, location: 0),
+                            .init(color: Theme.card, location: Self.headerHeight / total),
+                            .init(color: Theme.card.opacity(0),
+                                  location: min((Self.headerHeight + Self.fadeLength) / total, 1)),
+                        ], startPoint: .top, endPoint: .bottom))
+                    }
+                }
+            }
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.22)))
+    }
+}

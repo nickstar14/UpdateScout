@@ -188,26 +188,24 @@ struct UpdatesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     ForEach(grouped, id: \.source.id) { group in
                         let style = SourceStyle.forSource(group.source.id)
-                        sectionHeader(title: group.source.displayName, symbol: style.symbol,
-                                      color: style.color, count: group.items.count,
-                                      sourceID: group.source.id, items: group.items)
-                        if !collapsed.contains(group.source.id) {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            // Apps the App Store has to update itself collapse
-                            // into one hand-off card — individual cards would
-                            // offer a button that can't do anything.
-                            let handoff = group.items.filter { !$0.scriptedInstall && $0.sourceID == "mas" }
-                            ForEach(group.items.filter { !handoff.contains($0) }) { item in
-                                UpdateCard(item: item)
+                        section(id: group.source.id) {
+                            sectionHeader(title: group.source.displayName, symbol: style.symbol,
+                                          color: style.color, count: group.items.count,
+                                          sourceID: group.source.id, items: group.items)
+                        } content: {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                // Apps the App Store has to update itself collapse
+                                // into one hand-off card — individual cards would
+                                // offer a button that can't do anything.
+                                let handoff = group.items.filter { !$0.scriptedInstall && $0.sourceID == "mas" }
+                                ForEach(group.items.filter { !handoff.contains($0) }) { item in
+                                    UpdateCard(item: item)
+                                }
+                                if !handoff.isEmpty { AppStoreHandoffCard(items: handoff) }
                             }
-                            if !handoff.isEmpty { AppStoreHandoffCard(items: handoff) }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 20)
-                        .transition(.opacity)
                         }
                     }
                     leftoverSection
@@ -216,6 +214,28 @@ struct UpdatesView: View {
                 .padding(.vertical, 12)
             }
         }
+    }
+
+    /// One section: a header, and — unless collapsed — its content, together
+    /// in a SectionPanel so the outline shows what belongs to the section and
+    /// collapsing rolls the panel up into the header pill.
+    private func section<Header: View, Content: View>(
+        id: String, expanded: Bool? = nil,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let isExpanded = expanded ?? !collapsed.contains(id)
+        return VStack(alignment: .leading, spacing: 0) {
+            header()
+            if isExpanded {
+                content()
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 12)
+                    .transition(.opacity)
+            }
+        }
+        .modifier(SectionPanel())
+        .padding(.horizontal, 16)
     }
 
     private func sectionHeader(title: String, symbol: String, color: Color, count: Int,
@@ -227,26 +247,8 @@ struct UpdatesView: View {
         return HStack(spacing: 6) {
             // Everything left of the Update button toggles the section.
             Button { toggleCollapsed(id) } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.bold()).foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                        .frame(width: 10)
-                    Image(systemName: symbol).foregroundStyle(color)
-                    Text(title).foregroundStyle(.primary)
-                    // Number in the primary text colour, source colour in the
-                    // pill: coloured digits on a same-colour pill vanished in
-                    // dark mode (App Store blue) and would in light (Sparkle yellow).
-                    Text("\(count)")
-                        .font(.caption2).foregroundStyle(.primary)
-                        .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(color.opacity(0.32), in: Capsule())
-                    if let subtitle {
-                        Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+                headerLabel(symbol: symbol, color: color, title: title, count: count,
+                            subtitle: subtitle, expanded: !isCollapsed)
             }
             .buttonStyle(.plain)
             .help(isCollapsed ? "Show \(title)" : "Hide \(title)")
@@ -260,18 +262,39 @@ struct UpdatesView: View {
                         .font(.caption)
                 }
                 .glass().controlSize(.small)
-                // Match the header bar's capsule; the default small glass shape
+                // Match the panel's capsule ends; the default small glass shape
                 // is a rounded rectangle with visibly tighter corners.
                 .buttonBorderShape(.capsule)
             }
         }
-        // A full-width outlined bar: keeps the title legible on any glass
-        // tint and doubles as the divider between sections.
-        .padding(.leading, 10).padding(.trailing, 5).padding(.vertical, 5)
-        .background(Theme.card, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
+        .padding(.leading, 10).padding(.trailing, 5)
+        .frame(height: SectionPanel.headerHeight)
         .font(.subheadline.bold())
-        .padding(.horizontal, 20).padding(.top, 10)
+    }
+
+    /// Chevron, icon, title and count — shared by every section header.
+    private func headerLabel(symbol: String, color: Color, title: String, count: Int,
+                             subtitle: String?, expanded: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.caption2.bold()).foregroundStyle(.secondary)
+                .rotationEffect(.degrees(expanded ? 90 : 0))
+                .frame(width: 10)
+            Image(systemName: symbol).foregroundStyle(color)
+            Text(title).foregroundStyle(.primary)
+            // Number in the primary text colour, source colour in the pill:
+            // coloured digits on a same-colour pill vanished in dark mode (App
+            // Store blue) and would in light (Sparkle yellow).
+            Text("\(count)")
+                .font(.caption2).foregroundStyle(.primary)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(color.opacity(0.32), in: Capsule())
+            if let subtitle {
+                Text(subtitle).font(.caption).fontWeight(.regular).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
     }
 
     /// Third-party kexts sitting in /Library/Extensions that macOS isn't
@@ -280,18 +303,18 @@ struct UpdatesView: View {
     private var leftoverSection: some View {
         let leftovers = controller.visibleLeftovers
         if !leftovers.isEmpty {
-            sectionHeader(title: "Leftover drivers", symbol: "trash.slash.fill", color: .red,
-                          count: leftovers.count, subtitle: "not loaded — safe to remove")
-            if !collapsed.contains("Leftover drivers") {
-                Text("On disk but the kernel isn't using them — typically left behind by an old printer, dock, or drive-enclosure installer.")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 20)
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
+            section(id: "Leftover drivers") {
+                sectionHeader(title: "Leftover drivers", symbol: "trash.slash.fill", color: .red,
+                              count: leftovers.count, subtitle: "not loaded — safe to remove")
+            } content: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("On disk but the kernel isn't using them — typically left behind by an old printer, dock, or drive-enclosure installer.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(leftovers) { kext in LeftoverCard(kext: kext) }
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
             }
         }
     }
@@ -305,30 +328,18 @@ struct UpdatesView: View {
         let kexts = controller.hiddenLeftovers
         let total = items.count + kexts.count
         if total > 0 {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showHidden.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: showHidden ? "chevron.down" : "chevron.right")
-                        .font(.caption.bold()).frame(width: 10)
-                    Image(systemName: "eye.slash.fill").foregroundStyle(.secondary)
-                    Text("Hidden").foregroundStyle(.secondary)
-                    Text("\(total)")
-                        .font(.caption2).foregroundStyle(.secondary)
-                        .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.14), in: Capsule())
-                    Spacer()
+            section(id: "Hidden", expanded: showHidden) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showHidden.toggle() }
+                } label: {
+                    headerLabel(symbol: "eye.slash.fill", color: .secondary, title: "Hidden",
+                                count: total, subtitle: nil, expanded: showHidden)
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 10)
+                .frame(height: SectionPanel.headerHeight)
                 .font(.subheadline.bold())
-                .contentShape(Rectangle())
-                .padding(.leading, 10).padding(.trailing, 10).padding(.vertical, 5)
-                .background(Theme.card, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.14)))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20).padding(.top, 14)
-
-            if showHidden {
+            } content: {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(items) { item in
                         HiddenCard(id: item.id, name: item.name,
@@ -341,8 +352,6 @@ struct UpdatesView: View {
                                    appPath: nil, style: SourceStyle(symbol: "trash.slash.fill", color: .red))
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
             }
         }
     }
