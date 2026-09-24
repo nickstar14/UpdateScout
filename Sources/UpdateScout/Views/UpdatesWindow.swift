@@ -54,11 +54,13 @@ struct UpdatesView: View {
     @EnvironmentObject var controller: UpdateController
     /// Comma-separated ids of collapsed sections, remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
+    /// True while the list is scrolled to its end — see the scroll anchor below.
+    @State private var scrolledToBottom = false
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     private func toggleCollapsed(_ id: String) {
         var set = collapsed
         if set.contains(id) { set.remove(id) } else { set.insert(id) }
-        withAnimation(.easeInOut(duration: 0.2)) { collapsedRaw = set.sorted().joined(separator: ",") }
+        withAnimation(.smooth(duration: 0.38)) { collapsedRaw = set.sorted().joined(separator: ",") }
     }
 
     private var grouped: [(source: any UpdateSource, items: [UpdateItem])] {
@@ -70,9 +72,14 @@ struct UpdatesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            statusBanner
-            Divider().padding(.horizontal, 20)
+            // Header and status banner sit on a frosted title sheet; its
+            // rounded bottom edge replaces the old divider line.
+            VStack(spacing: 0) {
+                header
+                statusBanner
+            }
+            .background { TitleSheet() }
+            .padding(.bottom, 8)
             updateList
             errorSummary
         }
@@ -212,6 +219,25 @@ struct UpdatesView: View {
                     hiddenSection
                 }
                 .padding(.vertical, 12)
+                // Collapse state lives in @AppStorage, whose updates arrive
+                // outside any withAnimation transaction — so animate on the
+                // value itself. On the whole list, so the sections below slide
+                // up and down with the one that's rolling.
+                .animation(.smooth(duration: 0.38), value: collapsedRaw)
+                .animation(.smooth(duration: 0.38), value: showHidden)
+            }
+            // Which edge stays put when the content's height changes. Normally
+            // the top, so expanding pushes things down. But at the very end of
+            // the list, collapsing the last section would shrink the content
+            // under the scroll position and snap it to the new end; anchoring
+            // to the bottom there makes everything above glide down instead,
+            // and expanding it grows up into view rather than off-screen.
+            .defaultScrollAnchor(scrolledToBottom ? .bottom : .top, for: .sizeChanges)
+            .onScrollGeometryChange(for: Bool.self) { geo in
+                geo.contentSize.height > geo.containerSize.height
+                    && geo.contentOffset.y + geo.containerSize.height >= geo.contentSize.height - 24
+            } action: { _, atBottom in
+                scrolledToBottom = atBottom
             }
         }
     }
@@ -227,12 +253,20 @@ struct UpdatesView: View {
         let isExpanded = expanded ?? !collapsed.contains(id)
         return VStack(alignment: .leading, spacing: 0) {
             header()
-            if isExpanded {
-                content()
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 12)
-                    .transition(.opacity)
-            }
+            // The content stays in the layout and its height animates between
+            // zero and natural size, clipped and pinned to the top — so it
+            // unrolls from under the header rather than popping or fading.
+            content()
+                .frame(maxWidth: .infinity)
+                // Room below the header band's fade before the first cards.
+                .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 12)
+                // Keep the natural height even while the frame is shrunk, so
+                // the clip uncovers the cards instead of squashing them.
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: isExpanded ? nil : 0, alignment: .top)
+                .clipped()
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
         }
         .modifier(SectionPanel())
         .padding(.horizontal, 16)
@@ -330,7 +364,7 @@ struct UpdatesView: View {
         if total > 0 {
             section(id: "Hidden", expanded: showHidden) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showHidden.toggle() }
+                    withAnimation(.smooth(duration: 0.38)) { showHidden.toggle() }
                 } label: {
                     headerLabel(symbol: "eye.slash.fill", color: .secondary, title: "Hidden",
                                 count: total, subtitle: nil, expanded: showHidden)

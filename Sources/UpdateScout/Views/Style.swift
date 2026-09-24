@@ -147,34 +147,92 @@ struct AppLogo: View {
 
 /// A section's container. The corner radius is half the header's height, so a
 /// collapsed section is exactly a capsule — the header pill. Expanded, the
-/// header keeps its solid fill, which then fades out quickly so the cards sit
-/// on clear glass, while a firmer outline traces the whole section to show
-/// what belongs to it.
+/// header keeps its solid fill right down to where that pill would end, then
+/// fades out fast so the cards sit on clear glass; a firmer outline traces the
+/// whole section, and an outer shadow lifts it off the window's glass.
 struct SectionPanel: ViewModifier {
     static let headerHeight: CGFloat = 32
     static var radius: CGFloat { headerHeight / 2 }
-    /// How far below the header the fill takes to fade to clear.
-    static let fadeLength: CGFloat = 36
+
+    /// How far below the pill's edge the header band takes to fade out.
+    static let fadeLength: CGFloat = 10
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
         content
-            .background {
-                GeometryReader { geo in
-                    let total = geo.size.height
-                    if total <= Self.headerHeight + 1 {
-                        // Collapsed: a plain solid pill, no fade at the edge.
-                        shape.fill(Theme.card)
-                    } else {
-                        shape.fill(LinearGradient(stops: [
-                            .init(color: Theme.card, location: 0),
-                            .init(color: Theme.card, location: Self.headerHeight / total),
-                            .init(color: Theme.card.opacity(0),
-                                  location: min((Self.headerHeight + Self.fadeLength) / total, 1)),
-                        ], startPoint: .top, endPoint: .bottom))
-                    }
-                }
+            .background(alignment: .top) {
+                // A fixed-height band: solid down to exactly where the
+                // collapsed pill ends, then a short fade. Collapsed, the clip
+                // cuts it at that edge, so the pill is fully solid; expanded,
+                // the fade shows just below the header. Because it doesn't
+                // depend on the panel's height, it animates cleanly while the
+                // section rolls — a height-relative gradient jumped to its
+                // final stops mid-animation.
+                LinearGradient(stops: [
+                    .init(color: Theme.card, location: 0),
+                    .init(color: Theme.card, location: Self.headerHeight / (Self.headerHeight + Self.fadeLength)),
+                    .init(color: Theme.card.opacity(0), location: 1),
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: Self.headerHeight + Self.fadeLength)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .clipShape(shape)
             }
             .overlay(shape.strokeBorder(Color.primary.opacity(0.22)))
+            .background { OuterShadow(shape: shape) }
+    }
+}
+
+/// A shadow that only falls *outside* a shape. A plain `.shadow` on a mostly
+/// clear panel would darken its interior (or shadow the outline stroke on both
+/// sides); here the shape is drawn solid with its shadow and then masked so
+/// only the part beyond the shape's edge shows.
+private struct OuterShadow<S: Shape>: View {
+    let shape: S
+
+    var body: some View {
+        shape
+            .fill(Color.black)
+            .shadow(color: .black.opacity(0.22), radius: 9, y: 4)
+            .mask {
+                // An even-odd path — a big rectangle with exactly this shape
+                // cut out. (Padding a rectangle and overlaying the shape made
+                // the hole as large as the padded frame, hiding the shadow.)
+                GeometryReader { geo in
+                    let bounds = CGRect(origin: .zero, size: geo.size)
+                    Path { path in
+                        path.addRect(bounds.insetBy(dx: -40, dy: -40))
+                        path.addPath(shape.path(in: bounds))
+                    }
+                    .fill(style: FillStyle(eoFill: true))
+                }
+            }
+            .allowsHitTesting(false)
+    }
+}
+
+/// The frosted "title sheet" behind the window's header: glass with a light
+/// tint, running past the top and side edges so only its rounded bottom is
+/// visible — the bottom corners curve straight into the window's sides, and
+/// the side outlines fall outside the window and are clipped away.
+struct TitleSheet: View {
+    static let bottomRadius: CGFloat = 22
+
+    var body: some View {
+        let shape = UnevenRoundedRectangle(bottomLeadingRadius: Self.bottomRadius,
+                                           bottomTrailingRadius: Self.bottomRadius,
+                                           style: .continuous)
+        ZStack {
+            if #available(macOS 26.0, *) {
+                Color.clear.glassEffect(.regular, in: shape)
+            } else {
+                shape.fill(.ultraThickMaterial)
+            }
+            // A touch more frost than the window around it.
+            shape.fill(Theme.card.opacity(0.7))
+        }
+        .overlay(shape.strokeBorder(Color.primary.opacity(0.14)))
+        .background { OuterShadow(shape: shape) }
+        .padding(.horizontal, -1)    // side outlines land just outside the window
+        .padding(.top, -60)          // run past the window's top edge
     }
 }
