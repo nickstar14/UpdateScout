@@ -16,6 +16,9 @@ final class UpdateController: ObservableObject {
     @Published var installing: [String: String] = [:]
     /// Item id → error message from a failed install.
     @Published var installErrors: [String: String] = [:]
+    /// Failed installs that UpdateScout knows how to fix: item id → (cask
+    /// token, leftover staging folder). The card offers Repair for these.
+    @Published var repairable: [String: (token: String, folder: URL)] = [:]
 
     var visibleItems: [UpdateItem] {
         state.items.filter { !state.dismissed.contains($0.id) }
@@ -144,6 +147,34 @@ final class UpdateController: ObservableObject {
         ProcessRegistry.shared.terminate(tag: "install")
     }
 
+    /// Fix a cask stuck on a half-finished upgrade: move the leftover staging
+    /// folder to the Trash (recoverable, not deleted), then reinstall.
+    func repair(_ item: UpdateItem) {
+        guard let (token, folder) = repairable[item.id] else { return }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDir), isDir.boolValue else {
+            // Already gone (fixed some other way) — just retry.
+            repairable[item.id] = nil
+            BrewRepair.markForReinstall(token)
+            update(item)
+            return
+        }
+        installing[item.id] = "Moving the leftover upgrade folder to the Trash…"
+        installErrors[item.id] = nil
+        NSWorkspace.shared.recycle([folder]) { _, error in
+            Task { @MainActor in
+                self.installing[item.id] = nil
+                if let error {
+                    self.installErrors[item.id] = "Couldn't move \(folder.lastPathComponent) to the Trash: \(error.localizedDescription)"
+                    return
+                }
+                self.repairable[item.id] = nil
+                BrewRepair.markForReinstall(token)
+                self.update(item)
+            }
+        }
+    }
+
     func update(_ item: UpdateItem) {
         if !item.scriptedInstall {
             if let url = item.url.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
@@ -154,6 +185,7 @@ final class UpdateController: ObservableObject {
         // over Homebrew's cache lock and all but the first fail.
         installing[item.id] = "Queued…"
         installErrors[item.id] = nil
+        repairable[item.id] = nil
         pendingInstalls.append(item)
         processQueue()
     }
@@ -185,6 +217,9 @@ final class UpdateController: ObservableObject {
                     installing[item.id] = nil
                     // A user-cancelled install isn't an error worth showing.
                     if !cancelRequested { installErrors[item.id] = error.localizedDescription }
+                    if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
+                        repairable[item.id] = (token, folder)
+                    }
                 }
             }
             isProcessingQueue = false

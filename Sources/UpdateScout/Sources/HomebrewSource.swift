@@ -121,9 +121,21 @@ struct HomebrewSource: UpdateSource {
         }
         let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
         let (kind, name) = (parts.first ?? "", parts.last ?? item.name)
-        let args = kind == "cask" ? ["upgrade", "--cask", name] : ["upgrade", name]
+        // After a repair, `upgrade` can't run from the corrupted install
+        // record, so the retry is a forced reinstall.
+        let args: [String]
+        if kind == "cask" {
+            args = BrewRepair.consumeReinstall(name)
+                ? ["install", "--cask", "--force", name]
+                : ["upgrade", "--cask", name]
+        } else {
+            args = ["upgrade", name]
+        }
         let result = try await Shell.run(brew, args, tag: "install", lineHandler: progress)
         guard result.status == 0 else {
+            if kind == "cask", let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: name) {
+                throw UpdateScoutError.staleCaskUpgrade(token: name, folder: folder)
+            }
             throw UpdateScoutError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }
     }

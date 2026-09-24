@@ -128,6 +128,8 @@ enum UpdateScoutError: LocalizedError {
     case toolMissing(String, hint: String)
     case commandFailed(String, output: String)
     case parseFailure(String)
+    /// A cask stuck on a half-finished earlier upgrade — see BrewRepair.
+    case staleCaskUpgrade(token: String, folder: URL)
 
     var errorDescription: String? {
         switch self {
@@ -136,6 +138,8 @@ enum UpdateScoutError: LocalizedError {
             let tail = output.split(separator: "\n").suffix(4).joined(separator: "\n")
             return "`\(cmd)` failed:\n\(tail)"
         case .parseFailure(let what): return "Could not parse \(what)"
+        case .staleCaskUpgrade(let token, _):
+            return "Homebrew is stuck on an earlier upgrade of \(token) that never finished. Repair moves its leftover folder to the Trash and reinstalls it cleanly."
         }
     }
 }

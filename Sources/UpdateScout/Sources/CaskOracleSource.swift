@@ -58,6 +58,9 @@ struct CaskOracleSource: UpdateSource {
         let args = ["install", "--cask", item.installToken, "--force"]
         let result = try await Shell.run(brew, args, tag: "install", lineHandler: progress)
         guard result.status == 0 else {
+            if let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: item.installToken) {
+                throw UpdateScoutError.staleCaskUpgrade(token: item.installToken, folder: folder)
+            }
             throw UpdateScoutError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }
     }

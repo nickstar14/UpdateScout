@@ -149,10 +149,22 @@ struct UpdateCard: View {
                         UpdateDetailView(item: item).environmentObject(controller)
                     }
 
-                    Button(item.actionLabel) { controller.update(item) }
-                        .glassProminent(style.color)
+                    if controller.repairable[item.id] != nil {
+                        Button {
+                            controller.repair(item)
+                        } label: {
+                            Label("Repair", systemImage: "wrench.and.screwdriver")
+                        }
+                        .glassProminent(.orange)
                         .controlSize(.small)
                         .frame(maxWidth: .infinity)
+                        .help("Moves Homebrew's leftover upgrade folder to the Trash and reinstalls")
+                    } else {
+                        Button(item.actionLabel) { controller.update(item) }
+                            .glassProminent(style.color)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                    }
 
                     Menu {
                         Button("Ignore this version") { controller.dismiss(item) }
