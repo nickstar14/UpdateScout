@@ -19,6 +19,20 @@ final class UpdateController: ObservableObject {
     /// Failed installs that UpdateScout knows how to fix: item id → (cask
     /// token, leftover staging folder). The card offers Repair for these.
     @Published var repairable: [String: (token: String, folder: URL)] = [:]
+    /// Major upgrades waiting for the user to review them before they queue.
+    @Published var review: ReviewRequest?
+
+    struct ReviewRequest: Identifiable {
+        let id = UUID()
+        /// Major-version jumps the user must opt into, one by one.
+        let majors: [UpdateItem]
+        /// Ordinary updates that were requested alongside them.
+        let others: [UpdateItem]
+    }
+
+    private init() {
+        startWatching()
+    }
 
     var visibleItems: [UpdateItem] {
         state.items.filter { !state.dismissed.contains($0.id) }
@@ -35,8 +49,7 @@ final class UpdateController: ObservableObject {
     }
 
     func unhide(id: String) {
-        state.dismissed.remove(id)
-        Store.save(state)
+        state = Store.mutate { $0.dismissed.remove(id) }
     }
     /// Leftover id → progress text while a removal is in flight.
     @Published var removing: [String: String] = [:]
@@ -49,8 +62,13 @@ final class UpdateController: ObservableObject {
 
     // MARK: - Detection
 
+    /// Set when a check is asked for while one is already running, so the
+    /// request runs afterwards instead of being dropped (the re-check after an
+    /// install queue drains relies on this).
+    private var checkQueued = false
+
     func checkNow() {
-        guard !isChecking else { return }
+        guard !isChecking else { checkQueued = true; return }
         isChecking = true
         Task {
             async let detection = Self.runDetection(sources: enabledSources)
@@ -58,6 +76,10 @@ final class UpdateController: ObservableObject {
             let (items, errors) = await detection
             apply(items: items, errors: errors, leftovers: await leftovers)
             isChecking = false
+            if checkQueued {
+                checkQueued = false
+                checkNow()
+            }
         }
     }
 
@@ -108,7 +130,17 @@ final class UpdateController: ObservableObject {
     }
 
     private func apply(items: [UpdateItem], errors: [String: String], leftovers: [KextBundle]) {
-        var s = state
+        var fresh: [UpdateItem] = []
+        state = Store.mutate { s in
+            fresh = Self.merge(items: items, errors: errors, leftovers: leftovers, into: &s)
+        }
+        Notifier.notifyNewUpdates(fresh)
+    }
+
+    /// Fold one check's results into the stored state. Shared with the
+    /// headless background check; returns the items not notified about yet.
+    nonisolated static func merge(items: [UpdateItem], errors: [String: String],
+                                  leftovers: [KextBundle], into s: inout Store.State) -> [UpdateItem] {
         s.items = items
         s.sourceErrors = errors
         s.leftoverKexts = leftovers
@@ -120,11 +152,8 @@ final class UpdateController: ObservableObject {
         s.notified.formIntersection(ids)
 
         let fresh = items.filter { !s.notified.contains($0.id) && !s.dismissed.contains($0.id) }
-        Notifier.notifyNewUpdates(fresh)
         s.notified.formUnion(fresh.map(\.id))
-
-        state = s
-        Store.save(s)
+        return fresh
     }
 
     // MARK: - Install
@@ -132,6 +161,9 @@ final class UpdateController: ObservableObject {
     private var pendingInstalls: [UpdateItem] = []
     private var isProcessingQueue = false
     private var cancelRequested = false
+    /// The install running now, so Cancel can stop work that isn't a child
+    /// process (a Sparkle download).
+    private var currentInstall: Task<Void, Error>?
 
     /// Cancel a queued or in-flight install. Kills the child process (and any
     /// pending auth prompt it spawned); the item stays in the list for retry.
@@ -144,6 +176,7 @@ final class UpdateController: ObservableObject {
         guard installing[item.id] != nil else { return }
         cancelRequested = true
         installing[item.id] = "Cancelling…"
+        currentInstall?.cancel()
         ProcessRegistry.shared.terminate(tag: "install")
     }
 
@@ -202,17 +235,19 @@ final class UpdateController: ObservableObject {
                 }
                 cancelRequested = false
                 installing[item.id] = "Starting…"
-                do {
+                let install = Task {
                     try await source.install(item) { line in
                         Task { @MainActor in
                             if self.installing[item.id] != nil { self.installing[item.id] = line }
                         }
                     }
+                }
+                currentInstall = install
+                defer { currentInstall = nil }
+                do {
+                    try await install.value
                     installing[item.id] = nil
-                    var s = state
-                    s.items.removeAll { $0.id == item.id }
-                    state = s
-                    Store.save(s)
+                    state = Store.mutate { $0.items.removeAll { $0.id == item.id } }
                 } catch {
                     installing[item.id] = nil
                     // A user-cancelled install isn't an error worth showing.
@@ -229,31 +264,56 @@ final class UpdateController: ObservableObject {
         }
     }
 
-    /// Queue every visible scripted update; they still run one at a time.
-    func updateAll() {
-        for item in visibleItems where item.scriptedInstall && installing[item.id] == nil {
+    /// What the Update buttons call. A major-version jump goes through the
+    /// review sheet first; everything else queues straight away.
+    func requestUpdate(_ item: UpdateItem) {
+        if item.scriptedInstall && item.isMajorUpgrade {
+            review = ReviewRequest(majors: [item], others: [])
+        } else {
             update(item)
         }
+    }
+
+    /// Queue every visible scripted update; they still run one at a time.
+    func updateAll() {
+        queueAll(visibleItems.filter { $0.scriptedInstall && installing[$0.id] == nil })
     }
 
     /// Queue every installable update from one source.
     func updateAll(sourceID: String) {
-        for item in visibleItems
-        where item.sourceID == sourceID && item.scriptedInstall && installing[item.id] == nil {
-            update(item)
+        queueAll(visibleItems.filter {
+            $0.sourceID == sourceID && $0.scriptedInstall && installing[$0.id] == nil
+        })
+    }
+
+    /// Major upgrades are often paid, so a bulk update never includes them
+    /// without the user reviewing each one.
+    private func queueAll(_ items: [UpdateItem]) {
+        let majors = items.filter(\.isMajorUpgrade)
+        let others = items.filter { !$0.isMajorUpgrade }
+        if majors.isEmpty {
+            others.forEach(update)
+        } else {
+            review = ReviewRequest(majors: majors, others: others)
         }
     }
 
+    /// The review sheet's answer: queue the majors the user included, plus the
+    /// ordinary updates that came with them.
+    func finishReview(including majors: [UpdateItem]) {
+        guard let request = review else { return }
+        review = nil
+        (request.others + majors).forEach(update)
+    }
+
     func dismiss(_ item: UpdateItem) {
-        state.dismissed.insert(item.id)
-        Store.save(state)
+        state = Store.mutate { $0.dismissed.insert(item.id) }
     }
 
     // MARK: - Leftover kexts
 
     func dismissLeftover(_ kext: KextBundle) {
-        state.dismissed.insert(kext.id)
-        Store.save(state)
+        state = Store.mutate { $0.dismissed.insert(kext.id) }
     }
 
     /// Delete a leftover kext (admin prompt). Runs through the install queue's
@@ -270,10 +330,7 @@ final class UpdateController: ObservableObject {
                     }
                 }
                 removing[kext.id] = nil
-                var s = state
-                s.leftoverKexts.removeAll { $0.id == kext.id }
-                state = s
-                Store.save(s)
+                state = Store.mutate { $0.leftoverKexts.removeAll { $0.id == kext.id } }
             } catch {
                 removing[kext.id] = nil
                 removeErrors[kext.id] = error.localizedDescription
@@ -282,9 +339,61 @@ final class UpdateController: ObservableObject {
     }
 
     /// Re-read state from disk (a background check may have updated it).
+    /// Every write goes through Store.mutate, so the file is always at least
+    /// as new as what's in memory and reloading is safe at any time.
     func reloadFromDisk() {
-        guard installing.isEmpty, !isChecking else { return }
-        state = Store.load()
+        let fresh = Store.load()
+        if fresh != state { state = fresh }
+    }
+
+    // MARK: - Keeping the badge current
+
+    private var directoryWatcher: DispatchSourceFileSystemObject?
+    private var reloadPending = false
+    private var fallbackTimer: Timer?
+
+    /// The background agent writes state.json from another process, and the
+    /// badge has to follow it without the window being opened. Watch the
+    /// folder (state.json is replaced atomically, so a watch on the file
+    /// itself would go stale after the first write), and also reload on wake,
+    /// on activation, and on a slow timer in case an event is missed.
+    private func startWatching() {
+        let dir = Store.supportDirectory.path
+        let fd = open(dir, O_EVTONLY)
+        if fd >= 0 {
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd, eventMask: [.write, .rename], queue: .main)
+            source.setEventHandler { [weak self] in
+                MainActor.assumeIsolated { self?.scheduleReload() }
+            }
+            source.setCancelHandler { close(fd) }
+            source.resume()
+            directoryWatcher = source
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleReload() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleReload() }
+        }
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleReload() }
+        }
+    }
+
+    /// Coalesce bursts of events (one save touches the folder several times).
+    private func scheduleReload() {
+        guard !reloadPending else { return }
+        reloadPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            MainActor.assumeIsolated {
+                self?.reloadPending = false
+                self?.reloadFromDisk()
+            }
+        }
     }
 }
 

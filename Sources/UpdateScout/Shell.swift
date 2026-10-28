@@ -28,8 +28,10 @@ enum Shell {
     }
 
     /// Run an executable directly (no shell interpretation of arguments).
+    /// `environment` adds or overrides variables for this one process.
     @discardableResult
     static func run(_ executable: String, _ args: [String], tag: String? = nil,
+                    environment: [String: String] = [:],
                     lineHandler: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -48,50 +50,39 @@ enum Shell {
         // some mas updates need elevation. SUDO_ASKPASS makes sudo show a
         // graphical prompt instead — the password goes directly to sudo.
         env["SUDO_ASKPASS"] = Askpass.path
+        env.merge(environment) { _, new in new }
         process.environment = env
 
         let outPipe = Pipe(), errPipe = Pipe()
         process.standardOutput = outPipe
         process.standardError = errPipe
 
-        actor Collector {
-            var out = Data(); var err = Data()
-            func addOut(_ d: Data) { out.append(d) }
-            func addErr(_ d: Data) { err.append(d) }
-        }
-        let collector = Collector()
-
-        outPipe.fileHandleForReading.readabilityHandler = { h in
-            let d = h.availableData
-            guard !d.isEmpty else { return }
-            Task { await collector.addOut(d) }
-            if let lineHandler, let s = String(data: d, encoding: .utf8) {
-                for line in s.split(separator: "\n") { lineHandler(String(line)) }
+        // Appended synchronously under a lock, so output keeps its order (a
+        // Task per chunk could run out of order or after the process ended).
+        let out = OutputBuffer(), err = OutputBuffer()
+        func attach(_ pipe: Pipe, _ buffer: OutputBuffer) {
+            pipe.fileHandleForReading.readabilityHandler = { h in
+                let d = h.availableData
+                guard !d.isEmpty else { return }
+                let lines = buffer.append(d)
+                if let lineHandler { lines.forEach(lineHandler) }
             }
         }
-        errPipe.fileHandleForReading.readabilityHandler = { h in
-            let d = h.availableData
-            guard !d.isEmpty else { return }
-            Task { await collector.addErr(d) }
-            if let lineHandler, let s = String(data: d, encoding: .utf8) {
-                for line in s.split(separator: "\n") { lineHandler(String(line)) }
-            }
-        }
+        attach(outPipe, out)
+        attach(errPipe, err)
 
         return try await withCheckedThrowingContinuation { cont in
             process.terminationHandler = { p in
                 if let tag { ProcessRegistry.shared.remove(p, tag: tag) }
                 outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
-                let outRest = try? outPipe.fileHandleForReading.readToEnd()
-                let errRest = try? errPipe.fileHandleForReading.readToEnd()
-                Task {
-                    if let outRest { await collector.addOut(outRest) }
-                    if let errRest { await collector.addErr(errRest) }
-                    let out = String(data: await collector.out, encoding: .utf8) ?? ""
-                    let err = String(data: await collector.err, encoding: .utf8) ?? ""
-                    cont.resume(returning: Result(status: p.terminationStatus, stdout: out, stderr: err))
-                }
+                var tail: [String] = []
+                if let rest = try? outPipe.fileHandleForReading.readToEnd() { tail += out.append(rest) }
+                if let rest = try? errPipe.fileHandleForReading.readToEnd() { tail += err.append(rest) }
+                tail += out.finish() + err.finish()
+                if let lineHandler { tail.forEach(lineHandler) }
+                cont.resume(returning: Result(status: p.terminationStatus,
+                                              stdout: out.text, stderr: err.text))
             }
             do {
                 try process.run()
@@ -109,18 +100,53 @@ enum Shell {
         return nil
     }
 
-    // (Askpass helper lives below runPrivileged.)
-
     /// Run a command that needs admin rights. Uses `sudo -A`, which prompts
     /// through our own askpass dialog (AskpassDialog) and — unlike the
     /// osascript route — sets the real SUDO_UID/SUDO_USER environment that
     /// tools like mas rely on. Callers pass pre-quoted, trusted commands only.
-    static func runPrivileged(_ command: String, tag: String? = nil,
+    /// `reason` is the prompt's headline, so it says what the password is for.
+    static func runPrivileged(_ command: String, reason: String, tag: String? = nil,
                               lineHandler: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         // (Refronting after the auth dialog is handled via the distributed
         // notification the askpass process posts when it closes.)
         return try await run("/usr/bin/sudo", ["-A", "/bin/sh", "-c", command],
-                             tag: tag, lineHandler: lineHandler)
+                             tag: tag, environment: [Askpass.reasonKey: reason],
+                             lineHandler: lineHandler)
+    }
+}
+
+/// Collects one pipe's output and cuts it into lines for progress display.
+/// Lines end at \n or \r (brew redraws progress bars with \r); a line split
+/// across two reads is held until its end arrives.
+final class OutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    private var partial = Data()
+
+    func append(_ chunk: Data) -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        data.append(chunk)
+        partial.append(chunk)
+        var lines: [String] = []
+        while let i = partial.firstIndex(where: { $0 == 0x0A || $0 == 0x0D }) {
+            let line = partial[partial.startIndex..<i]
+            partial = Data(partial[partial.index(after: i)...])
+            if !line.isEmpty, let s = String(data: line, encoding: .utf8) { lines.append(s) }
+        }
+        return lines
+    }
+
+    /// Whatever is left after the last line break.
+    func finish() -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        defer { partial = Data() }
+        guard !partial.isEmpty, let s = String(data: partial, encoding: .utf8) else { return [] }
+        return [s]
+    }
+
+    var text: String {
+        lock.lock(); defer { lock.unlock() }
+        return String(data: data, encoding: .utf8) ?? ""
     }
 }
 
@@ -128,6 +154,10 @@ enum Shell {
 /// terminal: it shows a native password dialog and prints the entry to
 /// stdout, which sudo reads directly. UpdateScout itself never sees it.
 enum Askpass {
+    /// Environment variable carrying the prompt's headline from
+    /// runPrivileged, through sudo, to the askpass process.
+    static let reasonKey = "UPDATESCOUT_ASKPASS_REASON"
+
     static var path: String {
         let url = Store.supportDirectory.appendingPathComponent("askpass.sh")
         // Re-invoke our own binary in --askpass mode, which shows a

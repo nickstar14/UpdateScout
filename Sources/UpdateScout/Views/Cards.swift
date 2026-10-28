@@ -158,7 +158,7 @@ struct UpdateCard: View {
                         .frame(maxWidth: .infinity)
                         .help("Moves Homebrew's leftover upgrade folder to the Trash and reinstalls")
                     } else {
-                        Button(item.actionLabel) { controller.update(item) }
+                        Button(item.actionLabel) { controller.requestUpdate(item) }
                             .glassProminent(style.color)
                             .controlSize(.small)
                             .frame(maxWidth: .infinity)
@@ -192,6 +192,7 @@ struct UpdateCard: View {
 struct LeftoverCard: View {
     @EnvironmentObject var controller: UpdateController
     let kext: KextBundle
+    @State private var confirmingRemoval = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -228,9 +229,15 @@ struct LeftoverCard: View {
                 }
             } else {
                 HStack(spacing: 6) {
-                    Button("Remove", role: .destructive) { controller.removeLeftover(kext) }
+                    Button("Remove", role: .destructive) { confirmingRemoval = true }
                         .glassProminent(.red).controlSize(.small)
                         .frame(maxWidth: .infinity)
+                        .confirmationDialog("Remove \(kext.name)?", isPresented: $confirmingRemoval) {
+                            Button("Remove", role: .destructive) { controller.removeLeftover(kext) }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This deletes \(kext.path). macOS isn't loading it, but the software that installed it may stop working. This can't be undone.")
+                        }
                     Menu {
                         Button("Ignore this one") { controller.dismissLeftover(kext) }
                         Button("Show in Finder") {

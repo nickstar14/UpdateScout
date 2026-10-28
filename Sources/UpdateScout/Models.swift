@@ -2,9 +2,11 @@ import Foundation
 
 /// One available update, as reported by a detector.
 struct UpdateItem: Identifiable, Codable, Hashable {
-    /// Stable identity: source + name + latest version, so a new version of the
-    /// same app counts as a "new" item for notification/dismissal purposes.
-    var id: String { "\(sourceID)|\(name)|\(latestVersion)" }
+    /// Stable identity: source + install token + name + latest version, so a
+    /// new version of the same app counts as a "new" item for notification/
+    /// dismissal purposes. The token keeps a formula and a cask that share a
+    /// name (docker, docker) from collapsing into one id.
+    var id: String { "\(sourceID)|\(installToken)|\(name)|\(latestVersion)" }
 
     let sourceID: String
     let name: String
@@ -145,24 +147,80 @@ enum UpdateScoutError: LocalizedError {
 }
 
 /// Lenient dotted-version comparison ("1.10.2" > "1.9"). Non-numeric parts
-/// compare as strings. Returns true if `remote` is newer than `local`.
+/// compare as strings. A leading "v" is ignored, and a release ranks above its
+/// own prereleases ("3.0.0" > "3.0.0-beta.4" > "3.0.0-alpha.10").
+/// Returns true if `remote` is newer than `local`.
 func isNewerVersion(_ remote: String, than local: String) -> Bool {
-    // Homebrew cask versions can carry build metadata after "," or "_" — compare the front part.
-    func clean(_ s: String) -> [Substring] {
-        let front = s.split(whereSeparator: { $0 == "," || $0 == "_" }).first.map(String.init) ?? s
-        return front.split(separator: ".")
+    compareVersions(remote, local) == .orderedDescending
+}
+
+/// A version split into its dotted core and an optional prerelease stage.
+struct VersionParts {
+    var core: [String]
+    /// nil for a release; otherwise the stage rank (dev < alpha < beta < rc).
+    var stage: Int?
+    var stageNumber: Int
+
+    /// 0 for a release, 1 for beta-like (beta, preview, rc), 2 for alpha-like
+    /// (alpha, dev, nightly). Used to work out which release track an app is on.
+    var track: Int {
+        guard let stage else { return 0 }
+        return stage <= Self.alphaRank ? 2 : 1
     }
-    let r = clean(remote), l = clean(local)
-    for i in 0..<max(r.count, l.count) {
-        let rp = i < r.count ? r[i] : "0"
-        let lp = i < l.count ? l[i] : "0"
-        if let ri = Int(rp), let li = Int(lp) {
-            if ri != li { return ri > li }
-        } else if rp != lp {
-            return rp.compare(lp, options: .numeric) == .orderedDescending
+
+    static let alphaRank = 1
+    private static let stages: [(String, Int)] = [
+        ("nightly", 0), ("dev", 0), ("alpha", 1),
+        ("beta", 2), ("preview", 3), ("pre", 3), ("rc", 4),
+    ]
+    private static let marker = try! NSRegularExpression(
+        pattern: "[-.+ ]?(nightly|dev|alpha|beta|preview|pre|rc)[-.]?(\\d*)",
+        options: .caseInsensitive)
+
+    init(_ raw: String) {
+        var s = raw.trimmingCharacters(in: .whitespaces)
+        if let first = s.first, first == "v" || first == "V", s.dropFirst().first?.isNumber == true {
+            s.removeFirst()
+        }
+        // Homebrew cask versions can carry build metadata after "," or "_".
+        s = s.split(whereSeparator: { $0 == "," || $0 == "_" }).first.map(String.init) ?? s
+        stage = nil
+        stageNumber = 0
+        let ns = s as NSString
+        if let m = Self.marker.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
+           m.range.location > 0 {
+            let name = ns.substring(with: m.range(at: 1)).lowercased()
+            stage = Self.stages.first { $0.0 == name }?.1
+            stageNumber = Int(ns.substring(with: m.range(at: 2))) ?? 0
+            s = ns.substring(to: m.range.location)
+        }
+        core = s.split(separator: ".").map(String.init)
+    }
+}
+
+func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
+    let x = VersionParts(a), y = VersionParts(b)
+    for i in 0..<max(x.core.count, y.core.count) {
+        let xp = i < x.core.count ? x.core[i] : "0"
+        let yp = i < y.core.count ? y.core[i] : "0"
+        if let xi = Int(xp), let yi = Int(yp) {
+            if xi != yi { return xi < yi ? .orderedAscending : .orderedDescending }
+        } else if xp != yp {
+            let r = xp.compare(yp, options: .numeric)
+            if r != .orderedSame { return r }
         }
     }
-    return false
+    switch (x.stage, y.stage) {
+    case (nil, nil): return .orderedSame
+    case (nil, _): return .orderedDescending   // release beats its prerelease
+    case (_, nil): return .orderedAscending
+    case let (xs?, ys?):
+        if xs != ys { return xs < ys ? .orderedAscending : .orderedDescending }
+        if x.stageNumber != y.stageNumber {
+            return x.stageNumber < y.stageNumber ? .orderedAscending : .orderedDescending
+        }
+        return .orderedSame
+    }
 }
 
 extension UpdateItem {

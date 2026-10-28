@@ -38,10 +38,11 @@ enum KextInventory {
         }
     }
 
-    /// Bundle identifiers the kernel currently has loaded.
-    static func loadedIDs() async -> Set<String> {
+    /// Bundle identifiers the kernel currently has loaded, or nil if that
+    /// couldn't be determined.
+    static func loadedIDs() async -> Set<String>? {
         guard let result = try? await Shell.run("/usr/bin/kmutil", ["showloaded", "--no-kernel-components"]),
-              result.status == 0 else { return [] }
+              result.status == 0, !result.stdout.isEmpty else { return nil }
         // Each line lists the bundle ID in its own column; a substring check
         // against the full output is enough and tolerant of column changes.
         var ids = Set<String>()
@@ -49,9 +50,12 @@ enum KextInventory {
         return ids
     }
 
+    /// If the loaded set can't be read, nothing is called a leftover: an
+    /// empty answer would otherwise label every driver in use as "safe to
+    /// remove", one click from a root `rm -rf`.
     static func partition() async -> (loaded: [KextBundle], leftover: [KextBundle]) {
         let all = onDisk()
-        let loaded = await loadedIDs()
+        guard let loaded = await loadedIDs() else { return ([], []) }
         return (all.filter { loaded.contains($0.bundleID) },
                 all.filter { !loaded.contains($0.bundleID) })
     }
@@ -80,7 +84,8 @@ enum KextInventory {
         progress("Authorizing — enter your password to remove…")
         let quoted = "'" + kext.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
         let result = try await Shell.runPrivileged(
-            "/bin/rm -rf \(quoted) && /usr/bin/touch '\(directory)'", tag: "install")
+            "/bin/rm -rf \(quoted) && /usr/bin/touch '\(directory)'",
+            reason: "UpdateScout is trying to remove the leftover driver \(kext.name).", tag: "install")
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed("rm -rf \(kext.name).kext", output: result.combined)
         }

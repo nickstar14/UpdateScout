@@ -4,7 +4,7 @@ import QuartzCore
 
 /// Local JSON persistence under ~/Library/Application Support/UpdateScout/.
 struct Store {
-    struct State: Codable {
+    struct State: Codable, Equatable {
         var lastCheck: Date?
         var items: [UpdateItem] = []
         /// Item ids the user dismissed ("ignore this version").
@@ -46,10 +46,30 @@ struct Store {
         return state
     }
 
-    static func save(_ state: State) {
+    private static func save(_ state: State) {
         guard let data = try? encoder.encode(state) else { return }
         try? data.write(to: stateURL, options: .atomic)
     }
+
+    /// The only way to write state. The menu bar app and the background agent
+    /// are separate processes that both write this file, so each write
+    /// re-reads it under a cross-process lock and applies just its own
+    /// change. Saving a whole in-memory copy instead let one process erase the
+    /// other's newer results. Returns the state as written.
+    @discardableResult
+    static func mutate(_ change: (inout State) -> Void) -> State {
+        let lockPath = supportDirectory.appendingPathComponent("state.lock").path
+        let fd = open(lockPath, O_CREAT | O_RDWR, 0o600)
+        if fd >= 0 { flock(fd, LOCK_EX) }
+        defer { if fd >= 0 { flock(fd, LOCK_UN); close(fd) } }
+        var state = load()
+        change(&state)
+        save(state)
+        return state
+    }
+
+    /// Where state.json lives, for the app's file watcher.
+    static var stateFileURL: URL { stateURL }
 
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d

@@ -46,7 +46,12 @@ enum GitHubNotes {
     /// Notes already fetched, keyed "owner/repo@version". A missing-notes
     /// result is cached too, so a project with no release body isn't re-asked.
     private struct Cache: Codable {
-        struct Entry: Codable { var notes: String?; var url: String? }
+        struct Entry: Codable {
+            var notes: String?
+            var url: String?
+            /// When it was fetched, so trimming drops the oldest first.
+            var added: Date? = Date()
+        }
         var entries: [String: Entry] = [:]
 
         private static var url: URL { Store.supportDirectory.appendingPathComponent("github-notes.json") }
@@ -61,7 +66,8 @@ enum GitHubNotes {
             // Keep the file from growing forever: old versions are never asked for again.
             var trimmed = self
             if trimmed.entries.count > 400 {
-                trimmed.entries = Dictionary(uniqueKeysWithValues: Array(trimmed.entries.suffix(400)))
+                let newest = trimmed.entries.sorted { ($0.value.added ?? .distantPast) > ($1.value.added ?? .distantPast) }
+                trimmed.entries = Dictionary(uniqueKeysWithValues: Array(newest.prefix(400)))
             }
             if let data = try? JSONEncoder().encode(trimmed) { try? data.write(to: Self.url, options: .atomic) }
         }

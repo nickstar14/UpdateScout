@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// User-editable fallback: ~/Library/Application Support/UpdateScout/custom_sources.json
 /// Each entry defines where to read the installed version, where to fetch the
@@ -59,7 +60,7 @@ struct CustomSource: UpdateSource {
         catch { throw UpdateScoutError.parseFailure("custom_sources.json (\(error.localizedDescription))") }
 
         var items: [UpdateItem] = []
-        for (index, entry) in entries.enumerated() where entry.enabled ?? true {
+        for entry in entries where entry.enabled ?? true {
             guard let installed = await installedVersion(of: entry) else { continue }
             guard let latest = await remoteVersion(of: entry) else { continue }
             if isNewerVersion(latest, than: installed) {
@@ -68,7 +69,7 @@ struct CustomSource: UpdateSource {
                                         installedVersion: installed, latestVersion: latest,
                                         url: entry.downloadPage ?? entry.remoteURL,
                                         caveat: scripted ? entry.notes : "Opens the vendor download page.",
-                                        installToken: String(index),
+                                        installToken: Self.token(for: entry),
                                         scriptedInstall: scripted,
                                         appPath: entry.installedPlist.flatMap { plist in
                                             let r = plist.range(of: "/Contents/Info.plist")
@@ -120,12 +121,24 @@ struct CustomSource: UpdateSource {
         return nil
     }
 
+    /// Identifies an entry by name plus a fingerprint of its install command.
+    /// A position in the array would point at a different entry if the file
+    /// were edited between the check and the install, and run its command.
+    static func token(for entry: Entry) -> String {
+        let digest = SHA256.hash(data: Data((entry.installCommand ?? "").utf8))
+        return entry.name + "|" + digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let data = FileManager.default.contents(atPath: Self.configURL.path),
-              let entries = try? JSONDecoder().decode([Entry].self, from: data),
-              let index = Int(item.installToken), entries.indices.contains(index),
-              let cmd = entries[index].installCommand
-        else { throw UpdateScoutError.parseFailure("custom_sources.json entry for \(item.name)") }
+              let entries = try? JSONDecoder().decode([Entry].self, from: data)
+        else { throw UpdateScoutError.parseFailure("custom_sources.json") }
+        guard let entry = entries.first(where: { Self.token(for: $0) == item.installToken }),
+              let cmd = entry.installCommand
+        else {
+            throw UpdateScoutError.commandFailed(
+                item.name, output: "This entry changed in custom_sources.json since the last check. Check Now, then try again.")
+        }
 
         let result = try await Shell.run("/bin/sh", ["-c", cmd], tag: "install", lineHandler: progress)
         guard result.status == 0 else {

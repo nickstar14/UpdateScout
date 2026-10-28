@@ -55,6 +55,8 @@ enum SparkleInstaller {
             }
         }
 
+        try Task.checkCancellation()
+
         // 2. Verify the signature before unpacking anything.
         progress("Verifying signature…")
         let archiveData = try Data(contentsOf: archive)
@@ -102,11 +104,22 @@ enum SparkleInstaller {
         if wasRunning {
             progress("Quitting \(plan.appURL.lastPathComponent)…")
             running.forEach { $0.terminate() }
-            for _ in 0..<50 where NSRunningApplication
-                .runningApplications(withBundleIdentifier: bundleID ?? "").contains(where: { !$0.isTerminated }) {
+            func stillRunning() -> Bool {
+                NSRunningApplication.runningApplications(withBundleIdentifier: bundleID ?? "")
+                    .contains { !$0.isTerminated }
+            }
+            for _ in 0..<50 where stillRunning() {
                 try? await Task.sleep(for: .milliseconds(200))
             }
+            // Never swap a bundle out from under a running app (it may be
+            // sitting on an unsaved-changes dialog).
+            if stillRunning() {
+                throw UpdateScoutError.commandFailed(
+                    "quit \(plan.appURL.lastPathComponent)",
+                    output: "\(plan.appURL.deletingPathExtension().lastPathComponent) didn't quit. Save your work, quit it, then try again. Nothing was changed.")
+            }
         }
+        try Task.checkCancellation()
 
         progress("Installing…")
         try await swap(newApp: newApp, into: plan.appURL, workDir: workDir, progress: progress)
@@ -158,7 +171,9 @@ enum SparkleInstaller {
               /usr/sbin/chown -R \(owner):\(group) \(q(target.path)); } || \
             { /bin/mv \(q(backup.path)) \(q(target.path)); exit 1; }
             """
-            let result = try await Shell.runPrivileged(command, tag: "install")
+            let result = try await Shell.runPrivileged(
+                command, reason: "UpdateScout needs to replace \(target.deletingPathExtension().lastPathComponent) with its update.",
+                tag: "install")
             guard result.status == 0, fm.fileExists(atPath: target.path) else {
                 throw UpdateScoutError.commandFailed(
                     "replace \(target.lastPathComponent)",
@@ -268,9 +283,15 @@ final class ProgressDownloader: NSObject, URLSessionDownloadDelegate, @unchecked
         let delegate = ProgressDownloader(destination: destination, onProgress: onProgress)
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            delegate.continuation = cont
-            session.downloadTask(with: url).resume()
+        // Cancelling the install (the card's Cancel) stops the download too.
+        let task = session.downloadTask(with: url)
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                delegate.continuation = cont
+                task.resume()
+            }
+        } onCancel: {
+            task.cancel()
         }
     }
 

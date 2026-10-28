@@ -14,8 +14,13 @@ struct CaskOracleSource: UpdateSource {
         let casks = try await CaskIndex.load()
 
         // Apps already managed as brew casks are HomebrewSource's job; skip them here.
-        let installedCasksResult = try? await Shell.run(brew, ["list", "--cask", "-1"])
-        let brewManaged = Set((installedCasksResult?.stdout ?? "").split(separator: "\n").map(String.init))
+        // If this fails, stop: treating every cask as unmanaged would offer to
+        // reinstall apps Homebrew already manages.
+        let listed = try await Shell.run(brew, ["list", "--cask", "-1"])
+        guard listed.status == 0 else {
+            throw UpdateScoutError.commandFailed("brew list --cask", output: listed.combined)
+        }
+        let brewManaged = Set(listed.stdout.split(separator: "\n").map(String.init))
 
         // Index casks by lowercase app filename and by human name (stable
         // casks only — see CaskIndex.byAppName).

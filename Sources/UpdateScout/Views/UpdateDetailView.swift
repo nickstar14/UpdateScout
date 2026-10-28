@@ -121,7 +121,7 @@ struct UpdateDetailView: View {
             Button("Close") { dismiss() }.glass()
             if controller.installing[item.id] == nil {
                 Button {
-                    controller.update(item); dismiss()
+                    dismiss(); controller.requestUpdate(item)
                 } label: {
                     Label(item.actionLabelLong, systemImage: item.actionSymbol)
                 }
@@ -130,22 +130,47 @@ struct UpdateDetailView: View {
         }
     }
 
-    /// Vendors ship notes as HTML (Sparkle) or plain text (App Store). Render
-    /// HTML when it looks like HTML; otherwise show the text as-is.
-    static func attributed(from notes: String) -> AttributedString {
+    /// Rendered notes, keyed by their source text: the HTML importer is slow,
+    /// and SwiftUI asks for this on every redraw.
+    @MainActor private static var renderedNotes: [String: AttributedString] = [:]
+
+    /// Vendors ship notes as HTML (Sparkle), Markdown (GitHub) or plain text
+    /// (App Store). Remote images, scripts and stylesheets are stripped first
+    /// so rendering never fetches anything from the vendor's page.
+    @MainActor static func attributed(from notes: String) -> AttributedString {
+        if let hit = renderedNotes[notes] { return hit }
+        let rendered = render(notes)
+        if renderedNotes.count > 100 { renderedNotes.removeAll() }
+        renderedNotes[notes] = rendered
+        return rendered
+    }
+
+    private static func render(_ notes: String) -> AttributedString {
         let looksLikeHTML = notes.range(of: "<[a-zA-Z][^>]*>", options: .regularExpression) != nil
-        if looksLikeHTML, let data = notes.data(using: .utf8),
-           let ns = try? NSAttributedString(
-                data: data,
-                options: [.documentType: NSAttributedString.DocumentType.html,
-                          .characterEncoding: String.Encoding.utf8.rawValue],
-                documentAttributes: nil) {
-            // Drop the HTML's own fonts/colours so it follows the app's theme.
-            let plain = NSMutableAttributedString(attributedString: ns)
-            plain.removeAttribute(.font, range: NSRange(location: 0, length: plain.length))
-            plain.removeAttribute(.foregroundColor, range: NSRange(location: 0, length: plain.length))
-            plain.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: plain.length))
-            return AttributedString(plain)
+        if looksLikeHTML {
+            let safe = notes.replacingOccurrences(
+                of: "<(img|script|link|iframe|video|audio|source|object|embed)\\b[^>]*>(</\\1>)?",
+                with: "", options: [.regularExpression, .caseInsensitive])
+            if let data = safe.data(using: .utf8),
+               let ns = try? NSAttributedString(
+                    data: data,
+                    options: [.documentType: NSAttributedString.DocumentType.html,
+                              .characterEncoding: String.Encoding.utf8.rawValue],
+                    documentAttributes: nil) {
+                // Drop the HTML's own fonts/colours so it follows the app's theme.
+                let plain = NSMutableAttributedString(attributedString: ns)
+                plain.removeAttribute(.font, range: NSRange(location: 0, length: plain.length))
+                plain.removeAttribute(.foregroundColor, range: NSRange(location: 0, length: plain.length))
+                plain.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: plain.length))
+                return AttributedString(plain)
+            }
+        }
+        // Inline Markdown (bold, code, links) with line breaks kept; headings
+        // and list markers stay as written, which reads fine in plain text.
+        if let md = try? AttributedString(
+            markdown: notes,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            return md
         }
         return AttributedString(notes)
     }

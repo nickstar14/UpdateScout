@@ -82,8 +82,17 @@ struct SettingsView: View {
                     }
                 Toggle("Check for updates in the background", isOn: $agentInstalled)
                     .onChange(of: agentInstalled) { _, on in
-                        do { on ? try LaunchAgent.install(intervalMinutes: intervalMinutes) : try LaunchAgent.uninstall() }
-                        catch { agentError = error.localizedDescription; agentInstalled = LaunchAgent.isInstalled }
+                        guard on != LaunchAgent.isInstalled else { return }
+                        Task {
+                            do {
+                                agentError = nil
+                                on ? try await LaunchAgent.install(intervalMinutes: intervalMinutes)
+                                   : try await LaunchAgent.uninstall()
+                            } catch {
+                                agentError = error.localizedDescription
+                                agentInstalled = LaunchAgent.isInstalled
+                            }
+                        }
                     }
                 Picker("Check every", selection: $intervalMinutes) {
                     ForEach(Prefs.checkIntervalChoices, id: \.self) {
@@ -92,7 +101,11 @@ struct SettingsView: View {
                 }
                 .onChange(of: intervalMinutes) { _, minutes in
                     Prefs.checkIntervalMinutes = minutes
-                    if agentInstalled { try? LaunchAgent.install(intervalMinutes: minutes) }
+                    guard agentInstalled else { return }
+                    Task {
+                        do { agentError = nil; try await LaunchAgent.install(intervalMinutes: minutes) }
+                        catch { agentError = error.localizedDescription }
+                    }
                 }
                 if let agentError {
                     Text(agentError).font(.caption).foregroundStyle(.red)
@@ -183,7 +196,7 @@ enum LaunchAgent {
 
     static var isInstalled: Bool { FileManager.default.fileExists(atPath: plistURL.path) }
 
-    static func install(intervalMinutes: Int) throws {
+    static func install(intervalMinutes: Int) async throws {
         guard let exe = Bundle.main.executablePath else { return }
         let plist: [String: Any] = [
             "Label": label,
@@ -196,28 +209,22 @@ enum LaunchAgent {
         try FileManager.default.createDirectory(at: plistURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         try data.write(to: plistURL)
-        reload()
+        // bootout has to finish before bootstrap, or bootstrap can fail with
+        // "service already loaded". Shell.run waits for each to exit, off the
+        // main thread. bootout failing just means it wasn't loaded.
+        await bootout()
+        let result = try await Shell.run("/bin/launchctl", ["bootstrap", "gui/\(getuid())", plistURL.path])
+        guard result.status == 0 else {
+            throw UpdateScoutError.commandFailed("launchctl bootstrap", output: result.combined)
+        }
     }
 
-    static func uninstall() throws {
-        bootout()
+    static func uninstall() async throws {
+        await bootout()
         try? FileManager.default.removeItem(at: plistURL)
     }
 
-    private static func reload() {
-        bootout()
-        run(["bootstrap", "gui/\(getuid())", plistURL.path])
-    }
-
-    private static func bootout() {
-        run(["bootout", "gui/\(getuid())/\(label)"])
-    }
-
-    private static func run(_ args: [String]) {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        p.arguments = args
-        try? p.run()
-        p.waitUntilExit()
+    private static func bootout() async {
+        _ = try? await Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
     }
 }

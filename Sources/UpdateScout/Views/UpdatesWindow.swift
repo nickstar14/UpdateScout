@@ -150,6 +150,9 @@ struct UpdatesView: View {
         .frame(minWidth: Self.minimumWidth, minHeight: 380)
         .background(GlassBackground())
         .onAppear { controller.reloadFromDisk() }
+        .sheet(item: $controller.review) { request in
+            MajorUpgradeReview(request: request).environmentObject(controller)
+        }
     }
 
     // MARK: Chrome

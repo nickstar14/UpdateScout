@@ -22,18 +22,12 @@ struct Main {
             async let detection = UpdateController.runDetection(sources: sources)
             async let leftovers = KextInventory.partition().leftover
             let (items, errors) = await detection
-            var s = Store.load()
-            s.items = items
-            s.sourceErrors = errors
-            s.leftoverKexts = await leftovers
-            s.lastCheck = Date()
-            let ids = Set(items.map(\.id)).union(s.leftoverKexts.map(\.id))
-            s.dismissed.formIntersection(ids)
-            s.notified.formIntersection(ids)
-            let fresh = items.filter { !s.notified.contains($0.id) && !s.dismissed.contains($0.id) }
+            let kexts = await leftovers
+            var fresh: [UpdateItem] = []
+            Store.mutate { s in
+                fresh = UpdateController.merge(items: items, errors: errors, leftovers: kexts, into: &s)
+            }
             Notifier.notifyNewUpdates(fresh)
-            s.notified.formUnion(fresh.map(\.id))
-            Store.save(s)
             // Give the notification a moment to post before exiting.
             try? await Task.sleep(for: .seconds(2))
             semaphore.signal()
@@ -92,11 +86,14 @@ struct UpdateScoutApp: App {
                 .environmentObject(controller)
         } label: {
             // Rotated slightly so the arrow sweep matches the app icon's angle.
+            // While a check runs the count is followed by "…", so a number
+            // that is about to change never reads as final.
             let icon = Image(systemName: "arrow.triangle.2.circlepath")
-            if controller.badgeCount > 0 {
+            if controller.badgeCount > 0 || controller.isChecking {
                 HStack(spacing: 3) {
                     icon.rotationEffect(.degrees(-15))
-                    Text("\(controller.badgeCount)")
+                    Text((controller.badgeCount > 0 ? "\(controller.badgeCount)" : "")
+                         + (controller.isChecking ? "…" : ""))
                 }
             } else {
                 icon.rotationEffect(.degrees(-15))

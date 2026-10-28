@@ -65,13 +65,10 @@ struct SystemUpdateSource: UpdateSource {
             : "\(v.majorVersion).\(v.minorVersion)"
     }
 
+    /// Never reached: macOS rows aren't scripted (they open System Settings,
+    /// which handles the download, restart and progress).
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
-        progress("Authorizing — enter your password, then the install runs…")
-        // Quote the label for the embedded shell; labels come from softwareupdate itself.
-        let quoted = "'" + item.installToken.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        let result = try await Shell.runPrivileged("/usr/sbin/softwareupdate -i \(quoted)", tag: "install")
-        guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("softwareupdate -i \(item.installToken)", output: result.combined)
-        }
+        throw UpdateScoutError.commandFailed(
+            "softwareupdate", output: "macOS updates install from Software Update in System Settings.")
     }
 }

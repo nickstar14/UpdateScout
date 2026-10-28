@@ -14,7 +14,10 @@ enum AskpassDialog {
         app.setActivationPolicy(.accessory)
 
         let alert = NSAlert()
-        alert.messageText = "UpdateScout is trying to install an update."
+        // runPrivileged passes what the password is for; anything else that
+        // reaches sudo (brew installing a pkg cask) is an update install.
+        alert.messageText = ProcessInfo.processInfo.environment[Askpass.reasonKey]
+            ?? "UpdateScout is trying to install an update."
         alert.informativeText = "Enter your password to allow this."
         alert.icon = circularKeyIcon()
         alert.addButton(withTitle: "OK")
