@@ -309,5 +309,6 @@
     "squares": [
       "macOS"
     ]
-  }
+  },
+  "color-space-for-untagged-svg-colors": "display-p3"
 }

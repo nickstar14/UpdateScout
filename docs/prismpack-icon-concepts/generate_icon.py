@@ -70,7 +70,10 @@ def main():
         {"name": "Background", "layers": [layer("00-background", False)],
          "shadow": {"kind": "none", "opacity": 0.5}, "translucency": {"enabled": False, "value": 0.5}},
     ]
-    doc = {"fill": "automatic", "groups": groups, "supported-platforms": {"squares": ["macOS"]}}
+    doc = {"fill": "automatic", "groups": groups, "supported-platforms": {"squares": ["macOS"]},
+           # Icon Composer's "Use Display P3 if untagged": the SVGs' plain hex
+           # colours are read as Display P3, which makes the sheen more vivid.
+           "color-space-for-untagged-svg-colors": "display-p3"}
     (ICON / "icon.json").write_text(json.dumps(doc, indent=2))
     # Drop copied files no layer points at (Dark copies identical to Default).
     used = set(json.dumps(doc).split('"'))

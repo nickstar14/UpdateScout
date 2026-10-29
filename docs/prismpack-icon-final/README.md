@@ -19,6 +19,12 @@ Open it in Icon Composer and tune from there.
 - **Mono (Clear and Tinted):** swaps in the grey `clear/` layers, and hides the
   sheen and the background. The prism's shaded face is a solid dark grey
   (`#5c5c5c`) here, so the 3D doesn't get lost without colour.
+- **Use Display P3 if untagged: on** (`color-space-for-untagged-svg-colors`).
+  SVG hex colours carry no colour profile, so Icon Composer normally reads
+  them as sRGB. With this on, it reads the same numbers as Display P3, the
+  Mac's wider gamut, so they render more saturated. It mainly shows in the
+  sheen (measured about 11% more saturated). On older sRGB screens macOS
+  clips to the nearest colour, so nothing breaks.
 - **Display P3:** the six cards carry P3 fills in Default and Dark (the same
   values read as P3, so they're richer than sRGB). Mono keeps "automatic".
   Measured in the ictool render: the red card went from P3 0.93/0.56/0.49
