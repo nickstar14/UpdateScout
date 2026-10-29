@@ -4,9 +4,11 @@ A Swift (SwiftPM) macOS menu bar update manager. It finds updates from
 Homebrew, the Mac App Store (`mas`), Sparkle feeds, macOS updates and custom
 sources, and installs them.
 
-**Next up is 2.0.0.** Read [docs/2.0.0-plan.md](docs/2.0.0-plan.md) first. It
-covers the ideas, the decisions already made, leftover fixes, and a suggested
-order. [docs/1.8.0-plan.md](docs/1.8.0-plan.md) records what 1.8.0 changed.
+**Next up is 2.0.0, renamed PrismPack.** Read
+[docs/2.0.0-build-guide.md](docs/2.0.0-build-guide.md) first. It's the single
+entry point, with the status at handoff, Nick's answers (section 3.4), the
+build order and links to every other 2.0 doc.
+[docs/1.8.0-plan.md](docs/1.8.0-plan.md) records what 1.8.0 changed.
 
 ## Rules for working here
 
