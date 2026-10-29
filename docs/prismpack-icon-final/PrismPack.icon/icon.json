@@ -54,17 +54,16 @@
       "layers": [
         {
           "name": "08-front-sheen",
-          "image-name": "default-08-front-sheen.svg",
           "glass": false,
           "opacity": 0.75,
           "blend-mode": "normal",
-          "hidden-specializations": [
+          "image-name-specializations": [
             {
-              "value": false
+              "value": "default-08-front-sheen.svg"
             },
             {
               "appearance": "tinted",
-              "value": true
+              "value": "clear-08-front-sheen.svg"
             }
           ]
         },

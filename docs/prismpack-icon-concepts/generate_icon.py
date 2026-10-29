@@ -60,7 +60,7 @@ def main():
          "translucency": {"enabled": False, "value": 0.5}},
         # Sheen at 75% (Nick). A full-strength shadow behind the front card
         # sets it clearly in front of the stack.
-        {"name": "Front", "layers": [layer("08-front-sheen", False, 0.75, hide_in_mono=True),
+        {"name": "Front", "layers": [layer("08-front-sheen", False, 0.75),
                                      layer("07-front-card", True)],
          "shadow": {"kind": "neutral", "opacity": 1}, "specular": True,
          "translucency": {"enabled": True, "value": 0.5}},

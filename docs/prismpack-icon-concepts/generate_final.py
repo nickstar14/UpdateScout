@@ -8,7 +8,7 @@ appearance's variant. Layers are flat and full-canvas with no mask, with a sligh
 baked-in transparency (ALPHA). Icon Composer adds the glass and highlights.
 Run: python3 generate_final.py"""
 import pathlib
-from generate import svg, tile
+from generate import svg, tile, SPECTRUM
 from generate_round4 import spectrum_gradient
 from generate_round6 import backdrop, BACKDROPS
 
@@ -24,6 +24,18 @@ def poly(points, fill, alpha=1):
     pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in points)
     return f'<polygon points="{pts}" fill="{fill}" fill-opacity="{alpha}"/>'
 
+def mono_sheen_gradient(gid):
+    """The rainbow sheen without colour: the same diagonal bands, each
+    colour replaced by a grey of its own brightness, stretched a little so
+    the soft light and dark stripes still read in Clear and Tinted."""
+    stops = ""
+    for i, c in enumerate(SPECTRUM):
+        r, g, b = (int(c[k:k + 2], 16) / 255 for k in (1, 3, 5))
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        grey = round(255 * min(1, max(0, 0.35 + (lum - 0.35) * 1.4)))
+        stops += f'<stop offset="{i / 6:.3f}" stop-color="#{grey:02x}{grey:02x}{grey:02x}"/>'
+    return f'<linearGradient id="{gid}" x1="0" y1="0" x2="1" y2="1">{stops}</linearGradient>'
+
 def layer_set(background, cards, front, sheen, prism_light, prism_shade, prism_alpha=None):
     layers = {"00-background": backdrop(background)}
     # Each card is 40 wider and 34 lower than the one behind it, and the
@@ -34,7 +46,10 @@ def layer_set(background, cards, front, sheen, prism_light, prism_shade, prism_a
     fx, fw = 512 - FRONT_W // 2, FRONT_W
     front_a, sheen_a = ALPHA["front"], ALPHA["sheen"]
     layers["07-front-card"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="{front}" fill-opacity="{front_a}"/>')
-    if sheen:
+    if sheen == "mono":
+        layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="{sheen_a}"/>',
+                                       mono_sheen_gradient("sh"))
+    elif sheen:
         layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="{sheen_a}"/>',
                                        spectrum_gradient("sh", 0, 0, 1, 1))
     cx, cy, h = 512, FRONT_Y + FRONT_W / 2, 270
@@ -57,7 +72,7 @@ APPEARANCES = {
     # element, as Apple recommends. No sheen: it turns muddy without colour.
     "clear": layer_set(("#3a3a3c", "#2c2c2e", "#1c1c1e"),
                        ["#8e8e8e", "#999999", "#a4a4a4", "#afafaf", "#bababa", "#c5c5c5"],
-                       "#dedede", False, "#ffffff", "#5c5c5c", prism_alpha=1),
+                       "#dedede", "mono", "#ffffff", "#5c5c5c", prism_alpha=1),
 }
 
 if __name__ == "__main__":

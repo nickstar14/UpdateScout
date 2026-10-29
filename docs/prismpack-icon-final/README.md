@@ -16,8 +16,10 @@ Open it in Icon Composer and tune from there.
   it's clearly the front one.
 - **Dark:** swaps in the midnight background, the lavender front card and the
   deeper prism shade.
-- **Mono (Clear and Tinted):** swaps in the grey `clear/` layers, and hides the
-  sheen and the background. The prism's shaded face is a solid dark grey
+- **Mono (Clear and Tinted):** swaps in the grey `clear/` layers and hides the
+  background. The sheen stays, as a **greyscale sheen**: the same diagonal
+  bands with each rainbow colour turned into a grey of its own brightness,
+  so the front tile still gets soft light and dark stripes without colour. The prism's shaded face is a solid dark grey
   (`#5c5c5c`) here, so the 3D doesn't get lost without colour.
 - **Use Display P3 if untagged: on** (`color-space-for-untagged-svg-colors`).
   SVG hex colours carry no colour profile, so Icon Composer normally reads
