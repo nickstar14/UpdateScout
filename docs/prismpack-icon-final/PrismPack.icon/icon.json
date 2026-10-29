@@ -1,79 +1,246 @@
 {
-  "fill" : {
-    "automatic-gradient" : "srgb:0.60986,0.78828,0.80206,1.00000",
-    "orientation" : {
-      "start" : {
-        "x" : 0.5,
-        "y" : 0
-      },
-      "stop" : {
-        "x" : 0.5,
-        "y" : 0.7
-      }
-    }
-  },
-  "groups" : [
+  "fill": "automatic",
+  "groups": [
     {
-      "layers" : [
+      "name": "Prism",
+      "layers": [
         {
-          "image-name" : "10-prism-shade.svg",
-          "name" : "10-prism-shade"
+          "name": "10-prism-shade",
+          "glass": false,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-10-prism-shade.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "dark-10-prism-shade.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-10-prism-shade.svg"
+            }
+          ]
         },
         {
-          "image-name" : "09-prism-light.svg",
-          "name" : "09-prism-light"
-        },
-        {
-          "glass" : true,
-          "image-name" : "08-front-sheen.svg",
-          "name" : "08-front-sheen",
-          "opacity" : 1
-        },
-        {
-          "image-name" : "07-front-card.svg",
-          "name" : "07-front-card"
-        },
-        {
-          "image-name" : "06-card-violet.svg",
-          "name" : "06-card-violet"
-        },
-        {
-          "image-name" : "05-card-blue.svg",
-          "name" : "05-card-blue"
-        },
-        {
-          "image-name" : "04-card-green.svg",
-          "name" : "04-card-green"
-        },
-        {
-          "image-name" : "03-card-yellow.svg",
-          "name" : "03-card-yellow"
-        },
-        {
-          "image-name" : "02-card-orange.svg",
-          "name" : "02-card-orange"
-        },
-        {
-          "image-name" : "01-card-red.svg",
-          "name" : "01-card-red"
-        },
-        {
-          "image-name" : "00-background.svg",
-          "name" : "00-background"
+          "name": "09-prism-light",
+          "glass": false,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-09-prism-light.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-09-prism-light.svg"
+            }
+          ]
         }
       ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.3
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Front",
+      "layers": [
+        {
+          "name": "08-front-sheen",
+          "image-name": "default-08-front-sheen.svg",
+          "glass": false,
+          "opacity": 0.5,
+          "blend-mode": "normal",
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "07-front-card",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-07-front-card.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "dark-07-front-card.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-07-front-card.svg"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Cards",
+      "layers": [
+        {
+          "name": "06-card-violet",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-06-card-violet.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-06-card-violet.svg"
+            }
+          ]
+        },
+        {
+          "name": "05-card-blue",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-05-card-blue.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-05-card-blue.svg"
+            }
+          ]
+        },
+        {
+          "name": "04-card-green",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-04-card-green.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-04-card-green.svg"
+            }
+          ]
+        },
+        {
+          "name": "03-card-yellow",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-03-card-yellow.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-03-card-yellow.svg"
+            }
+          ]
+        },
+        {
+          "name": "02-card-orange",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-02-card-orange.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-02-card-orange.svg"
+            }
+          ]
+        },
+        {
+          "name": "01-card-red",
+          "glass": true,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-01-card-red.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "clear-01-card-red.svg"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
+      }
+    },
+    {
+      "name": "Background",
+      "layers": [
+        {
+          "name": "00-background",
+          "glass": false,
+          "opacity": 1.0,
+          "blend-mode": "normal",
+          "image-name-specializations": [
+            {
+              "value": "default-00-background.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "dark-00-background.svg"
+            }
+          ],
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
       }
     }
   ],
-  "supported-platforms" : {
-    "squares" : [
+  "supported-platforms": {
+    "squares": [
       "macOS"
     ]
   }
