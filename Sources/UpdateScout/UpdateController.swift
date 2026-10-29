@@ -11,7 +11,9 @@ final class UpdateController: ObservableObject {
     ]
 
     @Published var state = Store.load()
-    @Published var isChecking = false
+    @Published var isChecking = false { didSet { updateSpinner() } }
+    /// Menu bar icon rotation while a check runs; 0 when idle.
+    @Published private(set) var spinFrame = 0
     /// Item ids with an install in flight → latest progress line.
     @Published var installing: [String: String] = [:]
     /// Item id → error message from a failed install.
@@ -145,6 +147,7 @@ final class UpdateController: ObservableObject {
         s.sourceErrors = errors
         s.leftoverKexts = leftovers
         s.lastCheck = Date()
+        s.checkStartedAt = nil
         // Prune dismissals/notifications for items that no longer exist,
         // so a future re-appearance notifies again.
         let ids = Set(items.map(\.id)).union(leftovers.map(\.id))
@@ -344,6 +347,40 @@ final class UpdateController: ObservableObject {
     func reloadFromDisk() {
         let fresh = Store.load()
         if fresh != state { state = fresh }
+        updateSpinner()
+    }
+
+    // MARK: - Menu bar spinner
+
+    private var spinTimer: Timer?
+
+    /// A background check in progress, as flagged in state.json. Ignored once
+    /// stale, so an agent that crashed mid-check can't leave it spinning.
+    private var backgroundCheckRunning: Bool {
+        guard let started = state.checkStartedAt else { return false }
+        return Date().timeIntervalSince(started) < 10 * 60
+    }
+
+    var isSpinning: Bool { isChecking || backgroundCheckRunning }
+
+    private func updateSpinner() {
+        let spinning = isSpinning
+        if spinning, spinTimer == nil {
+            // One spoke per tick, so a full turn takes a second, like the
+            // system spinner.
+            spinTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(MenuBarIcon.spokes), repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.spinFrame = (self.spinFrame + 1) % MenuBarIcon.spokes
+                    // Catch a stale background flag without waiting for a reload.
+                    if !self.isChecking && !self.backgroundCheckRunning { self.updateSpinner() }
+                }
+            }
+        } else if !spinning, let timer = spinTimer {
+            timer.invalidate()
+            spinTimer = nil
+            spinFrame = 0
+        }
     }
 
     // MARK: - Keeping the badge current

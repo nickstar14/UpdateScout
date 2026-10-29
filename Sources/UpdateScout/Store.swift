@@ -16,6 +16,9 @@ struct Store {
         /// Third-party kexts on disk that the kernel isn't loading — offered
         /// for removal rather than update.
         var leftoverKexts: [KextBundle] = []
+        /// Set by the background agent while its check runs, so the menu bar
+        /// app can show the check in progress.
+        var checkStartedAt: Date?
 
         init() {}
 
@@ -28,6 +31,7 @@ struct Store {
             notified = try c.decodeIfPresent(Set<String>.self, forKey: .notified) ?? []
             sourceErrors = try c.decodeIfPresent([String: String].self, forKey: .sourceErrors) ?? [:]
             leftoverKexts = try c.decodeIfPresent([KextBundle].self, forKey: .leftoverKexts) ?? []
+            checkStartedAt = try c.decodeIfPresent(Date.self, forKey: .checkStartedAt)
         }
     }
 

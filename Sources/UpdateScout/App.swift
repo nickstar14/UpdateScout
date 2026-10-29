@@ -17,6 +17,8 @@ struct Main {
     /// Installs never happen here — detection only.
     static func backgroundCheck() {
         let semaphore = DispatchSemaphore(value: 0)
+        // Tell the menu bar app a check is under way (merge clears it).
+        Store.mutate { $0.checkStartedAt = Date() }
         Task {
             let sources = UpdateController.allSources.filter { !Prefs.disabledSources.contains($0.id) }
             async let detection = UpdateController.runDetection(sources: sources)
@@ -85,19 +87,9 @@ struct UpdateScoutApp: App {
             MenuView()
                 .environmentObject(controller)
         } label: {
-            // Rotated slightly so the arrow sweep matches the app icon's angle.
-            // While a check runs the count is followed by "…", so a number
-            // that is about to change never reads as final.
-            let icon = Image(systemName: "arrow.triangle.2.circlepath")
-            if controller.badgeCount > 0 || controller.isChecking {
-                HStack(spacing: 3) {
-                    icon.rotationEffect(.degrees(-15))
-                    Text((controller.badgeCount > 0 ? "\(controller.badgeCount)" : "")
-                         + (controller.isChecking ? "…" : ""))
-                }
-            } else {
-                icon.rotationEffect(.degrees(-15))
-            }
+            // A spinner while any check runs (here or in the background
+            // agent), so a count that is about to change never reads as final.
+            MenuBarLabel(controller: controller)
         }
         .menuBarExtraStyle(.window)
     }
