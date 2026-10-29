@@ -32,6 +32,27 @@ the macOS 27 version of Icon Composer.
   (see `scripts/build-app.sh`), so the finished file replaces that one,
   keeping the name `AppIcon.icon`.
 
+## Transparency is built in
+
+Every layer except the background has a slight transparency baked into its
+file, so it looks right as soon as it's imported:
+
+| Layer | Built-in opacity |
+|---|---|
+| Cards 01 to 06 | 85% |
+| 07-front-card | 30% (clear glass the cards show through) |
+| 08-front-sheen | 45% |
+| 09-prism-light | 95% |
+| 10-prism-shade | 85% |
+
+**Leave Icon Composer's Opacity at 100%** for these. Its slider multiplies on
+top of the built-in value, so 50% there would make a card about 43%. Lower
+it only to fine-tune. This departs from Apple's "flat and opaque" advice,
+because Nick wanted slight transparency on every layer.
+
+The front card is the next size step after violet (540 wide against
+violet's 500), so the deck grows toward the viewer.
+
 ## The three folders
 
 Each folder holds the same filenames, so each layer has a Default file and,
@@ -56,7 +77,7 @@ where needed, a Dark or Mono variant of it.
    | Group | Layers | Liquid Glass | Group settings to start with |
    |---|---|---|---|
    | **Cards** | 01 to 06 (red to violet) | On | Neutral shadow, light translucency |
-   | **Front** | 07-front-card, 08-front-sheen | 07 on, 08 off | **High translucency**, specular on. Sheen blend Soft Light or Overlay at 40 to 60% |
+   | **Front** | 07-front-card, 08-front-sheen | 07 on, 08 off | **High translucency**, specular on. Optionally set the sheen's blend to Soft Light or Overlay |
    | **Prism** | 09-prism-light, 10-prism-shade | Off, or light glass | Specular on, neutral shadow |
 
 3. **Dark.** Select the Dark appearance and, for each layer that has a file

@@ -4,8 +4,8 @@ front and the 3D prism. Writes one folder per Icon Composer appearance into
 ../prismpack-icon-final/: default/ (also light mode), dark/, and clear/ (the
 Mono appearance, which drives Clear and Tinted). Every folder has the same
 filenames, so each dark or clear file drops onto the matching layer as that
-appearance's variant. Layers are flat, opaque and full-canvas with no mask:
-Icon Composer adds the glass, translucency and highlights.
+appearance's variant. Layers are flat and full-canvas with no mask, with a slight
+baked-in transparency (ALPHA). Icon Composer adds the glass and highlights.
 Run: python3 generate_final.py"""
 import pathlib
 from generate import svg, tile
@@ -14,24 +14,33 @@ from generate_round6 import backdrop, BACKDROPS
 
 OUT = pathlib.Path(__file__).parent.parent / "prismpack-icon-final"
 NAMES = ["red", "orange", "yellow", "green", "blue", "violet"]
+FRONT_W = 540
+FRONT_Y = 322   # front card spans y 322 to 862; red, the top card, starts at 118
+# Baked-in transparency, so the layers look right as soon as they are
+# imported. Icon Composer's own Opacity slider multiplies on top of these.
+ALPHA = {"card": 0.85, "front": 0.3, "sheen": 0.45, "prism-light": 0.95, "prism-shade": 0.85}
 
-def poly(points, fill):
+def poly(points, fill, alpha=1):
     pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in points)
-    return f'<polygon points="{pts}" fill="{fill}"/>'
+    return f'<polygon points="{pts}" fill="{fill}" fill-opacity="{alpha}"/>'
 
 def layer_set(background, cards, front, sheen, prism_light, prism_shade):
     layers = {"00-background": backdrop(background)}
+    # Each card is 40 wider and 34 lower than the one behind it, and the
+    # front card takes the next step (540), so the deck grows toward you.
     for i, c in enumerate(cards):
         cw = 300 + i * 40
-        layers[f"{i + 1:02d}-card-{NAMES[i]}"] = svg(tile(512 - cw // 2, 352 - (6 - i) * 34, cw, c, 1, cw * 0.24))
-    layers["07-front-card"] = svg(f'<rect x="262" y="352" width="500" height="500" rx="120" fill="{front}"/>')
+        layers[f"{i + 1:02d}-card-{NAMES[i]}"] = svg(tile(512 - cw // 2, FRONT_Y - (6 - i) * 34, cw, c, ALPHA["card"], cw * 0.24))
+    fx, fw = 512 - FRONT_W // 2, FRONT_W
+    front_a, sheen_a = ALPHA["front"], ALPHA["sheen"]
+    layers["07-front-card"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="{front}" fill-opacity="{front_a}"/>')
     if sheen:
-        layers["08-front-sheen"] = svg('<rect x="262" y="352" width="500" height="500" rx="120" fill="url(#sh)"/>',
+        layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="{sheen_a}"/>',
                                        spectrum_gradient("sh", 0, 0, 1, 1))
-    cx, cy, h = 512, 602, 250
+    cx, cy, h = 512, FRONT_Y + FRONT_W / 2, 270
     apex, left, right, ridge = (cx, cy - h / 2), (cx - h * .55, cy + h / 2), (cx + h * .55, cy + h / 2), (cx + h * .17, cy + h / 2)
-    layers["09-prism-light"] = svg(poly([apex, left, ridge], prism_light))
-    layers["10-prism-shade"] = svg(poly([apex, ridge, right], prism_shade))
+    layers["09-prism-light"] = svg(poly([apex, left, ridge], prism_light, ALPHA["prism-light"]))
+    layers["10-prism-shade"] = svg(poly([apex, ridge, right], prism_shade, ALPHA["prism-shade"]))
     return layers
 
 APPEARANCES = {

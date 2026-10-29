@@ -1,0 +1,80 @@
+{
+  "fill" : {
+    "automatic-gradient" : "srgb:0.60986,0.78828,0.80206,1.00000",
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "10-prism-shade.svg",
+          "name" : "10-prism-shade"
+        },
+        {
+          "image-name" : "09-prism-light.svg",
+          "name" : "09-prism-light"
+        },
+        {
+          "glass" : true,
+          "image-name" : "08-front-sheen.svg",
+          "name" : "08-front-sheen",
+          "opacity" : 1
+        },
+        {
+          "image-name" : "07-front-card.svg",
+          "name" : "07-front-card"
+        },
+        {
+          "image-name" : "06-card-violet.svg",
+          "name" : "06-card-violet"
+        },
+        {
+          "image-name" : "05-card-blue.svg",
+          "name" : "05-card-blue"
+        },
+        {
+          "image-name" : "04-card-green.svg",
+          "name" : "04-card-green"
+        },
+        {
+          "image-name" : "03-card-yellow.svg",
+          "name" : "03-card-yellow"
+        },
+        {
+          "image-name" : "02-card-orange.svg",
+          "name" : "02-card-orange"
+        },
+        {
+          "image-name" : "01-card-red.svg",
+          "name" : "01-card-red"
+        },
+        {
+          "image-name" : "00-background.svg",
+          "name" : "00-background"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.3
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}
