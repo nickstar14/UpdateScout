@@ -40,8 +40,11 @@ struct UpdatesPage: View {
         }
     }
 
+    @AppStorage(Migration.noticeKey) private var showRenameNotice = false
+
     var body: some View {
         VStack(spacing: 0) {
+            if Migration.showsRenameBanner { renameBanner }
             let nothingToDo = controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty
             let hiddenCount = controller.hiddenItems.count + controller.hiddenLeftovers.count
             if nothingToDo && hiddenCount == 0 {
@@ -200,6 +203,25 @@ struct UpdatesPage: View {
                 }
             }
         }
+    }
+
+    /// Stays for all of 2.0. Clicking it replays the rename pop-up.
+    private var renameBanner: some View {
+        Button {
+            showRenameNotice = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
+                Text("UpdateScout is now \(AppIdentity.name)").font(.callout)
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20).padding(.vertical, 9)
+            .background(Color.accentColor.opacity(0.08))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Why the new name")
     }
 
     @ViewBuilder

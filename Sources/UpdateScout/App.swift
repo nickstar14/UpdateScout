@@ -70,6 +70,7 @@ struct UpdateScoutApp: App {
                 UpdatesWindow.shared.show()
             }
         }
+        Migration.prepareNotice()
         // First launch with missing dependencies → open Settings so the
         // Setup section can offer one-click installs.
         if !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {

@@ -89,6 +89,7 @@ final class UpdatesWindow {
 struct MainView: View {
     @EnvironmentObject var controller: UpdateController
     @State private var columns = NavigationSplitViewVisibility.all
+    @AppStorage(Migration.noticeKey) private var showRenameNotice = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
@@ -137,6 +138,9 @@ struct MainView: View {
         .sheet(item: $controller.passwordRequest) { request in
             PasswordSheet(request: request).environmentObject(controller)
                 .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $showRenameNotice) {
+            RenameWelcome { showRenameNotice = false }
         }
     }
 }

@@ -10,7 +10,13 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+        // Relaunching from the renamed bundle: the new copy does the rest.
+        if Migration.runAtLaunch() { return }
         StatusItemController.shared.install()
+        // The rename pop-up lives in the main window, so open it once.
+        if UserDefaults.standard.bool(forKey: Migration.noticeKey) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { UpdatesWindow.shared.show() }
+        }
     }
 
     /// User clicked (or actioned) a notification.
