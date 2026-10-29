@@ -9,6 +9,9 @@ struct ComponentsSource: UpdateSource {
     let id = "components"
     let displayName = "Drivers & extensions"
 
+    /// Driver casks that run a pkg installer ask for a password.
+    func needsAdmin(_ item: UpdateItem) -> Bool { HomebrewSource.isInstallerCask(item.installToken) }
+
     func detect() async throws -> [UpdateItem] {
         let casks = try await CaskIndex.load()
         let byName = CaskIndex.byAppName(casks)

@@ -93,6 +93,21 @@ enum Prefs {
         set { UserDefaults.standard.set(Array(newValue), forKey: "disabledSources") }
     }
 
+    /// Ask for the admin password once per batch instead of once per sudo call.
+    static var askPasswordOncePerBatch: Bool {
+        get { UserDefaults.standard.object(forKey: "askPasswordOncePerBatch") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "askPasswordOncePerBatch") }
+    }
+
+    /// How many installs may run at once ("Update at once", 1 to 8).
+    static var updateConcurrency: Int {
+        get {
+            let value = UserDefaults.standard.integer(forKey: "updateConcurrency")
+            return value == 0 ? 4 : min(max(value, 1), 8)
+        }
+        set { UserDefaults.standard.set(min(max(newValue, 1), 8), forKey: "updateConcurrency") }
+    }
+
     /// Choices for the background check interval, in minutes.
     static let checkIntervalChoices = [5, 15, 30, 45, 60, 180, 360, 720, 1440]
 

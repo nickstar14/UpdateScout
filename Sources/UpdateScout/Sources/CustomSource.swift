@@ -8,6 +8,10 @@ struct CustomSource: UpdateSource {
     let id = "custom"
     let displayName = "Custom sources"
 
+    /// Custom commands are opaque: they can't be marked ahead of time. If one
+    /// calls sudo, the batch password (or the usual dialog) answers it.
+    func needsAdmin(_ item: UpdateItem) -> Bool { false }
+
     struct Entry: Codable {
         var name: String
         /// Skip this entry without error if the app isn't installed.

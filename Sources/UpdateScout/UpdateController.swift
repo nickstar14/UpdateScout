@@ -161,7 +161,18 @@ final class UpdateController: ObservableObject {
     // MARK: - Install
 
     private var pendingInstalls: [UpdateItem] = []
-    private var isProcessingQueue = false
+    /// Lane of each running install, keyed by item id.
+    private var runningLanes: [String: String] = [:]
+    /// Running installs that may show a password prompt.
+    private var runningAdmin: Set<String> = []
+    /// Queued items already checked for needing admin, and those that do.
+    private var classified: Set<String> = []
+    private var adminItems: Set<String> = []
+    private var classifying = false
+    /// Queued Homebrew items whose download already ran in a shared `brew fetch`.
+    private var prefetched: Set<String> = []
+    /// Set while a batch is in flight, so the list is re-checked once it drains.
+    private var batchActive = false
     /// Running installs by item id, so Cancel can stop work that isn't a
     /// child process (a Sparkle download).
     private var runningInstalls: [String: Task<Void, Error>] = [:]
@@ -173,9 +184,14 @@ final class UpdateController: ObservableObject {
     /// (and any pending auth prompt they spawned); other installs carry on and
     /// the item stays in the list for retry.
     func cancelInstall(_ item: UpdateItem) {
-        if installStates[item.id] == .queued {
+        // Still waiting (queued, or sharing the batch's brew download).
+        if pendingInstalls.contains(where: { $0.id == item.id }) {
             pendingInstalls.removeAll { $0.id == item.id }
             installStates[item.id] = nil
+            forget(item)
+            if passwordRequest != nil, !pendingInstalls.contains(where: { adminItems.contains($0.id) }) {
+                passwordRequest = nil
+            }
             return
         }
         guard isBusy(item), let task = runningInstalls[item.id] else { return }
@@ -219,54 +235,205 @@ final class UpdateController: ObservableObject {
             return
         }
         guard !isBusy(item) else { return }
-        // Installs run strictly one at a time: parallel `brew` processes fight
-        // over Homebrew's cache lock and all but the first fail.
         installStates[item.id] = .queued
         repairable[item.id] = nil
         pendingInstalls.append(item)
-        processQueue()
+        startReadyInstalls()
     }
 
-    private func processQueue() {
-        guard !isProcessingQueue else { return }
-        isProcessingQueue = true
-        Task {
-            while !pendingInstalls.isEmpty {
-                let item = pendingInstalls.removeFirst()
-                guard let source = Self.allSources.first(where: { $0.id == item.sourceID }) else {
-                    installStates[item.id] = nil
-                    continue
-                }
-                installStates[item.id] = .installing("Starting…")
-                let install = Task {
-                    try await Shell.$installTag.withValue(Self.processTag(item)) {
-                        try await source.install(item) { line in
-                            Task { @MainActor in
-                                guard let current = self.installStates[item.id], current.isActive,
-                                      current != .cancelling else { return }
-                                self.installStates[item.id] = InstallState(progressLine: line)
-                            }
-                        }
-                    }
-                }
-                runningInstalls[item.id] = install
-                do {
-                    try await install.value
-                    installStates[item.id] = .done
-                    state = Store.mutate { $0.items.removeAll { $0.id == item.id } }
-                } catch {
-                    // A user-cancelled install isn't an error worth showing.
-                    installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
-                    if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
-                        repairable[item.id] = (token, folder)
-                    }
-                }
-                runningInstalls[item.id] = nil
+    /// The lane an install runs in. One install at a time per lane, because
+    /// package managers hold locks: every `brew` caller shares one lane
+    /// (custom commands may call brew too), and each other manager has its own.
+    nonisolated static func lane(for sourceID: String) -> String {
+        switch sourceID {
+        case "homebrew", "caskOracle", "components", "custom": return "brew"
+        default: return sourceID
+        }
+    }
+
+    /// Start every queued install that may run now: up to the "Update at once"
+    /// limit, one per lane. Items that need admin wait for the password sheet.
+    /// Without a batch password, only one install that may prompt runs at a
+    /// time, so two password dialogs never appear together.
+    private func startReadyInstalls() {
+        if classifying { return }
+        let unclassified = pendingInstalls.filter { !classified.contains($0.id) }
+        if !unclassified.isEmpty { classify(unclassified); return }
+        requestPasswordIfNeeded()
+        if prefetchBrewDownloads() { return }
+        let brokered = PasswordBroker.shared.isActive
+        var index = 0
+        while index < pendingInstalls.count, runningLanes.count < Prefs.updateConcurrency {
+            let item = pendingInstalls[index]
+            guard let source = Self.allSources.first(where: { $0.id == item.sourceID }) else {
+                pendingInstalls.remove(at: index)
+                installStates[item.id] = nil
+                continue
             }
-            isProcessingQueue = false
+            let lane = Self.lane(for: item.sourceID)
+            let admin = !brokered && Self.mayPrompt(item, needsAdmin: adminItems.contains(item.id))
+            if runningLanes.values.contains(lane) || (admin && !runningAdmin.isEmpty)
+                || (passwordRequest != nil && adminItems.contains(item.id)) {
+                index += 1
+                continue
+            }
+            pendingInstalls.remove(at: index)
+            runningLanes[item.id] = lane
+            if admin { runningAdmin.insert(item.id) }
+            batchActive = true
+            run(item, with: source)
+        }
+        if batchActive, pendingInstalls.isEmpty, runningLanes.isEmpty {
+            batchActive = false
+            PasswordBroker.shared.stop()
             // Re-detect once the queue drains so completed/externally-updated
             // items fall off the list instead of going stale.
             checkNow()
+        }
+    }
+
+    /// Could this install show a password dialog? Known pkg installers, plus
+    /// tools that may fall back to sudo with no warning (mas, custom commands,
+    /// Sparkle swaps, any cask).
+    nonisolated static func mayPrompt(_ item: UpdateItem, needsAdmin: Bool) -> Bool {
+        needsAdmin || ["mas", "custom", "sparkle", "caskOracle", "components"].contains(item.sourceID)
+            || item.installToken.hasPrefix("cask:")
+    }
+
+    private func forget(_ item: UpdateItem) {
+        prefetched.remove(item.id)
+        classified.remove(item.id)
+        adminItems.remove(item.id)
+    }
+
+    /// Work out which queued items need admin before any of them start. Casks
+    /// are looked up in one `brew info` call; other sources answer directly.
+    private func classify(_ items: [UpdateItem]) {
+        classifying = true
+        Task {
+            let casks = items.compactMap(HomebrewSource.caskToken(of:))
+            await HomebrewSource.lookUpInstallerCasks(casks)
+            for item in items {
+                classified.insert(item.id)
+                if Self.allSources.first(where: { $0.id == item.sourceID })?.needsAdmin(item) == true {
+                    adminItems.insert(item.id)
+                }
+            }
+            classifying = false
+            startReadyInstalls()
+        }
+    }
+
+    // MARK: Password once per batch
+
+    struct PasswordRequest: Identifiable {
+        let id = UUID()
+        let count: Int
+    }
+    /// Set while the password sheet should show.
+    @Published var passwordRequest: PasswordRequest?
+
+    private func requestPasswordIfNeeded() {
+        guard Prefs.askPasswordOncePerBatch, passwordRequest == nil, !PasswordBroker.shared.isActive else { return }
+        let waiting = pendingInstalls.filter { adminItems.contains($0.id) }.count
+        guard waiting > 0 else { return }
+        passwordRequest = PasswordRequest(count: waiting)
+        UpdatesWindow.shared.show()
+    }
+
+    /// The sheet's Authorize. False when the password is wrong.
+    func authorize(password: String) async -> Bool {
+        guard await PasswordBroker.shared.start(password: password) else { return false }
+        passwordRequest = nil
+        startReadyInstalls()
+        return true
+    }
+
+    /// The sheet's "Skip those N": leave them as "Needs admin" with a Retry.
+    func skipAdminItems() {
+        let skipped = pendingInstalls.filter { adminItems.contains($0.id) }
+        pendingInstalls.removeAll { adminItems.contains($0.id) }
+        for item in skipped {
+            installStates[item.id] = .failed("Needs admin")
+            forget(item)
+        }
+        passwordRequest = nil
+        startReadyInstalls()
+    }
+
+    /// Homebrew downloads in parallel inside one command, so before the brew
+    /// lane upgrades anything it runs one `brew fetch` for every queued
+    /// formula and cask, then the upgrades go one at a time. Returns true while
+    /// that fetch holds the lane. A failed fetch is harmless: each upgrade
+    /// then downloads for itself.
+    private func prefetchBrewDownloads() -> Bool {
+        guard !runningLanes.values.contains("brew") else { return false }
+        let batch = pendingInstalls.filter { Self.lane(for: $0.sourceID) == "brew" && !prefetched.contains($0.id) }
+        var formulae: [String] = [], casks: [String] = []
+        for item in batch {
+            switch item.sourceID {
+            case "homebrew":
+                let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
+                guard parts.count == 2 else { continue }
+                if parts[0] == "cask" { casks.append(parts[1]) } else { formulae.append(parts[1]) }
+            case "caskOracle", "components":
+                casks.append(item.installToken)
+            default:
+                continue
+            }
+        }
+        prefetched.formUnion(batch.map(\.id))
+        guard formulae.count + casks.count > 1, let brew = HomebrewSource.brewPath else { return false }
+
+        let lane = "prefetch"
+        runningLanes[lane] = "brew"
+        batchActive = true
+        for item in batch where Self.lane(for: item.sourceID) == "brew" && item.sourceID != "custom" {
+            installStates[item.id] = .downloading(percent: nil, line: "Downloading with the rest of the batch…")
+        }
+        Task {
+            if !formulae.isEmpty { _ = try? await Shell.run(brew, ["fetch", "--formula"] + formulae, tag: lane) }
+            if !casks.isEmpty { _ = try? await Shell.run(brew, ["fetch", "--cask"] + casks, tag: lane) }
+            for item in batch where installStates[item.id]?.isActive == true && installStates[item.id] != .cancelling {
+                installStates[item.id] = .queued
+            }
+            runningLanes[lane] = nil
+            startReadyInstalls()
+        }
+        return true
+    }
+
+    private func run(_ item: UpdateItem, with source: any UpdateSource) {
+        installStates[item.id] = .installing("Starting…")
+        let install = Task {
+            try await Shell.$installTag.withValue(Self.processTag(item)) {
+                try await source.install(item) { line in
+                    Task { @MainActor in
+                        guard let current = self.installStates[item.id], current.isActive,
+                              current != .cancelling else { return }
+                        self.installStates[item.id] = InstallState(progressLine: line)
+                    }
+                }
+            }
+        }
+        runningInstalls[item.id] = install
+        Task {
+            do {
+                try await install.value
+                installStates[item.id] = .done
+                state = Store.mutate { $0.items.removeAll { $0.id == item.id } }
+            } catch {
+                // A user-cancelled install isn't an error worth showing.
+                installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
+                if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
+                    repairable[item.id] = (token, folder)
+                }
+            }
+            runningInstalls[item.id] = nil
+            runningLanes[item.id] = nil
+            runningAdmin.remove(item.id)
+            forget(item)
+            startReadyInstalls()
         }
     }
 
@@ -280,7 +447,7 @@ final class UpdateController: ObservableObject {
         }
     }
 
-    /// Queue every visible scripted update; they still run one at a time.
+    /// Queue every visible scripted update; lanes decide what runs together.
     func updateAll() {
         queueAll(visibleItems.filter { $0.scriptedInstall && !$0.isPinned && !isBusy($0) })
     }

@@ -10,6 +10,12 @@ extension Notification.Name {
 /// dialog and prints the entry to stdout for sudo. Nothing is stored.
 enum AskpassDialog {
     static func run() -> Never {
+        // During a batch the app already has the password: hand it to sudo
+        // without showing anything.
+        if let password = PasswordBroker.fetchPassword() {
+            FileHandle.standardOutput.write(Data((password + "\n").utf8))
+            exit(0)
+        }
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
@@ -74,7 +80,7 @@ enum AskpassDialog {
     /// available" badge — a faint halo ring around a solid disc — coloured with
     /// the app icon's blue-to-violet gradient so the prompt is recognisably
     /// UpdateScout's. The white glyph keeps contrast on any background.
-    private static func circularKeyIcon() -> NSImage {
+    static func circularKeyIcon() -> NSImage {
         NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
             // The app icon's blue-to-violet, weighted toward violet: indigo by
             // the middle so the violet reads across the lower half of the disc.

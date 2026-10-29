@@ -4,6 +4,50 @@ struct HomebrewSource: UpdateSource {
     let id = "homebrew"
     let displayName = "Homebrew"
 
+    /// Casks that run a pkg installer ask for a password; formulae never do.
+    func needsAdmin(_ item: UpdateItem) -> Bool {
+        Self.caskToken(of: item).map(Self.isInstallerCask) ?? false
+    }
+
+    /// The cask token of a Homebrew-managed item, if it is a cask.
+    static func caskToken(of item: UpdateItem) -> String? {
+        switch item.sourceID {
+        case "homebrew":
+            return item.installToken.hasPrefix("cask:") ? String(item.installToken.dropFirst(5)) : nil
+        case "caskOracle", "components":
+            return item.installToken
+        default:
+            return nil
+        }
+    }
+
+    private static let installerLock = NSLock()
+    nonisolated(unsafe) private static var installerCasks: Set<String> = []
+
+    /// True when the cask runs a pkg installer, as found by the last lookup.
+    static func isInstallerCask(_ token: String) -> Bool {
+        installerLock.withLock { installerCasks.contains(token) }
+    }
+
+    /// Ask Homebrew which of these casks run a pkg installer (one call).
+    static func lookUpInstallerCasks(_ tokens: [String]) async {
+        guard !tokens.isEmpty, let brew = brewPath,
+              let result = try? await Shell.run(brew, ["info", "--json=v2", "--cask"] + tokens),
+              let json = try? JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any],
+              let casks = json["casks"] as? [[String: Any]]
+        else { return }
+        var found: Set<String> = []
+        for cask in casks {
+            guard let token = cask["token"] as? String else { continue }
+            let artifacts = cask["artifacts"] as? [[String: Any]] ?? []
+            if artifacts.contains(where: { $0["pkg"] != nil }) { found.insert(token) }
+        }
+        installerLock.withLock {
+            installerCasks.subtract(tokens)
+            installerCasks.formUnion(found)
+        }
+    }
+
     static var brewPath: String? { Shell.which("brew") }
 
     func detect() async throws -> [UpdateItem] {

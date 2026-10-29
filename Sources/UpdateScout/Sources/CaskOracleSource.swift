@@ -8,6 +8,9 @@ struct CaskOracleSource: UpdateSource {
     let id = "caskOracle"
     let displayName = "Other apps (via Homebrew data)"
 
+    /// Casks that run a pkg installer ask for a password.
+    func needsAdmin(_ item: UpdateItem) -> Bool { HomebrewSource.isInstallerCask(item.installToken) }
+
     func detect() async throws -> [UpdateItem] {
         guard let brew = HomebrewSource.brewPath else { return [] }
 

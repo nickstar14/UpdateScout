@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
+    @State private var updateConcurrency = Prefs.updateConcurrency
+    @State private var passwordOnce = Prefs.askPasswordOncePerBatch
     @AppStorage(Prefs.glassTintKey) private var glassTint: Double = 0.35
     @State private var showDockIcon = Prefs.showDockIcon
 
@@ -72,6 +74,19 @@ struct SettingsView: View {
                     Label("All dependencies installed (Homebrew, mas-cli)", systemImage: "checkmark.circle")
                         .foregroundStyle(.green).font(.callout)
                 }
+            }
+
+            Section("Updating") {
+                Stepper(value: $updateConcurrency, in: 1...8) {
+                    LabeledContent("Update at once", value: "\(updateConcurrency)")
+                }
+                .onChange(of: updateConcurrency) { _, value in Prefs.updateConcurrency = value }
+                Text("Installs from different sources run side by side. Each package manager still updates one item at a time.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Ask for my password once per batch", isOn: $passwordOnce)
+                    .onChange(of: passwordOnce) { _, value in Prefs.askPasswordOncePerBatch = value }
+                Text("Kept in memory for that batch only, then wiped. Never saved. When off, each installer asks for itself.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Background checking") {

@@ -9,6 +9,13 @@ struct SparkleSource: UpdateSource {
     let id = "sparkle"
     let displayName = "Sparkle apps"
 
+    /// Replacing an app in a folder the user can't write to needs a password.
+    func needsAdmin(_ item: UpdateItem) -> Bool {
+        guard let path = item.appPath else { return true }
+        let fm = FileManager.default
+        return !fm.isWritableFile(atPath: path) || !fm.isWritableFile(atPath: (path as NSString).deletingLastPathComponent)
+    }
+
     /// Sentinel install token meaning "this is UpdateScout itself".
     static let selfUpdateToken = "__self__"
 

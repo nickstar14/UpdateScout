@@ -5,6 +5,10 @@ struct MASSource: UpdateSource {
     let id = "mas"
     let displayName = "Mac App Store"
 
+    /// mas only sometimes falls back to sudo, and there's no telling
+    /// beforehand, so it isn't marked; the batch password covers it if it does.
+    func needsAdmin(_ item: UpdateItem) -> Bool { false }
+
     func detect() async throws -> [UpdateItem] {
         guard let mas = Shell.which("mas") else {
             throw UpdateScoutError.toolMissing("mas-cli", hint: "Run `brew install mas` to enable App Store checks.")
