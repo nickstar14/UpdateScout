@@ -5,101 +5,445 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PrismPack 2.0 mockups</title>
 <style>
-:root{--surface-0:#f6f6f4;--surface-1:#efefec;--surface-2:#fff;--text-primary:#1a1a18;--text-secondary:#5f5e5a;--text-muted:#888780;--border:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.25);--radius:8px;
---bg-accent:#e6f1fb;--text-accent:#0c447c;--bg-success:#eaf3de;--text-success:#27500a;--bg-warning:#faeeda;--text-warning:#633806;--bg-danger:#fcebeb;--text-danger:#791f1f;--bg-pro:#eeedfe;--text-pro:#3c3489;
---font-sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
-@media (prefers-color-scheme:dark){:root{--surface-0:#1b1b19;--surface-1:#242422;--surface-2:#2c2c2a;--text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;--border:rgba(255,255,255,.14);--border-strong:rgba(255,255,255,.3);
---bg-accent:#0c447c;--text-accent:#b5d4f4;--bg-success:#27500a;--text-success:#c0dd97;--bg-warning:#633806;--text-warning:#fac775;--bg-danger:#791f1f;--text-danger:#f7c1c1;--bg-pro:#3c3489;--text-pro:#cecbf6}}
-body{margin:0;padding:24px 16px;background:var(--surface-0);color:var(--text-primary);font-family:var(--font-sans);line-height:1.5}
-.wrap{max-width:760px;margin:0 auto}
-h1{font-size:22px;font-weight:500;margin:0 0 4px}h2{font-size:16px;font-weight:500;margin:28px 0 8px}p.lead{margin:0 0 8px;color:var(--text-secondary);font-size:14px}
-button{font:inherit;font-size:13px;padding:5px 12px;border-radius:var(--radius);border:.5px solid var(--border-strong);background:transparent;color:var(--text-primary);cursor:pointer}
-input{font:inherit;font-size:14px;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:var(--radius);border:.5px solid var(--border-strong);background:var(--surface-2);color:var(--text-primary)}
-.win{display:grid;grid-template-columns:132px minmax(0,1fr);border:.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-2);font-size:13px}
-.side{background:var(--surface-1);padding:12px 8px;border-right:.5px solid var(--border)}
-.nav{padding:6px 10px;border-radius:6px;color:var(--text-secondary);display:flex;justify-content:space-between}
-.nav.on{background:var(--bg-accent);color:var(--text-accent);font-weight:500}
-.main{padding:14px;min-width:0}
-.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.top .sp{flex:1}
-.sec{border:.5px solid var(--border);border-radius:10px;margin-top:10px;overflow:hidden}
-.sh{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface-1);font-weight:500}
-.cnt{font-weight:400;color:var(--text-secondary);font-size:12px}
-.row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:.5px solid var(--border)}
-.av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px;flex:none}
-.nm{flex:1;min-width:0}.nm b{font-weight:500}.nm i{display:block;font-style:normal;font-size:12px;color:var(--text-secondary)}
-.pill{font-size:12px;padding:2px 8px;border-radius:6px;white-space:nowrap}
-.bar{width:84px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}.bar u{display:block;height:100%;background:var(--text-accent)}
+/* Tokens follow macOS system colours and the app's current grouped-form look. */
+:root{--bg:#f2f2f7;--card:rgba(255,255,255,.72);--text-primary:#1d1d1f;--text-secondary:#6e6e73;--sep:rgba(60,60,67,.18);--edge:rgba(255,255,255,.8);--hi:rgba(255,255,255,.9);--shadow:rgba(0,0,0,.10);
+--accent:#007aff;--green:#34c759;--orange:#ff9500;--red:#ff3b30;
+--sidebar:rgba(236,236,241,.7);
+--font-sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--card:rgba(255,255,255,.07);--text-primary:#f5f5f7;--text-secondary:#a1a1a6;--sep:rgba(255,255,255,.14);--edge:rgba(255,255,255,.18);--hi:rgba(255,255,255,.22);--shadow:rgba(0,0,0,.45);
+--accent:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--sidebar:rgba(44,44,46,.7)}}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--text-primary);font-family:var(--font-sans);line-height:1.45;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}h2{font-size:15px;font-weight:600;margin:30px 0 8px}p.lead{margin:0;color:var(--text-secondary);font-size:13px}
+button{font:inherit;font-size:13px;padding:4px 12px;border-radius:999px;border:.5px solid var(--edge);background:var(--card);color:var(--text-primary);cursor:pointer;backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 var(--hi)}
+button.prom{background:var(--accent);color:#fff;border-color:transparent;font-weight:500}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* window: plain system background, light or dark */
+.win{display:grid;grid-template-columns:200px minmax(0,1fr);border:.5px solid var(--sep);border-radius:12px;overflow:hidden;font-size:13px;position:relative;background:var(--bg);height:700px}
+.win.collapsed{grid-template-columns:58px minmax(0,1fr)}
+/* macOS 27: edge to edge, flush, no shadow. A hairline separates it from content. */
+.side{overflow-y:auto;padding:34px 10px 10px;display:flex;flex-direction:column;gap:2px;background:var(--sidebar);backdrop-filter:blur(28px) saturate(1.7);border-right:.5px solid var(--sep)}
+.tg{padding:4px 6px;border-radius:8px;border:none;background:transparent;box-shadow:none;color:var(--text-secondary)}
+.tg:hover{background:var(--card)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px 20px;margin-bottom:18px;border-bottom:.5px solid var(--sep)}
+.lights{position:absolute;left:14px;top:12px;display:flex;gap:8px;z-index:4}.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.logos{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}.logos button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 12px;border-radius:14px}.logos button.on{outline:2px solid var(--accent)}.layerlist{font-size:12.5px}.layerlist ol{margin:4px 0 0;padding-left:18px;color:var(--text-secondary)}
+.appicon{width:40px;height:40px;border-radius:10px;flex:none;position:relative;overflow:hidden;background:linear-gradient(150deg,#58a6ff,#6b5cff 55%,#a64bff);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(0,0,0,.12),0 2px 8px rgba(60,40,140,.35)}
+.appicon::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(160deg,rgba(255,255,255,.38),rgba(255,255,255,0) 42%);pointer-events:none}
+.appicon svg{position:absolute;inset:0;width:100%;height:100%}
+.bt b{display:block;font-weight:600;font-size:14px;line-height:1.2}.bt i{font-style:normal;font-size:11.5px;color:var(--text-secondary)}
+.nav{padding:6px 10px;border-radius:8px;color:var(--text-primary);display:flex;align-items:center;gap:9px;cursor:pointer}
+.nav svg{color:var(--accent)}
+.nav .navn{margin-left:auto;font-size:12px}
+.nav.on{background:color-mix(in srgb,var(--accent) 18%,transparent);font-weight:500}
+.collapsed .bt,.collapsed .navl,.collapsed .navn{display:none}
+.collapsed .brand{padding:0 0 14px;justify-content:center}.collapsed .nav{justify-content:center}
+.main{padding:0 18px 16px;min-width:0;overflow-y:auto;overflow-x:hidden}
+.page{display:none}.page.on{display:block}
+.hdr{position:sticky;top:0;z-index:3;backdrop-filter:blur(20px);display:flex;align-items:center;gap:12px;margin:0 -18px 12px;padding:10px 18px;border-bottom:.5px solid var(--sep);background:color-mix(in srgb,var(--bg) 80%,transparent)}
+.hdr .t{flex:1}.hdr .t b{display:block;font-size:19px;font-weight:600;line-height:1.2}.hdr .t span{font-size:12px;color:var(--text-secondary)}
 .t2{font-size:12px;color:var(--text-secondary)}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.chip{font-size:12px;padding:3px 10px;border-radius:12px;border:.5px solid var(--border-strong);color:var(--text-secondary)}.chip.on{background:var(--bg-accent);color:var(--text-accent);border-color:transparent}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.card{border:.5px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.card .hd{display:flex;gap:10px;align-items:center}
-.lab{font-size:12px;color:var(--text-secondary);margin:14px 0 2px}
-.admin{display:flex;align-items:center;gap:10px;margin-top:12px;padding:8px 12px;border-radius:10px;background:var(--bg-warning);color:var(--text-warning)}
+
+/* section cards: glass tinted by --c, collapsible */
+.sec{--c:#888;margin-top:10px;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 22%,transparent),color-mix(in srgb,var(--c) 8%,transparent)),var(--card);backdrop-filter:blur(22px) saturate(1.8);border:.5px solid color-mix(in srgb,var(--c) 38%,var(--edge));box-shadow:inset 0 1px 0 var(--hi),0 6px 18px var(--shadow)}
+.shd{display:flex;align-items:center;gap:10px;padding:9px 12px;font-weight:600;cursor:pointer;user-select:none}
+.chev{width:14px;height:14px;transition:transform .15s;color:var(--text-secondary)}
+.sec.closed .chev{transform:rotate(-90deg)}
+.sec.closed .row{display:none}
+.ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 75%,#fff),var(--c));box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 5px color-mix(in srgb,var(--c) 40%,transparent)}
+.ic svg{width:15px;height:15px}
+.cnt{font-weight:400;color:var(--text-secondary);font-size:12px}.sp{flex:1}
+.ub{padding:3px 11px;font-size:12px;background:color-mix(in srgb,var(--c) 28%,var(--card))}
+.row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-top:.5px solid color-mix(in srgb,var(--c) 22%,var(--sep))}
+.nm{flex:1;min-width:0}.nm b{font-weight:500}.nm i{display:block;font-style:normal;font-size:12px;color:var(--text-secondary)}
+.pill{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap;font-weight:500}
+.p-run{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.p-ok{background:color-mix(in srgb,var(--green) 20%,transparent);color:var(--green)}
+.p-adm{background:color-mix(in srgb,var(--orange) 20%,transparent);color:var(--orange)}
+.p-bad{background:color-mix(in srgb,var(--red) 18%,transparent);color:var(--red)}
+.bar{width:84px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--text-primary) 14%,transparent);overflow:hidden}.bar u{display:block;height:100%;background:var(--c)}
+
+/* app icons: the real icon when found, else first letter, else the section's icon */
+.ai{width:30px;height:30px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 3px rgba(0,0,0,.25)}
+.ai.letter{background:color-mix(in srgb,var(--text-secondary) 28%,transparent);color:var(--text-primary);box-shadow:none;border:.5px solid var(--sep)}
+.ai.fb{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 75%,#fff),var(--c))}
+.ai.fb svg{width:16px;height:16px}
+
+/* grouped form, as in today's Settings */
+.group{margin-top:14px}.group>h3{font-size:12px;font-weight:600;color:var(--text-secondary);margin:0 0 5px 12px}
+.card{border-radius:12px;background:var(--card);backdrop-filter:blur(18px) saturate(1.6);border:.5px solid var(--edge);box-shadow:inset 0 1px 0 var(--hi),0 4px 14px var(--shadow)}
+.frow{display:flex;align-items:center;gap:10px;padding:8px 12px;min-height:34px}.frow+.frow{border-top:.5px solid var(--sep)}
+.note{font-size:11.5px;color:var(--text-secondary);padding:6px 12px 8px}
+.tog{width:36px;height:22px;border-radius:11px;background:color-mix(in srgb,var(--text-secondary) 35%,transparent);position:relative;flex:none;cursor:pointer}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.tog.on{background:var(--green)}.tog.on::after{left:16px}
+.seg{display:flex;border-radius:8px;background:color-mix(in srgb,var(--text-secondary) 20%,transparent);padding:2px}.seg span{padding:2px 12px;border-radius:6px;font-size:12px}.seg .on{background:var(--card);box-shadow:0 1px 2px var(--shadow);font-weight:500}
+.pop{font-size:12px;padding:2px 10px;border-radius:6px;background:color-mix(in srgb,var(--text-secondary) 18%,transparent)}
+.stepper{display:flex;align-items:center;gap:8px}.stepper b{min-width:18px;text-align:center;font-weight:500}
+.slider{flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 35%,color-mix(in srgb,var(--text-secondary) 30%,transparent) 35%)}
+
+.hint{font-size:12px;color:var(--text-secondary);margin:-4px 0 4px}
+.newtag{margin:14px 4px 0;font-size:11.5px;color:var(--text-secondary);text-align:center}
+.nm b,.row .ai{cursor:pointer}.nm b:hover{text-decoration:underline}
+
+/* app detail card: floating, opened from an app's icon or name. Builds on 1.8's info popover. */
+.pcard{--c:#888;position:absolute;z-index:6;width:340px;display:none;border-radius:18px;padding:14px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(34px) saturate(1.8);border:.5px solid color-mix(in srgb,var(--c) 35%,var(--edge));box-shadow:inset 0 1px 0 var(--hi),0 18px 48px rgba(0,0,0,.30)}
+.pcard.on{display:block}
+.pcard .top{display:flex;gap:10px;align-items:center}.pcard .top .ai{width:44px;height:44px;font-size:18px;border-radius:10px}
+.pcard .top b{font-size:15px;font-weight:600;display:block;line-height:1.2}.pcard .top span{font-size:12px;color:var(--text-secondary)}
+.chipsrc{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--c) 22%,transparent);margin-top:3px}
+.vers{display:flex;gap:8px;margin:12px 0 8px}.vers div{flex:1;border-radius:10px;padding:6px 10px;background:var(--card);border:.5px solid var(--sep)}.vers small{display:block;font-size:11px;color:var(--text-secondary)}.vers b{font-weight:600}
+.warn{font-size:12px;padding:7px 10px;border-radius:10px;background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--text-primary);margin-bottom:8px}
+.notes{font-size:12px;max-height:92px;overflow:auto;padding:8px 10px;border-radius:10px;background:var(--card);border:.5px solid var(--sep)}.notes h4{margin:0 0 3px;font-size:12px}.notes ul{margin:0;padding-left:16px}
+.pcard .act{display:flex;gap:6px;margin:10px 0 4px}.pcard .act .prom{flex:1}
+.ign{margin-top:8px;border-top:.5px solid var(--sep);padding-top:6px}
+.ign .opt{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:8px;cursor:pointer;font-size:13px}.ign .opt:hover{background:var(--card)}
+.ign .opt small{display:block;font-size:11px;color:var(--text-secondary)}.ign .opt .nw{margin-left:auto;font-size:10px;font-weight:600;color:var(--accent)}
+.ign h5{margin:0 0 2px 6px;font-size:11px;color:var(--text-secondary);font-weight:600}
+
+.adopt{--c:#30b0c7;display:flex;align-items:center;gap:10px;margin:10px 0 2px;padding:9px 12px;border-radius:14px;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 22%,transparent),color-mix(in srgb,var(--c) 8%,transparent)),var(--card);border:.5px solid color-mix(in srgb,var(--c) 38%,var(--edge));backdrop-filter:blur(20px)}
+.adopt .ic{background:linear-gradient(160deg,color-mix(in srgb,var(--c) 75%,#fff),var(--c))}
+.sheet.wide{width:470px;max-height:640px;overflow:auto;text-align:left;padding:18px}
+.sheet.wide .hd2{display:flex;align-items:center;gap:10px;margin-bottom:10px}.sheet.wide .hd2 b{margin:0;font-size:15px}.sheet.wide .hd2 span{font-size:12px;color:var(--text-secondary)}
+.cand{border:.5px solid var(--sep);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--card)}
+.cand .top2{display:flex;gap:10px;align-items:center}.cand .top2 .nm{flex:1}
+.vd{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px}.vd.good{background:color-mix(in srgb,var(--green) 20%,transparent);color:var(--green)}.vd.mid{background:color-mix(in srgb,var(--orange) 20%,transparent);color:var(--orange)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 6px}.cmp div{border-radius:10px;padding:7px 10px;background:color-mix(in srgb,var(--text-secondary) 9%,transparent);font-size:12px}.cmp small{display:block;color:var(--text-secondary);font-size:11px;margin-bottom:2px}
+.chk{font-size:12px;color:var(--text-secondary);margin:4px 0}.chk span{display:inline-block;margin-right:10px}.chk span::before{content:"\2713 ";color:var(--green);font-weight:700}.chk span.w::before{content:"! ";color:var(--orange)}
+.mth{font-size:12px;margin:6px 0 8px}.cand .acts{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--c) 22%,transparent)}
+/* discover */
+input{font:inherit;font-size:14px;width:100%;padding:8px 14px;border-radius:999px;border:.5px solid var(--edge);background:var(--card);backdrop-filter:blur(14px);color:var(--text-primary)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.chip{font-size:12px;padding:3px 10px;border-radius:999px;border:.5px solid var(--edge);background:var(--card);color:var(--text-secondary)}.chip.on{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.tile{border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--card);backdrop-filter:blur(18px);border:.5px solid var(--edge);box-shadow:inset 0 1px 0 var(--hi),0 4px 14px var(--shadow)}
+.tile .hd{display:flex;gap:10px;align-items:center}
+.lab{font-size:12px;color:var(--text-secondary);margin:14px 0 4px}
+
+/* password popup: a sheet over the window, shown once the batch starts */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.18);display:none;align-items:center;justify-content:center;z-index:5;backdrop-filter:blur(2px)}
+.scrim.on{display:flex}
+.sheet{width:330px;border-radius:22px;padding:22px 22px 16px;text-align:center;background:var(--sidebar);background-color:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(34px) saturate(1.8);border:.5px solid var(--edge);box-shadow:inset 0 1px 0 var(--hi),0 22px 60px rgba(0,0,0,.35)}
+.sheet .lock{width:48px;height:48px;border-radius:12px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(160deg,#ffb340,#ff9500);box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+.sheet .lock svg{width:24px;height:24px}
+.sheet b{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
+.sheet p{margin:0 0 12px;font-size:12px;color:var(--text-secondary)}
+.sheet .pw{border:.5px solid var(--sep);background:var(--card);border-radius:8px;padding:6px 10px;margin-bottom:12px;text-align:left;font-size:13px;color:var(--text-secondary)}
+.sheet .btns{display:flex;gap:8px}.sheet .btns button{flex:1;padding:6px 0}
+.static{position:static;display:flex;background:transparent;backdrop-filter:none;padding:18px;border-radius:16px;border:.5px dashed var(--sep)}
+.ap{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;font-size:15px;line-height:1}.ap::before{content:'\F8FF'}.ai .ap{font-size:17px;color:#fff}
+.stile{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 75%,#fff),var(--c))}.stile svg{width:13px;height:13px}.stile .ap{font-size:13px}
+.pill.src{font-weight:400;background:color-mix(in srgb,var(--text-secondary) 16%,transparent);color:var(--text-secondary)}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="sb" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 5v14"/></symbol>
+    <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="sr" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></symbol>
+    <symbol id="ins" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+    <symbol id="act" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+    <symbol id="set" viewBox="0 0 24 24"><path d="M10.88 5.50 L10.90 2.87 L13.10 2.87 L13.12 5.50 L15.81 6.61 L17.68 4.76 L19.24 6.32 L17.39 8.19 L18.50 10.88 L21.13 10.90 L21.13 13.10 L18.50 13.12 L17.39 15.81 L19.24 17.68 L17.68 19.24 L15.81 17.39 L13.12 18.50 L13.10 21.13 L10.90 21.13 L10.88 18.50 L8.19 17.39 L6.32 19.24 L4.76 17.68 L6.61 15.81 L5.50 13.12 L2.87 13.10 L2.87 10.90 L5.50 10.88 L6.61 8.19 L4.76 6.32 L6.32 4.76 L8.19 6.61 Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="cask" viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M5 8l7 4 7-4M12 12v8"/></symbol>
+    <symbol id="py" viewBox="0 0 24 24"><path d="M9 4h4a3 3 0 013 3v3H9a3 3 0 00-3 3v1a3 3 0 003 3h1"/><path d="M15 20h-4a3 3 0 01-3-3v-3h7a3 3 0 003-3V9a3 3 0 00-3-3h-1"/></symbol>
+    <symbol id="spk" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <symbol id="npm" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M12 12V20M12 12L4 8M12 12l8-4"/></symbol>
+    <symbol id="drv" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></symbol>
+    <symbol id="ext" viewBox="0 0 24 24"><path d="M9 4h4v3a2 2 0 104 0V4h3v6h-3a2 2 0 100 4h3v6h-6v-3a2 2 0 10-4 0v3H4v-6h3a2 2 0 100-4H4V4z"/></symbol>
+    <symbol id="bag" viewBox="0 0 24 24"><path d="M6 8h12l1 12H5z"/><path d="M9 8a3 3 0 016 0"/></symbol>
+    <symbol id="apl" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 20h6M12 16v4"/></symbol>
+    <symbol id="cask2" viewBox="0 0 24 24"><path d="M5 9l7-4 7 4v7l-7 4-7-4z"/></symbol>
+    <symbol id="cust" viewBox="0 0 24 24"><path d="M5 8h14M5 16h14"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="16" r="2"/></symbol>
+    <symbol id="trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></symbol>
+    <symbol id="eye" viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="mug" viewBox="0 0 24 24"><path d="M5 9h11v6a4 4 0 01-4 4H9a4 4 0 01-4-4z"/><path d="M16 11h1.5a2.5 2.5 0 010 5H16"/><path d="M8 3.5c0 1.2 1 1.2 1 2.4M12 3.5c0 1.2 1 1.2 1 2.4"/></symbol>
+    <symbol id="chv" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="lck" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  </defs>
+</svg>
+
 <div class="wrap">
 <h1>PrismPack 2.0 mockups</h1>
-<p class="lead">Layout sketches, not final design. See 2.0.0-vision.md.</p>
+<p class="lead">Layout sketches, not final design. Follows the macOS 27 notes in 2.0.0-macos27-design.md: edge-to-edge sidebar, coloured icons, unified toolbar. Click sidebar items to switch screens, section headers to collapse them, Update all to see the password prompt, and the toolbar button to collapse the sidebar. Light and dark follow your system.</p>
 
-<h2>Updates: parallel installs, one authorization</h2>
-<div class="win">
+<h2>The app window</h2>
+<div class="win" id="w">
+  <div class="lights"><i></i><i></i><i></i></div>
   <div class="side">
-    <div class="nav on"><span>Updates</span><span>14</span></div>
-    <div class="nav"><span>Discover</span></div>
-    <div class="nav"><span>Installed</span><span>212</span></div>
-    <div class="nav"><span>Activity</span></div>
-    <div class="nav"><span>Settings</span></div>
+    <div class="brand">
+      <div class="appicon" title="Placeholder. A new icon is still to be designed."><svg viewBox="0 0 40 40"><path d="M20 8l11 20H9z" fill="rgba(255,255,255,.28)" stroke="rgba(255,255,255,.9)" stroke-width="1.3" stroke-linejoin="round"/><path d="M20 8v20M9 28l11-6 11 6" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1"/></svg></div>
+      <div class="bt"><b>PrismPack</b><i>Version 2.0.0</i></div>
+    </div>
+    <div class="nav on" data-p="p1"><svg class="i"><use href="#up"/></svg><span class="navl">Updates</span><span class="navn">14</span></div>
+    <div class="nav" data-p="p2"><svg class="i"><use href="#sr"/></svg><span class="navl">Discover</span></div>
+    <div class="nav" data-p="p3"><svg class="i"><use href="#ins"/></svg><span class="navl">Installed</span><span class="navn">212</span></div>
+    <div class="nav" data-p="p5"><svg class="i"><use href="#act"/></svg><span class="navl">Activity</span></div>
+    <div class="nav" data-p="p4"><svg class="i"><use href="#set"/></svg><span class="navl">Settings</span></div>
   </div>
+
   <div class="main">
-    <div class="top"><div><div style="font-size:16px;font-weight:500">Updates</div><div class="t2">14 available · 3 need admin · running 6 of 14</div></div><span class="sp"></span><span class="t2">At once</span><button>4</button><button style="background:var(--bg-accent);color:var(--text-accent);border-color:transparent">Update all</button></div>
-    <div class="sec"><div class="sh">Homebrew casks <span class="cnt">5</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">F</div><div class="nm"><b>Firefox</b><i>131.0 to 132.0</i></div><div class="bar"><u style="width:62%"></u></div><span class="t2">62%</span><button>Cancel</button></div>
-      <div class="row"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">R</div><div class="nm"><b>Raycast</b><i>1.84 to 1.85</i></div><span class="pill" style="background:var(--bg-accent);color:var(--text-accent)">Installing</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">Z</div><div class="nm"><b>Zoom</b><i>6.2 to 6.3 · installer package</i></div><span class="pill" style="background:var(--bg-warning);color:var(--text-warning)">Needs admin</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">D</div><div class="nm"><b>Docker</b><i>4.34 to 4.35</i></div><span class="t2">Queued</span><button>Cancel</button></div>
+    <!-- UPDATES -->
+    <div class="page on" id="p1">
+      <div class="hdr"><div class="t"><b>Updates</b><span>Checked 2 min ago · 14 available</span></div><button>Check now</button><button class="prom" onclick="document.getElementById('sc').classList.add('on')">Update all</button></div>
+      <div class="hint">Click an app's icon or name for details, release notes and ignore options.</div>
+      <div class="adopt"><span class="ic" style="--c:#30b0c7"><svg class="i"><use href="#cask2"/></svg></span><div class="nm"><b>2 apps could be updated by Homebrew</b><i>They have no updater of their own today. Nothing changes unless you say so.</i></div><button onclick="document.getElementById('as').classList.add('on')">Review</button><button class="x" aria-label="Dismiss" onclick="this.closest('.adopt').style.display='none'">Not now</button></div>
+
+      <div class="sec" style="--c:#a2845e">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#mug"/></svg></span>Homebrew <span class="cnt">5</span><span class="sp"></span><button class="ub">Update all Homebrew</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#ff9a3d,#e8480c)">Fx</div><div class="nm"><b>Firefox</b><i>131.0 to 131.0.1</i></div><div class="bar"><u style="width:62%"></u></div><span class="t2">62%</span><button>Cancel</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#ff6a5f,#d1281c)">Rc</div><div class="nm"><b>Raycast</b><i>1.84 to 1.85</i></div><span class="pill p-run">Installing</span></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#5aa9ff,#1763d6)">Zm</div><div class="nm"><b>Zoom</b><i>6.2 to 6.3 · installer package</i></div><span class="pill p-adm">Needs admin</span></div>
+        <div class="row"><div class="ai letter">D</div><div class="nm"><b>docker</b><i>4.34 to 4.35 · formula, no icon found</i></div><span class="t2">Queued</span><button>Cancel</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#9aa0ff,#5a4bd6)">Jt</div><div class="nm"><b>JetBrains Toolbox</b><i>2.5.1 to 2.5.2<span> · a stuck earlier upgrade</span></i></div><span class="pill p-bad">Failed</span><button>Repair</button></div>
+      </div>
+
+      <div class="sec" style="--c:#0a84ff">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#bag"/></svg></span>Mac App Store <span class="cnt">3</span><span class="sp"></span><button class="ub">Open App Store</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#bag"/></svg></div><div class="nm"><b>3 apps update in the App Store</b><i>Pages, Numbers, Keynote · the App Store has to do these itself</i></div><button>Open in App Store</button></div>
+      </div>
+
+      <div class="sec" style="--c:#8e8e93">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><span class="ap"></span></span>macOS <span class="cnt">1</span><span class="sp"></span><button class="ub">Update macOS</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#a0a0a8,#5c5c63)"><span class="ap"></span></div><div class="nm"><b>macOS 27.2</b><i>27.1 to 27.2<span> · installs in System Settings</span></i></div><button>Settings</button></div>
+      </div>
+
+      <div class="sec" style="--c:#30b0c7">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#cask2"/></svg></span>Other apps (via Homebrew data) <span class="cnt">2</span><span class="sp"></span><button class="ub">Update all Other apps</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#6fd0e0,#1f8aa6)">Ob</div><div class="nm"><b>Obsidian</b><i>1.7.4 to 1.7.5</i></div><button>Update</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#ffd36a,#e59a12)">Dl</div><div class="nm"><b>DisplayLink Manager</b><i>1.10 to 1.11 · switches this app to Homebrew management</i></div><button>Update</button></div>
+      </div>
+
+      <div class="sec" style="--c:#ffcc00">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#spk"/></svg></span>Sparkle apps <span class="cnt">2</span><span class="sp"></span><button class="ub">Update all Sparkle apps</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#6fe0c5,#1aa07f)">Th</div><div class="nm"><b>Thaw</b><i>3.0.0-beta.2 to beta.3</i></div><span class="pill p-bad">Failed</span><button>Retry</button></div>
+        <div class="row"><div class="ai" style="background:linear-gradient(160deg,#c7a8ff,#7a4bd6)">Cr</div><div class="nm"><b>CleanShot X</b><i>4.7.4 to 4.8.0</i></div><button>Update</button></div>
+      </div>
+
+      <div class="sec closed" style="--c:#bf5af2">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#drv"/></svg></span>Drivers &amp; extensions <span class="cnt">1</span><span class="sp"></span></div>
+        <div class="row"><div class="ai letter">D</div><div class="nm"><b>DisplayLink driver</b><i>1.10 to 1.11 · needs a restart</i></div><button>Get…</button></div>
+      </div>
+
+      <div class="sec closed" style="--c:#34c759">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#cust"/></svg></span>Custom sources <span class="cnt">1</span><span class="sp"></span><button class="ub">Update Custom sources</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#cust"/></svg></div><div class="nm"><b>my-tool</b><i>2.1 to 2.2 · from custom_sources.json</i></div><button>Update</button></div>
+      </div>
+
+      <div class="newtag">New in 2.0: the sections below are additions. Everything above exists in 1.8.0 and stays.</div>
+
+      <div class="sec" style="--c:#ff9f0a">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#py"/></svg></span>Python (pip) <span class="cnt">3</span><span class="sp"></span><button class="ub">Update all Python</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#py"/></svg></div><div class="nm"><b>rich</b><i>13.7.1 to 13.9.2 · packages use the section icon</i></div><span class="pill p-ok">Updated</span></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#py"/></svg></div><div class="nm"><b>black</b><i>24.8 to 24.10</i></div><button>Update</button></div>
+      </div>
+
+      <div class="sec closed" style="--c:#ff453a">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#npm"/></svg></span>npm global <span class="cnt">2</span><span class="sp"></span><button class="ub">Update all npm</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#npm"/></svg></div><div class="nm"><b>typescript</b><i>5.5.4 to 5.6.2</i></div><button>Update</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#npm"/></svg></div><div class="nm"><b>pnpm</b><i>9.9.0 to 9.12.1</i></div><button>Update</button></div>
+      </div>
+
+      <div class="sec closed" style="--c:#5e5ce6">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic"><svg class="i"><use href="#ext"/></svg></span>Editor extensions <span class="cnt">4</span><span class="sp"></span><button class="ub">Update all extensions</button></div>
+        <div class="row"><div class="ai fb"><svg class="i"><use href="#ext"/></svg></div><div class="nm"><b>Swift</b><i>2.4.0 to 2.5.1</i></div><button>Update</button></div>
+      </div>
+
+      <div class="sec closed" style="--c:#ff453a;--c:#a1a1a6">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic" style="background:#8e8e93"><svg class="i"><use href="#trash"/></svg></span>Leftover drivers <span class="cnt">1</span><span class="sp"></span></div>
+        <div class="row"><div class="ai letter">K</div><div class="nm"><b>OldPrinter.kext</b><i>On disk but the kernel isn't using it</i></div><button>Ignore this one</button><button>Remove…</button></div>
+      </div>
+      <div class="sec closed" style="--c:#a1a1a6">
+        <div class="shd"><svg class="i chev"><use href="#chv"/></svg><span class="ic" style="background:#8e8e93"><svg class="i"><use href="#eye"/></svg></span>Hidden <span class="cnt">2</span><span class="sp"></span></div>
+        <div class="row" style="opacity:.7"><div class="ai letter">S</div><div class="nm"><b>Slack</b><i>Ignored 4.40 · ignored apps appear here too</i></div><button>Bring back</button></div>
+        <div class="row" style="opacity:.7"><div class="ai letter">T</div><div class="nm"><b>Teams</b><i>All updates ignored</i></div><button>Bring back</button></div>
+      </div>
     </div>
-    <div class="sec"><div class="sh">Python (pip) <span class="cnt">3</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-success);color:var(--text-success)">r</div><div class="nm"><b>rich</b><i>13.7.1 to 13.9.2</i></div><span class="pill" style="background:var(--bg-success);color:var(--text-success)">Updated</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-success);color:var(--text-success)">b</div><div class="nm"><b>black</b><i>24.8 to 24.10</i></div><button>Update</button></div>
+
+    <!-- DISCOVER -->
+    <div class="page" id="p2">
+      <div class="hdr"><div class="t"><b>Discover</b><span>Apps and tools from Homebrew, pip, npm and more</span></div></div>
+      <input placeholder="Search apps, command-line tools, packages" aria-label="Search">
+      <div class="chips"><span class="chip on">All</span><span class="chip">Apps</span><span class="chip">Command line</span><span class="chip">Python</span><span class="chip">Node</span><span class="chip">Rust</span><span class="chip">Ruby</span><span class="chip">Go</span><span class="chip">Editor extensions</span><span class="chip">Runtimes</span><span class="chip">Fonts</span></div>
+      <div class="lab">Popular this week</div>
+      <div class="grid">
+        <div class="tile"><div class="hd"><div class="ai" style="background:linear-gradient(160deg,#7ab8ff,#2a62e0)">Ar</div><div class="nm"><b>Arc</b><i>Browser · cask</i></div></div><button>Install</button></div>
+        <div class="tile"><div class="hd"><div class="ai letter">f</div><div class="nm"><b>ffmpeg</b><i>Media tool · formula</i></div></div><button>Install</button></div>
+        <div class="tile"><div class="hd"><div class="ai letter">u</div><div class="nm"><b>uv</b><i>Python tooling · formula</i></div></div><span class="pill p-ok" style="align-self:flex-start">Installed</span></div>
+        <div class="tile"><div class="hd"><div class="ai" style="background:linear-gradient(160deg,#4db5ff,#0a6cc2)">Vs</div><div class="nm"><b>VS Code</b><i>Editor · cask</i></div></div><span class="pill p-ok" style="align-self:flex-start">Installed</span></div>
+        <div class="tile"><div class="hd"><div class="ai letter">r</div><div class="nm"><b>ripgrep</b><i>Search · formula</i></div></div><button>Install</button></div>
+        <div class="tile" style="--c:#ff453a"><div class="hd"><div class="ai fb"><svg class="i"><use href="#npm"/></svg></div><div class="nm"><b>pnpm</b><i>Node tooling · npm</i></div></div><button>Install</button></div>
+      </div>
     </div>
-    <div class="sec"><div class="sh">Sparkle apps <span class="cnt">2</span></div>
-      <div class="row"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">T</div><div class="nm"><b>Thaw</b><i>3.0.0-beta.2 to beta.3</i></div><span class="pill" style="background:var(--bg-danger);color:var(--text-danger)">Failed</span><button>Retry</button></div>
+
+    <!-- INSTALLED -->
+    <div class="page" id="p3">
+      <div class="hdr"><div class="t"><b>Installed</b><span>212 items across 9 sources</span></div></div>
+      <input placeholder="Filter installed apps and packages" aria-label="Filter">
+      <div class="chips"><span class="chip on">All</span><span class="chip">Updates available</span><span class="chip">Homebrew</span><span class="chip">Mac App Store</span><span class="chip">Sparkle</span><span class="chip">Python</span><span class="chip">npm</span><span class="chip">Ignored</span></div>
+      <div class="list">
+      <div class="row irow" style="--c:#a2845e"><div class="ai" style="background:linear-gradient(160deg,#ff9a3d,#e8480c)">Fx</div><div class="nm"><b>Firefox</b><i>131.0</i></div><span class="pill src">Homebrew</span><span class="pill p-adm">Update to 132.0</span></div>
+      <div class="row irow" style="--c:#ffcc00"><div class="ai" style="background:linear-gradient(160deg,#6fe0c5,#1aa07f)">Th</div><div class="nm"><b>Thaw</b><i>3.0.0-beta.2 · beta track</i></div><span class="pill src">Sparkle</span><span class="pill p-adm">Update to beta.3</span></div>
+      <div class="row irow" style="--c:#a2845e"><div class="ai" style="background:linear-gradient(160deg,#4db5ff,#0a6cc2)">Vs</div><div class="nm"><b>VS Code</b><i>1.95.2</i></div><span class="pill src">Homebrew</span><span class="pill p-ok">Up to date</span></div>
+      <div class="row irow"><div class="ai fb" style="--c:#ff9f0a"><svg class="i"><use href="#py"/></svg></div><div class="nm"><b>rich</b><i>13.9.2</i></div><span class="pill src">pip</span><span class="pill p-ok">Up to date</span></div>
+      <div class="row irow"><div class="ai" style="background:linear-gradient(160deg,#4f6bff,#1b2a9c)">Au</div><div class="nm"><b>Audacity</b><i>3.7.5 · no updater</i></div><span class="pill src">Not managed</span><button onclick="document.querySelector('.nav[data-p=p1]').click();document.getElementById('as').classList.add('on')">Can adopt</button></div>
+      <div class="row irow"><div class="ai letter">T</div><div class="nm"><b>Teams</b><i>25306.x · all updates ignored</i></div><span class="pill src">Other apps</span><button>Bring back</button></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Click any app for its card: versions, release notes, ignore options, Show in Finder, and Uninstall where the source supports it.</div>
     </div>
-    <div class="sec"><div class="sh">npm global <span class="cnt">2</span> · Drivers and extensions <span class="cnt">1</span> · Editor extensions <span class="cnt">4</span></div></div>
-    <div class="admin"><b style="font-weight:500">3 updates need your password.</b><span style="flex:1"></span><button>Authorize once for this batch</button></div>
+
+    <!-- ACTIVITY -->
+    <div class="page" id="p5">
+      <div class="hdr"><div class="t"><b>Activity</b><span>What PrismPack installed, checked and skipped</span></div><button>Clear</button></div>
+      <div class="list">
+        <div class="row"><span class="pill p-ok">Updated</span><div class="nm"><b>Firefox 131.0 to 132.0</b><i>Homebrew · 2 minutes ago · 14 s</i></div><button>Show log</button></div>
+        <div class="row"><span class="pill p-bad">Failed</span><div class="nm"><b>Thaw 3.0.0-beta.3</b><i>Sparkle · 5 minutes ago · the download could not be verified</i></div><button>Retry</button><button>Show log</button></div>
+        <div class="row"><span class="pill p-adm">Skipped</span><div class="nm"><b>Zoom 6.3</b><i>Homebrew · needed admin, password skipped</i></div><button>Retry</button></div>
+        <div class="row"><span class="pill p-run">Checked</span><div class="nm"><b>Background check found 3 new updates</b><i>Today 08:00 · Homebrew, Sparkle, pip</i></div></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS: same grouped-form look as today -->
+    <div class="page" id="p4">
+      <div class="hdr"><div class="appicon" style="width:44px;height:44px"><svg viewBox="0 0 40 40"><path d="M20 8l11 20H9z" fill="rgba(255,255,255,.28)" stroke="rgba(255,255,255,.9)" stroke-width="1.3" stroke-linejoin="round"/><path d="M20 8v20M9 28l11-6 11 6" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1"/></svg></div><div class="t"><b>PrismPack</b><span>Version 2.0.0</span></div><button>Check for Updates</button></div>
+
+      <div class="group"><h3>Setup</h3><div class="card"><div class="frow" style="color:var(--green)"><svg class="i"><use href="#up"/></svg>All dependencies installed (Homebrew, mas-cli, pip, npm)</div></div></div>
+
+      <div class="group"><h3>Updating</h3><div class="card">
+        <div class="frow"><span class="sp">Update at once</span><div class="stepper"><button>−</button><b>4</b><button>+</button></div></div>
+        <div class="note">How many updates run at the same time. Homebrew items still install one after another, because it takes a lock.</div>
+        <div class="frow"><span class="sp">Ask for my password once per batch</span><div class="tog on"></div></div>
+      </div></div>
+
+      <div class="group"><h3>Homebrew adoption</h3><div class="card">
+        <div class="frow"><span class="sp">Suggest apps that can move under Homebrew</span><div class="tog on"></div></div>
+        <div class="frow"><span class="sp">Include apps that already update themselves</span><div class="tog"></div></div>
+        <div class="note">Only apps with no updater are suggested by default, and only when Homebrew's version is current. PrismPack never changes an app without asking, and sends at most one notification a week.</div>
+      </div></div>
+
+      <div class="group"><h3>Background checking</h3><div class="card">
+        <div class="frow"><span class="sp">Start PrismPack at login</span><div class="tog on"></div></div>
+        <div class="frow"><span class="sp">Check for updates in the background</span><div class="tog on"></div></div>
+        <div class="frow"><span class="sp">Check every</span><span class="pop">1 hour</span></div>
+        <div class="note">Background checks only detect and notify. Updates are always installed by you.</div>
+      </div></div>
+
+      <div class="group"><h3>Appearance</h3><div class="card">
+        <div class="frow"><span class="sp">Theme</span><div class="seg"><span>System</span><span class="on">Light</span><span>Dark</span></div></div>
+        <div class="frow"><span>Glass</span><span class="t2">Clear</span><div class="slider"></div><span class="t2">Opaque</span></div>
+        <div class="note">Clear is the system's Liquid Glass with no tint. Toward Opaque adds a light or dark wash behind the sections to match the theme.</div>
+        <div class="frow"><span class="sp">Show icon in Dock</span><div class="tog"></div></div>
+      </div></div>
+
+      <div class="group"><h3>Sources</h3><div class="card">
+        <div class="frow" style="--c:#a2845e"><span class="stile"><svg class="i"><use href="#mug"/></svg></span><span class="sp">Homebrew<small style="color:var(--text-secondary);margin-left:6px">formulae and casks</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#0a84ff"><span class="stile"><svg class="i"><use href="#bag"/></svg></span><span class="sp">Mac App Store<small style="color:var(--text-secondary);margin-left:6px">needs mas-cli</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#8e8e93"><span class="stile"><span class="ap"></span></span><span class="sp">macOS<small style="color:var(--text-secondary);margin-left:6px">System Settings updates</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#30b0c7"><span class="stile"><svg class="i"><use href="#cask2"/></svg></span><span class="sp">Other apps (via Homebrew data)<small style="color:var(--text-secondary);margin-left:6px">Homebrew cask data as a version oracle</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#bf5af2"><span class="stile"><svg class="i"><use href="#drv"/></svg></span><span class="sp">Drivers &amp; extensions</span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#ffcc00"><span class="stile"><svg class="i"><use href="#spk"/></svg></span><span class="sp">Sparkle apps</span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#34c759"><span class="stile"><svg class="i"><use href="#cust"/></svg></span><span class="sp">Custom sources<small style="color:var(--text-secondary);margin-left:6px">from custom_sources.json</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#ff9f0a"><span class="stile"><svg class="i"><use href="#py"/></svg></span><span class="sp">Python (pip)<small style="color:var(--text-secondary);margin-left:6px">new</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#ff453a"><span class="stile"><svg class="i"><use href="#npm"/></svg></span><span class="sp">npm global<small style="color:var(--text-secondary);margin-left:6px">new</small></span><div class="tog on"></div></div>
+        <div class="frow" style="--c:#5e5ce6"><span class="stile"><svg class="i"><use href="#ext"/></svg></span><span class="sp">Editor extensions<small style="color:var(--text-secondary);margin-left:6px">new</small></span><div class="tog on"></div></div>
+        <div class="note">Turn a source off and it is skipped in checks and hidden from Updates. Sections marked new are added in 2.0.</div>
+      </div></div>
+
+      <div class="group"><h3>Custom sources</h3><div class="card"><div class="frow"><span class="sp t2">Edit custom_sources.json for apps nothing else covers.</span><button>Open File</button></div></div></div>
+
+      <div class="group"><div class="card"><div class="note">There is no unified API for third-party driver updates on macOS. Vendors like DisplayLink ship their own installers. PrismPack uses Homebrew's cask database as a version oracle for those, and the custom-sources file for anything without a cask.</div></div></div>
+    </div>
+
+  </div>
+    <!-- app detail card -->
+    <div class="pcard" id="pc">
+      <div class="top"><div class="ai" id="pcI"></div><div><b id="pcN">App</b><span id="pcV"></span><div class="chipsrc" id="pcS"></div></div></div>
+      <div class="vers"><div><small>Installed</small><b id="pcA">1.0</b></div><div><small>Available</small><b id="pcB">2.0</b></div></div>
+      <div class="warn" id="pcW"></div>
+      <div class="notes"><h4>What's new</h4><ul><li>Faster startup and lower memory use</li><li>New picture-in-picture controls</li><li>Fixes for sleep and wake crashes</li></ul></div>
+      <div class="act"><button class="prom">Update</button><button>Release notes</button><button>Info page</button></div>
+      <div class="ign"><h5>IGNORE</h5>
+        <div class="opt"><span>Ignore this version<small>Hides this version only. The next version shows again.</small></span></div>
+        <div class="opt"><span>Ignore updates from this app<small>Hides every future version until you bring it back.</small></span><span class="nw">NEW</span></div>
+        <div class="opt"><span>Ignore major upgrades only<small>Still offers 7.x fixes, never 8.0.</small></span><span class="nw">NEW</span></div>
+      </div>
+    </div>
+
+    <!-- password prompt, opened by Update all -->
+    <div class="scrim" id="sc" onclick="if(event.target===this)this.classList.remove('on')">
+      <div class="sheet">
+        <div class="lock"><svg class="i"><use href="#lck"/></svg></div>
+        <b>PrismPack needs your password</b>
+        <p>3 updates need administrator access. Enter it once and PrismPack uses it for this batch only. Nothing is saved.</p>
+        <div class="pw">Password</div>
+        <div class="btns"><button onclick="document.getElementById('sc').classList.remove('on')">Skip those 3</button><button class="prom" onclick="document.getElementById('sc').classList.remove('on')">Authorize</button></div>
+      </div>
+    </div>
+  <div class="scrim" id="as" onclick="if(event.target===this)this.classList.remove('on')">
+    <div class="sheet wide">
+      <div class="hd2"><span class="ic" style="--c:#30b0c7;width:34px;height:34px;border-radius:10px"><svg class="i"><use href="#cask2"/></svg></span><div><b>Move apps under Homebrew</b><span>PrismPack checks each app first and only suggests it when it is actually better.</span></div></div>
+
+      <div class="cand"><div class="top2"><div class="ai" style="background:linear-gradient(160deg,#4f6bff,#1b2a9c)">Au</div><div class="nm"><b>Audacity</b><i>3.7.5 · /Applications · cask <code>audacity</code></i></div><span class="vd good">Recommended</span></div>
+        <div class="cmp"><div><small>Today</small>No updater. You'd never be told about 3.7.6.</div><div><small>With Homebrew</small>Updates with everything else, in PrismPack.</div></div>
+        <div class="mth"><b>Adopt in place.</b> Nothing is downloaded and nothing is replaced. The version matches the cask exactly. No password.</div>
+        <div class="chk"><span>Name and bundle ID match</span><span>Not an App Store app</span><span>No updater found</span><span>Cask is current</span><span>One copy on disk</span></div>
+        <div class="acts"><button class="prom">Adopt</button><button>Not now</button><button>Never for this app</button></div></div>
+
+      <div class="cand"><div class="top2"><div class="ai" style="background:linear-gradient(160deg,#4d8dff,#1650c8)">W</div><div class="nm"><b>Microsoft Word</b><i>16.108 · /Applications · cask <code>microsoft-word</code></i></div><span class="vd mid">Worth considering</span></div>
+        <div class="cmp"><div><small>Today</small>Updates itself through Microsoft AutoUpdate.</div><div><small>With Homebrew</small>Updated from PrismPack instead. Needs your password each time.</div></div>
+        <div class="mth"><b>Replace.</b> Downloads the installer (size read from the vendor's server when this sheet opens, shown as unknown if it can't be read) and runs it. The old app waits in the Trash until the new one is checked. Needs your password.</div>
+        <div class="chk"><span>Name and bundle ID match</span><span>Not an App Store app</span><span class="w">Already updates itself</span><span class="w">Installer needs admin</span></div>
+        <div class="acts"><button>Replace…</button><button>Not now</button><button>Never for this app</button></div></div>
+
+      <div class="chk" style="margin-top:2px">Hidden because Homebrew would be worse: <b>1</b> (its cask is older than the vendor's release). <a href="#" onclick="return false">Show</a></div>
+      <div class="btns" style="margin-top:12px"><button onclick="document.getElementById('as').classList.remove('on')">Close</button><button class="prom">Adopt all safe ones (1)</button></div>
+    </div>
   </div>
 </div>
 
-<h2>Discover: search and browse across sources</h2>
-<div class="win">
-  <div class="side">
-    <div class="nav"><span>Updates</span><span>14</span></div>
-    <div class="nav on"><span>Discover</span></div>
-    <div class="nav"><span>Installed</span><span>212</span></div>
-    <div class="nav"><span>Activity</span></div>
-    <div class="nav"><span>Settings</span></div>
-  </div>
-  <div class="main">
-    <input placeholder="Search apps, command-line tools, packages" aria-label="Search">
-    <div class="chips"><span class="chip on">All</span><span class="chip">Apps</span><span class="chip">Command line</span><span class="chip">Python</span><span class="chip">Node</span><span class="chip">Rust</span><span class="chip">Ruby</span><span class="chip">Go</span><span class="chip">Editor extensions</span><span class="chip">Runtimes</span><span class="chip">Fonts</span></div>
-    <div class="lab">Popular this week</div>
-    <div class="grid">
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">Ar</div><div class="nm"><b>Arc</b><i>Browser · cask</i></div></div><button>Install</button></div>
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-success);color:var(--text-success)">ff</div><div class="nm"><b>ffmpeg</b><i>Media tool · formula</i></div></div><button>Install</button></div>
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">uv</div><div class="nm"><b>uv</b><i>Python tooling · formula</i></div></div><span class="pill" style="background:var(--bg-success);color:var(--text-success);align-self:flex-start">Installed</span></div>
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">Vs</div><div class="nm"><b>VS Code</b><i>Editor · cask</i></div></div><span class="pill" style="background:var(--bg-success);color:var(--text-success);align-self:flex-start">Installed</span></div>
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">rg</div><div class="nm"><b>ripgrep</b><i>Search · cargo or formula</i></div></div><button>Install</button></div>
-      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">pn</div><div class="nm"><b>pnpm</b><i>Node tooling · npm</i></div></div><button>Install</button></div>
-    </div>
-    <div class="lab">Recently added</div>
-    <div class="sec" style="margin-top:4px">
-      <div class="row" style="border-top:none"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">Gh</div><div class="nm"><b>Ghostty</b><i>Terminal · cask</i></div><button>Install</button></div>
-      <div class="row"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">Ol</div><div class="nm"><b>Ollama</b><i>Local AI models · cask</i></div><button>Install</button></div>
-    </div>
+<h2>Logo: Prism Layers</h2>
+<p class="lead">Three stacked glass prisms with a soft sheen and a sharp glint. Each object is its own SVG layer in <code>docs/prismpack-icon/</code> for Icon Composer. Draft art.</p>
+<div class="logos"><div class="appicon" style="width:128px;height:128px;border-radius:29px" id="bigLogo"></div>
+<div class="layerlist"><b>Layers, bottom to top</b><ol><li>Backdrop gradient</li><li>Glass prism, back</li><li>Glass prism, middle</li><li>Glass prism, front</li><li>Sheen (soft gloss)</li><li>Glint (sharp shine)</li></ol></div></div>
+
+<h2>The password prompt on its own</h2>
+<p class="lead">It appears as a sheet a moment after Update all starts, only if something in the batch needs admin. Everything else keeps running behind it. Skipping leaves those items as "Needs admin".</p>
+<div class="scrim static on" style="margin-top:10px">
+  <div class="sheet">
+    <div class="lock"><svg class="i"><use href="#lck"/></svg></div>
+    <b>PrismPack needs your password</b>
+    <p>3 updates need administrator access. Enter it once and PrismPack uses it for this batch only. Nothing is saved.</p>
+    <div class="pw">Password</div>
+    <div class="btns"><button>Skip those 3</button><button class="prom">Authorize</button></div>
   </div>
 </div>
 </div>
+
+<script>
+const LOGO='<svg viewBox="0 0 1024 1024"><defs><linearGradient id="gb2" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity=".10"/></linearGradient></defs><path d="M489.0 209.8 Q512.0 170.0 535.0 209.8 L809.0 684.2 Q832.0 724.0 786.0 724.0 L238.0 724.0 Q192.0 724.0 215.0 684.2 Z" fill="url(#gb2)" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linejoin="round"/><path d="M492.0 378.6 Q512.0 344.0 532.0 378.6 L732.0 725.4 Q752.0 760.0 712.0 760.0 L312.0 760.0 Q272.0 760.0 292.0 725.4 Z" fill="#fff" fill-opacity=".26" stroke="#fff" stroke-opacity=".75" stroke-width="8" stroke-linejoin="round"/><path d="M495.0 548.4 Q512.0 519.0 529.0 548.4 L655.0 766.6 Q672.0 796.0 638.0 796.0 L386.0 796.0 Q352.0 796.0 369.0 766.6 Z" fill="#fff" fill-opacity=".62" stroke="#fff" stroke-opacity=".95" stroke-width="8" stroke-linejoin="round"/><defs><linearGradient id="sh2" x1="0.15" y1="0.05" x2="0.6" y2="0.7"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".45" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path d="M489.0 209.8 Q512.0 170.0 535.0 209.8 L809.0 684.2 Q832.0 724.0 786.0 724.0 L238.0 724.0 Q192.0 724.0 215.0 684.2 Z" fill="url(#sh2)"/><path d="M418 330 L352 452" stroke="#fff" stroke-opacity=".95" stroke-width="16" stroke-linecap="round" fill="none"/><circle cx="446" cy="282" r="9" fill="#fff" fill-opacity=".95"/></svg>';
+document.querySelectorAll('.appicon').forEach(e=>e.innerHTML=LOGO);
+/* sidebar toggle sits at the leading end of the unified toolbar */
+document.querySelectorAll('.hdr').forEach(h=>{const b=document.createElement('button');b.className='tg';b.setAttribute('aria-label','Toggle sidebar');b.innerHTML='<svg class="i"><use href="#sb"/></svg>';b.onclick=()=>document.getElementById('w').classList.toggle('collapsed');h.prepend(b)});
+document.querySelectorAll('.shd').forEach(h=>h.addEventListener('click',e=>{if(e.target.closest('button'))return;h.parentElement.classList.toggle('closed')}));
+document.querySelectorAll('.nav[data-p]').forEach(n=>n.addEventListener('click',()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));n.classList.add('on');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));document.getElementById(n.dataset.p).classList.add('on')}));
+const pc=document.getElementById('pc'),main=document.querySelector('#w .main'),win=document.getElementById('w');
+document.querySelectorAll('#p1 .row .ai, #p1 .row .nm b').forEach(el=>el.addEventListener('click',e=>{
+  e.stopPropagation();const row=el.closest('.row'),sec=row.closest('.sec');
+  pc.style.setProperty('--c',getComputedStyle(sec).getPropertyValue('--c'));
+  const ai=row.querySelector('.ai');const I=document.getElementById('pcI');I.className=ai.className;I.style.cssText=ai.style.cssText;I.innerHTML=ai.innerHTML;
+  document.getElementById('pcN').textContent=row.querySelector('.nm b').textContent;
+  const v=row.querySelector('.nm i').textContent.split(' · ')[0].split(' to ');
+  document.getElementById('pcA').textContent=v[0]||'';const mj=x=>parseInt((x||'').split('.')[0]),w=document.getElementById('pcW'),big=mj(v[1])>mj(v[0])&&mj(v[0])<1000&&!sec.querySelector('.shd').textContent.startsWith('Python');w.style.display=big?'block':'none';w.textContent='Major version change ('+mj(v[0])+' to '+mj(v[1])+'). For paid apps this is often a separate purchase.';document.getElementById('pcB').textContent=v[1]||'';
+  document.getElementById('pcV').textContent=sec.querySelector('.shd').childNodes[3]?'':'';
+  document.getElementById('pcS').textContent=sec.querySelector('.shd').textContent.replace(/\d+.*$/,'').trim();
+  const m=win.getBoundingClientRect(),r=row.getBoundingClientRect();
+  pc.classList.add('on');const h=pc.offsetHeight;pc.style.top=Math.max(8,Math.min(r.bottom-m.top+6,m.height-h-8))+'px';pc.style.left=(main.getBoundingClientRect().left-m.left+24)+'px';pc.classList.add('on')}));
+document.addEventListener('click',e=>{if(!e.target.closest('#pc'))pc.classList.remove('on')});
+document.querySelectorAll('.tog').forEach(t=>t.addEventListener('click',()=>t.classList.toggle('on')));
+</script>
 </body>
 </html>
