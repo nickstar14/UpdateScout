@@ -11,8 +11,9 @@ per-appearance override already written in. It's built by
 `../prismpack-icon-concepts/generate_icon.py` from the three layer folders.
 Open it in Icon Composer and tune from there.
 
-- **Default:** silver background, rainbow cards, clear front card, sheen at 50%
-  (Nick's setting).
+- **Default:** silver background, rainbow cards, clear front card, sheen at 75%
+  (Nick's setting), and a full-strength shadow behind the front card so
+  it's clearly the front one.
 - **Dark:** swaps in the midnight background, the lavender front card and the
   deeper prism shade.
 - **Mono (Clear and Tinted):** swaps in the grey `clear/` layers, and hides the

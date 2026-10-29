@@ -58,9 +58,12 @@ def main():
         {"name": "Prism", "layers": [layer("10-prism-shade", True), layer("09-prism-light", True)],
          "shadow": {"kind": "neutral", "opacity": 1}, "specular": True,
          "translucency": {"enabled": False, "value": 0.5}},
-        {"name": "Front", "layers": [layer("08-front-sheen", False, 0.5, hide_in_mono=True),
+        # Sheen at 75% (Nick). A full-strength shadow behind the front card
+        # sets it clearly in front of the stack.
+        {"name": "Front", "layers": [layer("08-front-sheen", False, 0.75, hide_in_mono=True),
                                      layer("07-front-card", True)],
-         "shadow": NEUTRAL, "specular": True, "translucency": {"enabled": True, "value": 0.5}},
+         "shadow": {"kind": "neutral", "opacity": 1}, "specular": True,
+         "translucency": {"enabled": True, "value": 0.5}},
         {"name": "Cards", "layers": [dict(layer(n, True), **{"fill-specializations": p3_fill(P3_CARDS[n])})
                                      for n in reversed(cards)],
          "shadow": NEUTRAL, "translucency": {"enabled": True, "value": 0.3}},

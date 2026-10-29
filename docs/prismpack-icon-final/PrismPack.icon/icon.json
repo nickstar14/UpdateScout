@@ -56,7 +56,7 @@
           "name": "08-front-sheen",
           "image-name": "default-08-front-sheen.svg",
           "glass": false,
-          "opacity": 0.5,
+          "opacity": 0.75,
           "blend-mode": "normal",
           "hidden-specializations": [
             {
@@ -90,7 +90,7 @@
       ],
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.5
+        "opacity": 1
       },
       "specular": true,
       "translucency": {
