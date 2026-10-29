@@ -65,6 +65,15 @@
               "appearance": "tinted",
               "value": "clear-08-front-sheen.svg"
             }
+          ],
+          "opacity-specializations": [
+            {
+              "value": 0.75
+            },
+            {
+              "appearance": "tinted",
+              "value": 1
+            }
           ]
         },
         {

@@ -32,7 +32,7 @@ def mono_sheen_gradient(gid):
     for i, c in enumerate(SPECTRUM):
         r, g, b = (int(c[k:k + 2], 16) / 255 for k in (1, 3, 5))
         lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        grey = round(255 * min(1, max(0, 0.35 + (lum - 0.35) * 1.4)))
+        grey = round(255 * min(1, max(0, 0.45 + (lum - 0.45) * 2.4)))
         stops += f'<stop offset="{i / 6:.3f}" stop-color="#{grey:02x}{grey:02x}{grey:02x}"/>'
     return f'<linearGradient id="{gid}" x1="0" y1="0" x2="1" y2="1">{stops}</linearGradient>'
 
@@ -47,7 +47,8 @@ def layer_set(background, cards, front, sheen, prism_light, prism_shade, prism_a
     front_a, sheen_a = ALPHA["front"], ALPHA["sheen"]
     layers["07-front-card"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="{front}" fill-opacity="{front_a}"/>')
     if sheen == "mono":
-        layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="{sheen_a}"/>',
+        # Stronger than the colour sheen: grey bands need more to show.
+        layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="0.8"/>',
                                        mono_sheen_gradient("sh"))
     elif sheen:
         layers["08-front-sheen"] = svg(f'<rect x="{fx}" y="{FRONT_Y}" width="{fw}" height="{fw}" rx="{fw * 0.24:.0f}" fill="url(#sh)" fill-opacity="{sheen_a}"/>',
