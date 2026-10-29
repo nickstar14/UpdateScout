@@ -114,6 +114,17 @@
               "appearance": "tinted",
               "value": "clear-06-card-violet.svg"
             }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.74902,0.35294,0.94902,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
+            }
           ]
         },
         {
@@ -128,6 +139,17 @@
             {
               "appearance": "tinted",
               "value": "clear-05-card-blue.svg"
+            }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.03922,0.51765,1.00000,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
             }
           ]
         },
@@ -144,6 +166,17 @@
               "appearance": "tinted",
               "value": "clear-04-card-green.svg"
             }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.18824,0.81961,0.34510,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
+            }
           ]
         },
         {
@@ -158,6 +191,17 @@
             {
               "appearance": "tinted",
               "value": "clear-03-card-yellow.svg"
+            }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:1.00000,0.83922,0.03922,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
             }
           ]
         },
@@ -174,6 +218,17 @@
               "appearance": "tinted",
               "value": "clear-02-card-orange.svg"
             }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:1.00000,0.62353,0.03922,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
+            }
           ]
         },
         {
@@ -188,6 +243,17 @@
             {
               "appearance": "tinted",
               "value": "clear-01-card-red.svg"
+            }
+          ],
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:1.00000,0.27059,0.22745,0.85000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
             }
           ]
         }

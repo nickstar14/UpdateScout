@@ -24,7 +24,7 @@ def poly(points, fill, alpha=1):
     pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in points)
     return f'<polygon points="{pts}" fill="{fill}" fill-opacity="{alpha}"/>'
 
-def layer_set(background, cards, front, sheen, prism_light, prism_shade):
+def layer_set(background, cards, front, sheen, prism_light, prism_shade, prism_alpha=None):
     layers = {"00-background": backdrop(background)}
     # Each card is 40 wider and 34 lower than the one behind it, and the
     # front card takes the next step (540), so the deck grows toward you.
@@ -39,8 +39,8 @@ def layer_set(background, cards, front, sheen, prism_light, prism_shade):
                                        spectrum_gradient("sh", 0, 0, 1, 1))
     cx, cy, h = 512, FRONT_Y + FRONT_W / 2, 270
     apex, left, right, ridge = (cx, cy - h / 2), (cx - h * .55, cy + h / 2), (cx + h * .55, cy + h / 2), (cx + h * .17, cy + h / 2)
-    layers["09-prism-light"] = svg(poly([apex, left, ridge], prism_light, ALPHA["prism-light"]))
-    layers["10-prism-shade"] = svg(poly([apex, ridge, right], prism_shade, ALPHA["prism-shade"]))
+    layers["09-prism-light"] = svg(poly([apex, left, ridge], prism_light, prism_alpha or ALPHA["prism-light"]))
+    layers["10-prism-shade"] = svg(poly([apex, ridge, right], prism_shade, prism_alpha or ALPHA["prism-shade"]))
     return layers
 
 APPEARANCES = {
@@ -57,7 +57,7 @@ APPEARANCES = {
     # element, as Apple recommends. No sheen: it turns muddy without colour.
     "clear": layer_set(("#3a3a3c", "#2c2c2e", "#1c1c1e"),
                        ["#8e8e8e", "#999999", "#a4a4a4", "#afafaf", "#bababa", "#c5c5c5"],
-                       "#dedede", False, "#ffffff", "#a8a8a8"),
+                       "#dedede", False, "#ffffff", "#5c5c5c", prism_alpha=1),
 }
 
 if __name__ == "__main__":

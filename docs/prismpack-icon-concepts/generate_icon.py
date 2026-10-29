@@ -36,6 +36,17 @@ def layer(name, glass, opacity=1.0, hide_in_mono=False):
 
 NEUTRAL = {"kind": "neutral", "opacity": 0.5}
 
+# Display P3 fills for the cards in Default and Dark: the same channel values
+# read as P3 instead of sRGB, which pushes them toward P3's wider, richer
+# primaries. Mono ("tinted") keeps its grey artwork ("automatic").
+P3_CARDS = {"01-card-red": "#ff453a", "02-card-orange": "#ff9f0a", "03-card-yellow": "#ffd60a",
+            "04-card-green": "#30d158", "05-card-blue": "#0a84ff", "06-card-violet": "#bf5af2"}
+
+def p3_fill(hex_colour, alpha=0.85):
+    r, g, b = (int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return [{"value": {"solid": f"display-p3:{r:.5f},{g:.5f},{b:.5f},{alpha:.5f}"}},
+            {"appearance": "tinted", "value": "automatic"}]
+
 def main():
     if ICON.exists():
         shutil.rmtree(ICON)
@@ -47,7 +58,8 @@ def main():
         {"name": "Front", "layers": [layer("08-front-sheen", False, 0.5, hide_in_mono=True),
                                      layer("07-front-card", True)],
          "shadow": NEUTRAL, "specular": True, "translucency": {"enabled": True, "value": 0.5}},
-        {"name": "Cards", "layers": [layer(n, True) for n in reversed(cards)],
+        {"name": "Cards", "layers": [dict(layer(n, True), **{"fill-specializations": p3_fill(P3_CARDS[n])})
+                                     for n in reversed(cards)],
          "shadow": NEUTRAL, "translucency": {"enabled": True, "value": 0.3}},
         {"name": "Background", "layers": [layer("00-background", False)],
          "shadow": {"kind": "none", "opacity": 0.5}, "translucency": {"enabled": False, "value": 0.5}},
