@@ -33,6 +33,8 @@ def mono_sheen_gradient(gid):
         r, g, b = (int(c[k:k + 2], 16) / 255 for k in (1, 3, 5))
         lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
         grey = round(255 * min(1, max(0, 0.45 + (lum - 0.45) * 2.4)))
+        if i % 2:   # every other band a little darker: a soft stripe
+            grey = round(grey * 0.72)
         stops += f'<stop offset="{i / 6:.3f}" stop-color="#{grey:02x}{grey:02x}{grey:02x}"/>'
     return f'<linearGradient id="{gid}" x1="0" y1="0" x2="1" y2="1">{stops}</linearGradient>'
 

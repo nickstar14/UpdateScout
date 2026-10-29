@@ -21,7 +21,8 @@ Open it in Icon Composer and tune from there.
   bands with each rainbow colour turned into a grey of its own brightness,
   so the front tile still gets light and dark stripes without colour. It's
   stronger than the colour sheen: wider grey contrast, 80% baked in, and full
-  layer opacity in Mono (75% elsewhere). Mono is one appearance for all four
+  layer opacity in Mono (75% elsewhere). Every other band is 28% darker,
+  which gives a soft stripe. Mono is one appearance for all four
   Clear and Tinted modes, so it can't be tuned per mode. The prism's shaded face is a solid dark grey
   (`#5c5c5c`) here, so the 3D doesn't get lost without colour.
 - **Use Display P3 if untagged: on** (`color-space-for-untagged-svg-colors`).
