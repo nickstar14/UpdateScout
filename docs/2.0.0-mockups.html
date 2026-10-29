@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrismPack 2.0 mockups</title>
+<style>
+:root{--surface-0:#f6f6f4;--surface-1:#efefec;--surface-2:#fff;--text-primary:#1a1a18;--text-secondary:#5f5e5a;--text-muted:#888780;--border:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.25);--radius:8px;
+--bg-accent:#e6f1fb;--text-accent:#0c447c;--bg-success:#eaf3de;--text-success:#27500a;--bg-warning:#faeeda;--text-warning:#633806;--bg-danger:#fcebeb;--text-danger:#791f1f;--bg-pro:#eeedfe;--text-pro:#3c3489;
+--font-sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+@media (prefers-color-scheme:dark){:root{--surface-0:#1b1b19;--surface-1:#242422;--surface-2:#2c2c2a;--text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;--border:rgba(255,255,255,.14);--border-strong:rgba(255,255,255,.3);
+--bg-accent:#0c447c;--text-accent:#b5d4f4;--bg-success:#27500a;--text-success:#c0dd97;--bg-warning:#633806;--text-warning:#fac775;--bg-danger:#791f1f;--text-danger:#f7c1c1;--bg-pro:#3c3489;--text-pro:#cecbf6}}
+body{margin:0;padding:24px 16px;background:var(--surface-0);color:var(--text-primary);font-family:var(--font-sans);line-height:1.5}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:22px;font-weight:500;margin:0 0 4px}h2{font-size:16px;font-weight:500;margin:28px 0 8px}p.lead{margin:0 0 8px;color:var(--text-secondary);font-size:14px}
+button{font:inherit;font-size:13px;padding:5px 12px;border-radius:var(--radius);border:.5px solid var(--border-strong);background:transparent;color:var(--text-primary);cursor:pointer}
+input{font:inherit;font-size:14px;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:var(--radius);border:.5px solid var(--border-strong);background:var(--surface-2);color:var(--text-primary)}
+.win{display:grid;grid-template-columns:132px minmax(0,1fr);border:.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-2);font-size:13px}
+.side{background:var(--surface-1);padding:12px 8px;border-right:.5px solid var(--border)}
+.nav{padding:6px 10px;border-radius:6px;color:var(--text-secondary);display:flex;justify-content:space-between}
+.nav.on{background:var(--bg-accent);color:var(--text-accent);font-weight:500}
+.main{padding:14px;min-width:0}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.top .sp{flex:1}
+.sec{border:.5px solid var(--border);border-radius:10px;margin-top:10px;overflow:hidden}
+.sh{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface-1);font-weight:500}
+.cnt{font-weight:400;color:var(--text-secondary);font-size:12px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:.5px solid var(--border)}
+.av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px;flex:none}
+.nm{flex:1;min-width:0}.nm b{font-weight:500}.nm i{display:block;font-style:normal;font-size:12px;color:var(--text-secondary)}
+.pill{font-size:12px;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.bar{width:84px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}.bar u{display:block;height:100%;background:var(--text-accent)}
+.t2{font-size:12px;color:var(--text-secondary)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.chip{font-size:12px;padding:3px 10px;border-radius:12px;border:.5px solid var(--border-strong);color:var(--text-secondary)}.chip.on{background:var(--bg-accent);color:var(--text-accent);border-color:transparent}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.card{border:.5px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.card .hd{display:flex;gap:10px;align-items:center}
+.lab{font-size:12px;color:var(--text-secondary);margin:14px 0 2px}
+.admin{display:flex;align-items:center;gap:10px;margin-top:12px;padding:8px 12px;border-radius:10px;background:var(--bg-warning);color:var(--text-warning)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>PrismPack 2.0 mockups</h1>
+<p class="lead">Layout sketches, not final design. See 2.0.0-vision.md.</p>
+
+<h2>Updates: parallel installs, one authorization</h2>
+<div class="win">
+  <div class="side">
+    <div class="nav on"><span>Updates</span><span>14</span></div>
+    <div class="nav"><span>Discover</span></div>
+    <div class="nav"><span>Installed</span><span>212</span></div>
+    <div class="nav"><span>Activity</span></div>
+    <div class="nav"><span>Settings</span></div>
+  </div>
+  <div class="main">
+    <div class="top"><div><div style="font-size:16px;font-weight:500">Updates</div><div class="t2">14 available · 3 need admin · running 6 of 14</div></div><span class="sp"></span><span class="t2">At once</span><button>4</button><button style="background:var(--bg-accent);color:var(--text-accent);border-color:transparent">Update all</button></div>
+    <div class="sec"><div class="sh">Homebrew casks <span class="cnt">5</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">F</div><div class="nm"><b>Firefox</b><i>131.0 to 132.0</i></div><div class="bar"><u style="width:62%"></u></div><span class="t2">62%</span><button>Cancel</button></div>
+      <div class="row"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">R</div><div class="nm"><b>Raycast</b><i>1.84 to 1.85</i></div><span class="pill" style="background:var(--bg-accent);color:var(--text-accent)">Installing</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">Z</div><div class="nm"><b>Zoom</b><i>6.2 to 6.3 · installer package</i></div><span class="pill" style="background:var(--bg-warning);color:var(--text-warning)">Needs admin</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">D</div><div class="nm"><b>Docker</b><i>4.34 to 4.35</i></div><span class="t2">Queued</span><button>Cancel</button></div>
+    </div>
+    <div class="sec"><div class="sh">Python (pip) <span class="cnt">3</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-success);color:var(--text-success)">r</div><div class="nm"><b>rich</b><i>13.7.1 to 13.9.2</i></div><span class="pill" style="background:var(--bg-success);color:var(--text-success)">Updated</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-success);color:var(--text-success)">b</div><div class="nm"><b>black</b><i>24.8 to 24.10</i></div><button>Update</button></div>
+    </div>
+    <div class="sec"><div class="sh">Sparkle apps <span class="cnt">2</span></div>
+      <div class="row"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">T</div><div class="nm"><b>Thaw</b><i>3.0.0-beta.2 to beta.3</i></div><span class="pill" style="background:var(--bg-danger);color:var(--text-danger)">Failed</span><button>Retry</button></div>
+    </div>
+    <div class="sec"><div class="sh">npm global <span class="cnt">2</span> · Drivers and extensions <span class="cnt">1</span> · Editor extensions <span class="cnt">4</span></div></div>
+    <div class="admin"><b style="font-weight:500">3 updates need your password.</b><span style="flex:1"></span><button>Authorize once for this batch</button></div>
+  </div>
+</div>
+
+<h2>Discover: search and browse across sources</h2>
+<div class="win">
+  <div class="side">
+    <div class="nav"><span>Updates</span><span>14</span></div>
+    <div class="nav on"><span>Discover</span></div>
+    <div class="nav"><span>Installed</span><span>212</span></div>
+    <div class="nav"><span>Activity</span></div>
+    <div class="nav"><span>Settings</span></div>
+  </div>
+  <div class="main">
+    <input placeholder="Search apps, command-line tools, packages" aria-label="Search">
+    <div class="chips"><span class="chip on">All</span><span class="chip">Apps</span><span class="chip">Command line</span><span class="chip">Python</span><span class="chip">Node</span><span class="chip">Rust</span><span class="chip">Ruby</span><span class="chip">Go</span><span class="chip">Editor extensions</span><span class="chip">Runtimes</span><span class="chip">Fonts</span></div>
+    <div class="lab">Popular this week</div>
+    <div class="grid">
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">Ar</div><div class="nm"><b>Arc</b><i>Browser · cask</i></div></div><button>Install</button></div>
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-success);color:var(--text-success)">ff</div><div class="nm"><b>ffmpeg</b><i>Media tool · formula</i></div></div><button>Install</button></div>
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">uv</div><div class="nm"><b>uv</b><i>Python tooling · formula</i></div></div><span class="pill" style="background:var(--bg-success);color:var(--text-success);align-self:flex-start">Installed</span></div>
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">Vs</div><div class="nm"><b>VS Code</b><i>Editor · cask</i></div></div><span class="pill" style="background:var(--bg-success);color:var(--text-success);align-self:flex-start">Installed</span></div>
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-danger);color:var(--text-danger)">rg</div><div class="nm"><b>ripgrep</b><i>Search · cargo or formula</i></div></div><button>Install</button></div>
+      <div class="card"><div class="hd"><div class="av" style="background:var(--bg-accent);color:var(--text-accent)">pn</div><div class="nm"><b>pnpm</b><i>Node tooling · npm</i></div></div><button>Install</button></div>
+    </div>
+    <div class="lab">Recently added</div>
+    <div class="sec" style="margin-top:4px">
+      <div class="row" style="border-top:none"><div class="av" style="background:var(--bg-pro);color:var(--text-pro)">Gh</div><div class="nm"><b>Ghostty</b><i>Terminal · cask</i></div><button>Install</button></div>
+      <div class="row"><div class="av" style="background:var(--bg-warning);color:var(--text-warning)">Ol</div><div class="nm"><b>Ollama</b><i>Local AI models · cask</i></div><button>Install</button></div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>
