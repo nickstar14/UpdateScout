@@ -38,7 +38,7 @@ enum SparkleInstaller {
 
     static func install(_ plan: Plan, progress: @escaping @Sendable (String) -> Void) async throws {
         let fm = FileManager.default
-        let workDir = fm.temporaryDirectory.appendingPathComponent("UpdateScout-\(UUID().uuidString)")
+        let workDir = fm.temporaryDirectory.appendingPathComponent("PrismPack-\(UUID().uuidString)")
         try fm.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: workDir) }
 
@@ -61,7 +61,7 @@ enum SparkleInstaller {
         progress("Verifying signature…")
         let archiveData = try Data(contentsOf: archive)
         guard verifyEdDSA(data: archiveData, signatureB64: plan.edSignature, publicKeyB64: plan.publicEDKey) else {
-            throw UpdateScoutError.commandFailed(
+            throw PrismPackError.commandFailed(
                 "signature check",
                 output: "The download's signature does not match this app's public key. Nothing was installed.")
         }
@@ -82,7 +82,7 @@ enum SparkleInstaller {
         _ = try? await Shell.run("/usr/bin/xattr", ["-cr", newApp.path])
         let verify = try await Shell.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path])
         guard verify.status == 0 else {
-            throw UpdateScoutError.commandFailed("codesign --verify", output: verify.combined)
+            throw PrismPackError.commandFailed("codesign --verify", output: verify.combined)
         }
         // If the installed app has a Team ID, the update must carry the same one
         // — that stops a validly signed app from a *different* developer (or an
@@ -92,7 +92,7 @@ enum SparkleInstaller {
         let newTeam = try await teamIdentifier(of: newApp)
         let oldTeam = try await teamIdentifier(of: plan.appURL)
         if let oldTeam, newTeam != oldTeam {
-            throw UpdateScoutError.commandFailed(
+            throw PrismPackError.commandFailed(
                 "identity check",
                 output: "The update is signed by a different developer (\(newTeam ?? "unsigned") vs \(oldTeam)). Nothing was installed.")
         }
@@ -114,7 +114,7 @@ enum SparkleInstaller {
             // Never swap a bundle out from under a running app (it may be
             // sitting on an unsaved-changes dialog).
             if stillRunning() {
-                throw UpdateScoutError.commandFailed(
+                throw PrismPackError.commandFailed(
                     "quit \(plan.appURL.lastPathComponent)",
                     output: "\(plan.appURL.deletingPathExtension().lastPathComponent) didn't quit. Save your work, quit it, then try again. Nothing was changed.")
             }
@@ -175,7 +175,7 @@ enum SparkleInstaller {
                 command, reason: "\(AppIdentity.name) needs to replace \(target.deletingPathExtension().lastPathComponent) with its update.",
                 tag: Shell.installTag)
             guard result.status == 0, fm.fileExists(atPath: target.path) else {
-                throw UpdateScoutError.commandFailed(
+                throw PrismPackError.commandFailed(
                     "replace \(target.lastPathComponent)",
                     output: result.combined.isEmpty
                         ? "The app could not be replaced, even with administrator rights. Nothing was changed."
@@ -204,7 +204,7 @@ enum SparkleInstaller {
             || name.hasSuffix(".txz") || name.hasSuffix(".tgz") || name.hasSuffix(".tar") {
             let result = try await Shell.run("/usr/bin/tar", ["-xf", archive.path, "-C", dir.path])
             guard result.status == 0 else {
-                throw UpdateScoutError.commandFailed("tar -xf", output: result.combined)
+                throw PrismPackError.commandFailed("tar -xf", output: result.combined)
             }
             return try findApp(in: dir)
         }
@@ -212,7 +212,7 @@ enum SparkleInstaller {
         case "zip":
             let result = try await Shell.run("/usr/bin/ditto", ["-x", "-k", archive.path, dir.path])
             guard result.status == 0 else {
-                throw UpdateScoutError.commandFailed("ditto", output: result.combined)
+                throw PrismPackError.commandFailed("ditto", output: result.combined)
             }
             return try findApp(in: dir)
         case "dmg":
@@ -220,7 +220,7 @@ enum SparkleInstaller {
             let attach = try await Shell.run("/usr/bin/hdiutil",
                 ["attach", archive.path, "-nobrowse", "-readonly", "-mountpoint", mountPoint.path])
             guard attach.status == 0 else {
-                throw UpdateScoutError.commandFailed("hdiutil attach", output: attach.combined)
+                throw PrismPackError.commandFailed("hdiutil attach", output: attach.combined)
             }
             defer { Task { _ = try? await Shell.run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-quiet"]) } }
             // Copy off the read-only image before detaching.
@@ -229,7 +229,7 @@ enum SparkleInstaller {
             try FileManager.default.copyItem(at: source, to: dest)
             return dest
         default:
-            throw UpdateScoutError.commandFailed(
+            throw PrismPackError.commandFailed(
                 "unpack", output: "Unsupported archive type: .\(archive.pathExtension)")
         }
     }
@@ -244,7 +244,7 @@ enum SparkleInstaller {
             let nested = (try? fm.contentsOfDirectory(at: sub, includingPropertiesForKeys: nil)) ?? []
             if let app = nested.first(where: { $0.pathExtension == "app" }) { return app }
         }
-        throw UpdateScoutError.commandFailed("unpack", output: "No .app found in the downloaded archive.")
+        throw PrismPackError.commandFailed("unpack", output: "No .app found in the downloaded archive.")
     }
 
     private static func teamIdentifier(of app: URL) async throws -> String? {
@@ -308,7 +308,7 @@ final class ProgressDownloader: NSObject, URLSessionDownloadDelegate, @unchecked
         // The temp file is removed as soon as this returns, so move it now.
         do {
             if let http = downloadTask.response as? HTTPURLResponse, http.statusCode != 200 {
-                throw UpdateScoutError.commandFailed("download", output: "HTTP \(http.statusCode)")
+                throw PrismPackError.commandFailed("download", output: "HTTP \(http.statusCode)")
             }
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: location, to: destination)

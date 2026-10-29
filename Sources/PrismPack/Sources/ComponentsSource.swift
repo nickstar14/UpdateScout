@@ -40,15 +40,15 @@ struct ComponentsSource: UpdateSource {
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let brew = HomebrewSource.brewPath else {
-            throw UpdateScoutError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
+            throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
         let args = ["install", "--cask", item.installToken, "--force"]
         let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
             if let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: item.installToken) {
-                throw UpdateScoutError.staleCaskUpgrade(token: item.installToken, folder: folder)
+                throw PrismPackError.staleCaskUpgrade(token: item.installToken, folder: folder)
             }
-            throw UpdateScoutError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
+            throw PrismPackError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }
     }
 

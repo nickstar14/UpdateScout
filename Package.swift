@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "UpdateScout",
+    name: "PrismPack",
     platforms: [.macOS(.v15)],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.0"),
     ],
     targets: [
         .executableTarget(
-            name: "UpdateScout",
+            name: "PrismPack",
             dependencies: [.product(name: "Sparkle", package: "Sparkle")],
-            path: "Sources/UpdateScout",
+            path: "Sources/PrismPack",
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 // Sparkle.framework is embedded in Contents/Frameworks by build-app.sh.
@@ -19,9 +19,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "UpdateScoutTests",
-            dependencies: ["UpdateScout"],
-            path: "Tests/UpdateScoutTests"
+            name: "PrismPackTests",
+            dependencies: ["PrismPack"],
+            path: "Tests/PrismPackTests"
         )
     ]
 )

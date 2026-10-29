@@ -1,7 +1,7 @@
 import Foundation
 import Sparkle
 
-/// UpdateScout keeping *itself* up to date, via Sparkle + GitHub Releases.
+/// PrismPack keeping *itself* up to date, via Sparkle + GitHub Releases.
 /// Feed URL and EdDSA public key live in Info.plist (SUFeedURL / SUPublicEDKey).
 /// Sparkle does its own HTTP fetching and honours `Cache-Control`, and
 /// raw.githubusercontent.com serves the appcast with `max-age=300`. That makes a

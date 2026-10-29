@@ -68,7 +68,7 @@ struct SystemUpdateSource: UpdateSource {
     /// Never reached: macOS rows aren't scripted (they open System Settings,
     /// which handles the download, restart and progress).
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
-        throw UpdateScoutError.commandFailed(
+        throw PrismPackError.commandFailed(
             "softwareupdate", output: "macOS updates install from Software Update in System Settings.")
     }
 }

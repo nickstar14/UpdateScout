@@ -11,7 +11,8 @@ swift build -c "$CONFIG"
 
 APP_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" Resources/Info.plist)
 EXE_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" Resources/Info.plist)
-BIN=".build/$CONFIG/UpdateScout"
+# SwiftPM names the binary after the target; the bundle keeps CFBundleExecutable.
+BIN=".build/$CONFIG/PrismPack"
 APP="build/$APP_NAME.app"
 
 rm -rf "$APP"

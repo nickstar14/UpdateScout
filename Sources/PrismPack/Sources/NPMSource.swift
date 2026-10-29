@@ -15,7 +15,7 @@ struct NPMSource: UpdateSource {
         // is the success signal, not the exit status.
         let out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let json = try? JSONSerialization.jsonObject(with: Data((out.isEmpty ? "{}" : out).utf8)) as? [String: Any] else {
-            throw UpdateScoutError.commandFailed("npm outdated -g", output: result.combined)
+            throw PrismPackError.commandFailed("npm outdated -g", output: result.combined)
         }
         return Self.parse(json).map { pkg in
             UpdateItem(sourceID: id, name: pkg.name, installedVersion: pkg.current, latestVersion: pkg.latest,
@@ -36,12 +36,12 @@ struct NPMSource: UpdateSource {
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let npm = Shell.which("npm") else {
-            throw UpdateScoutError.toolMissing("npm", hint: "It was removed after the last check.")
+            throw PrismPackError.toolMissing("npm", hint: "It was removed after the last check.")
         }
         let args = ["install", "-g", "\(item.installToken)@latest"]
         let result = try await Shell.run(npm, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("npm " + args.joined(separator: " "), output: result.combined)
+            throw PrismPackError.commandFailed("npm " + args.joined(separator: " "), output: result.combined)
         }
     }
 }

@@ -16,7 +16,7 @@ struct SparkleSource: UpdateSource {
         return !fm.isWritableFile(atPath: path) || !fm.isWritableFile(atPath: (path as NSString).deletingLastPathComponent)
     }
 
-    /// Sentinel install token meaning "this is UpdateScout itself".
+    /// Sentinel install token meaning "this is PrismPack itself".
     static let selfUpdateToken = "__self__"
 
     func detect() async throws -> [UpdateItem] {
@@ -63,7 +63,7 @@ struct SparkleSource: UpdateSource {
         let latestVersion = latest.displayVersion
         guard isNewerVersion(latestVersion, than: installed) else { return nil }
 
-        // We can't swap our own bundle out from under ourselves — UpdateScout
+        // We can't swap our own bundle out from under ourselves — PrismPack
         // has an embedded Sparkle updater built for exactly that, so hand off
         // to it (it shows release notes and relaunches us cleanly).
         if appPath == Bundle.main.bundlePath {
@@ -115,14 +115,14 @@ struct SparkleSource: UpdateSource {
               let feedString = plist["SUFeedURL"] as? String,
               let feed = URL(string: feedString),
               let installed = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
-        else { throw UpdateScoutError.parseFailure("feed URL for \(item.name)") }
+        else { throw PrismPackError.parseFailure("feed URL for \(item.name)") }
 
         let (feedData, response) = try await Net.fetch(feed)
         guard (response as? HTTPURLResponse)?.statusCode == 200,
               let latest = AppcastParser.latestVersion(from: feedData, installed: installed,
                                                        installedBuild: plist["CFBundleVersion"] as? String),
               let plan = SparkleInstaller.plan(appPath: appPath, latest: latest)
-        else { throw UpdateScoutError.parseFailure("appcast for \(item.name)") }
+        else { throw PrismPackError.parseFailure("appcast for \(item.name)") }
 
         try await SparkleInstaller.install(plan, progress: progress)
     }

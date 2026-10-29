@@ -11,11 +11,11 @@ struct MASSource: UpdateSource {
 
     func detect() async throws -> [UpdateItem] {
         guard let mas = Shell.which("mas") else {
-            throw UpdateScoutError.toolMissing("mas-cli", hint: "Run `brew install mas` to enable App Store checks.")
+            throw PrismPackError.toolMissing("mas-cli", hint: "Run `brew install mas` to enable App Store checks.")
         }
         let result = try await Shell.run(mas, ["outdated"])
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("mas outdated", output: result.combined)
+            throw PrismPackError.commandFailed("mas outdated", output: result.combined)
         }
         // Lines look like: 497799835  Xcode (14.2 -> 14.3). mas right-aligns
         // the id column, so shorter ids arrive with leading spaces.
@@ -136,7 +136,7 @@ struct MASSource: UpdateSource {
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let mas = Shell.which("mas") else {
-            throw UpdateScoutError.toolMissing("mas-cli", hint: "Run `brew install mas`.")
+            throw PrismPackError.toolMissing("mas-cli", hint: "Run `brew install mas`.")
         }
         let result = try await Shell.run(mas, ["upgrade", item.installToken], tag: Shell.installTag, lineHandler: progress)
         let sudoBlocked = result.combined.contains("sudo: a terminal is required")
@@ -154,7 +154,7 @@ struct MASSource: UpdateSource {
                 await MainActor.run {
                     NSWorkspace.shared.open(URL(string: "macappstore://showUpdatesPage")!)
                 }
-                throw UpdateScoutError.commandFailed(
+                throw PrismPackError.commandFailed(
                     "mas upgrade \(item.installToken)",
                     output: "mas doesn't see this update yet. Finish it in the App Store window that just opened, then Check Now.")
             }
@@ -198,11 +198,11 @@ struct MASSource: UpdateSource {
                 }
             if priv.combined.contains("No installed apps with ADAM ID") { return }
             guard priv.status == 0 else {
-                throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken) (admin)", output: priv.combined)
+                throw PrismPackError.commandFailed("mas upgrade \(item.installToken) (admin)", output: priv.combined)
             }
             return
         }
-        throw UpdateScoutError.commandFailed("mas upgrade \(item.installToken)", output: result.combined)
+        throw PrismPackError.commandFailed("mas upgrade \(item.installToken)", output: result.combined)
     }
 }
 

@@ -52,7 +52,7 @@ struct HomebrewSource: UpdateSource {
 
     func detect() async throws -> [UpdateItem] {
         guard let brew = Self.brewPath else {
-            throw UpdateScoutError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
+            throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
         // Refresh brew's own metadata first so "outdated" is against current
         // data. Background checks can run every few minutes, and brew's
@@ -66,7 +66,7 @@ struct HomebrewSource: UpdateSource {
         }
         let result = try await Shell.run(brew, ["outdated", "--json=v2"])
         guard result.status == 0, let data = result.stdout.data(using: .utf8) else {
-            throw UpdateScoutError.commandFailed("brew outdated", output: result.combined)
+            throw PrismPackError.commandFailed("brew outdated", output: result.combined)
         }
 
         struct Outdated: Decodable {
@@ -161,7 +161,7 @@ struct HomebrewSource: UpdateSource {
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let brew = Self.brewPath else {
-            throw UpdateScoutError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
+            throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
         let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
         let (kind, name) = (parts.first ?? "", parts.last ?? item.name)
@@ -178,9 +178,9 @@ struct HomebrewSource: UpdateSource {
         let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
             if kind == "cask", let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: name) {
-                throw UpdateScoutError.staleCaskUpgrade(token: name, folder: folder)
+                throw PrismPackError.staleCaskUpgrade(token: name, folder: folder)
             }
-            throw UpdateScoutError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
+            throw PrismPackError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }
     }
 }

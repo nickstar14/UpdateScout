@@ -29,7 +29,7 @@ enum CaskIndex {
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 // Fall back to a stale cache if we're offline.
                 if let stale = fm.contents(atPath: cacheURL.path) { return try parse(stale) }
-                throw UpdateScoutError.parseFailure("cask index download")
+                throw PrismPackError.parseFailure("cask index download")
             }
             try? downloaded.write(to: cacheURL, options: .atomic)
             data = downloaded
@@ -40,7 +40,7 @@ enum CaskIndex {
     private static func parse(_ data: Data) throws -> [CaskInfo] {
         // The cask JSON's `artifacts` array is heterogeneous, so parse leniently.
         guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw UpdateScoutError.parseFailure("cask index JSON")
+            throw PrismPackError.parseFailure("cask index JSON")
         }
         var casks: [CaskInfo] = []
         casks.reserveCapacity(array.count)

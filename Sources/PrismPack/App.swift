@@ -9,7 +9,7 @@ struct Main {
         } else if CommandLine.arguments.contains("--background-check") {
             backgroundCheck()
         } else {
-            UpdateScoutApp.main()
+            PrismPackApp.main()
         }
     }
 
@@ -38,7 +38,7 @@ struct Main {
     }
 }
 
-struct UpdateScoutApp: App {
+struct PrismPackApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var controller = UpdateController.shared
 
@@ -49,7 +49,7 @@ struct UpdateScoutApp: App {
             Prefs.migrateGlassTint()
             Appearance.apply(Prefs.appearance)
             if Prefs.showDockIcon { NSApp.setActivationPolicy(.regular) }
-            // `open UpdateScout.app --args --open-window` shows the status
+            // `open PrismPack.app --args --open-window` shows the status
             // window straight away (handy for screenshots and testing).
             if CommandLine.arguments.contains("--open-window") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { UpdatesWindow.shared.show() }
@@ -64,7 +64,7 @@ struct UpdateScoutApp: App {
         // When the askpass dialog closes, bring the status window back to the
         // front (the auth prompt pushes us behind other apps).
         DistributedNotificationCenter.default().addObserver(
-            forName: .updateScoutRefront, object: nil, queue: .main
+            forName: .prismPackRefront, object: nil, queue: .main
         ) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 UpdatesWindow.shared.show()

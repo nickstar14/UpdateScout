@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import UpdateScout
+@testable import PrismPack
 
 /// state.json stays readable both ways: old files load, new fields survive.
 struct StateTests {

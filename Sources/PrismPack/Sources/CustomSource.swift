@@ -61,7 +61,7 @@ struct CustomSource: UpdateSource {
         guard let data = FileManager.default.contents(atPath: Self.configURL.path) else { return [] }
         let entries: [Entry]
         do { entries = try JSONDecoder().decode([Entry].self, from: data) }
-        catch { throw UpdateScoutError.parseFailure("custom_sources.json (\(error.localizedDescription))") }
+        catch { throw PrismPackError.parseFailure("custom_sources.json (\(error.localizedDescription))") }
 
         var items: [UpdateItem] = []
         for entry in entries where entry.enabled ?? true {
@@ -136,17 +136,17 @@ struct CustomSource: UpdateSource {
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let data = FileManager.default.contents(atPath: Self.configURL.path),
               let entries = try? JSONDecoder().decode([Entry].self, from: data)
-        else { throw UpdateScoutError.parseFailure("custom_sources.json") }
+        else { throw PrismPackError.parseFailure("custom_sources.json") }
         guard let entry = entries.first(where: { Self.token(for: $0) == item.installToken }),
               let cmd = entry.installCommand
         else {
-            throw UpdateScoutError.commandFailed(
+            throw PrismPackError.commandFailed(
                 item.name, output: "This entry changed in custom_sources.json since the last check. Check Now, then try again.")
         }
 
         let result = try await Shell.run("/bin/sh", ["-c", cmd], tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed(cmd, output: result.combined)
+            throw PrismPackError.commandFailed(cmd, output: result.combined)
         }
     }
 }

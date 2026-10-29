@@ -79,7 +79,7 @@ enum KextInventory {
     /// wasn't loaded.
     static func remove(_ kext: KextBundle, progress: @escaping @Sendable (String) -> Void) async throws {
         guard isSafeToRemove(kext.path) else {
-            throw UpdateScoutError.commandFailed("remove", output: "Refusing to delete outside \(directory): \(kext.path)")
+            throw PrismPackError.commandFailed("remove", output: "Refusing to delete outside \(directory): \(kext.path)")
         }
         progress("Authorizing — enter your password to remove…")
         let quoted = "'" + kext.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
@@ -87,10 +87,10 @@ enum KextInventory {
             "/bin/rm -rf \(quoted) && /usr/bin/touch '\(directory)'",
             reason: "\(AppIdentity.name) is trying to remove the leftover driver \(kext.name).", tag: Shell.installTag)
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("rm -rf \(kext.name).kext", output: result.combined)
+            throw PrismPackError.commandFailed("rm -rf \(kext.name).kext", output: result.combined)
         }
         if FileManager.default.fileExists(atPath: kext.path) {
-            throw UpdateScoutError.commandFailed("remove", output: "\(kext.path) still exists after removal.")
+            throw PrismPackError.commandFailed("remove", output: "\(kext.path) still exists after removal.")
         }
     }
 }

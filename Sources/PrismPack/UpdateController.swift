@@ -17,7 +17,7 @@ final class UpdateController: ObservableObject {
     @Published private(set) var spinFrame = 0
     /// Item id → where its install is. Absent means idle.
     @Published var installStates: [String: InstallState] = [:]
-    /// Failed installs that UpdateScout knows how to fix: item id → (cask
+    /// Failed installs that PrismPack knows how to fix: item id → (cask
     /// token, leftover staging folder). The card offers Repair for these.
     @Published var repairable: [String: (token: String, folder: URL)] = [:]
     /// Major upgrades waiting for the user to review them before they queue.
@@ -528,7 +528,7 @@ final class UpdateController: ObservableObject {
                                     detail: "\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
                                     itemID: item.id, sourceID: item.sourceID,
                                     log: (outputTails[item.id] ?? []).joined(separator: "\n")))
-                if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
+                if case PrismPackError.staleCaskUpgrade(let token, let folder) = error {
                     repairable[item.id] = (token, folder)
                 }
             }

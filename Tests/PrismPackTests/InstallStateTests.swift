@@ -1,5 +1,5 @@
 import Testing
-@testable import UpdateScout
+@testable import PrismPack
 
 /// How install progress lines map to the states the cards show.
 struct InstallStateTests {

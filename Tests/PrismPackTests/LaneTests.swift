@@ -1,5 +1,5 @@
 import Testing
-@testable import UpdateScout
+@testable import PrismPack
 
 /// Every brew caller shares one lane; other managers get their own.
 struct LaneTests {

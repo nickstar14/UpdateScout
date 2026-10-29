@@ -18,7 +18,7 @@ final class ProcessRegistry: @unchecked Sendable {
     }
 }
 
-/// Async subprocess runner. Everything UpdateScout does externally goes through here.
+/// Async subprocess runner. Everything PrismPack does externally goes through here.
 enum Shell {
     struct Result {
         let status: Int32
@@ -156,7 +156,7 @@ final class OutputBuffer: @unchecked Sendable {
 
 /// A tiny helper script sudo runs when it needs a password and has no
 /// terminal: it shows a native password dialog and prints the entry to
-/// stdout, which sudo reads directly. UpdateScout itself never sees it.
+/// stdout, which sudo reads directly. PrismPack itself never sees it.
 enum Askpass {
     /// Environment variable carrying the prompt's headline from
     /// runPrivileged, through sudo, to the askpass process.

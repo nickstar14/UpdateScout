@@ -1,5 +1,5 @@
 import Testing
-@testable import UpdateScout
+@testable import PrismPack
 
 /// Pure version logic: comparison, release tracks, major upgrades, item ids.
 struct VersionTests {

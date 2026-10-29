@@ -152,7 +152,7 @@ extension UpdateSource {
     func search(_ query: String) async throws -> [PackageInfo] { [] }
     func info(_ name: String) async throws -> PackageInfo? { nil }
     func uninstall(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
-        throw UpdateScoutError.unsupported("\(displayName) can't remove items")
+        throw PrismPackError.unsupported("\(displayName) can't remove items")
     }
     func channels(for item: UpdateItem) -> [String] { [] }
     func needsAdmin(_ item: UpdateItem) -> Bool { false }
@@ -171,7 +171,7 @@ enum AppIdentity {
     static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "PrismPack"
 }
 
-enum UpdateScoutError: LocalizedError {
+enum PrismPackError: LocalizedError {
     case toolMissing(String, hint: String)
     case commandFailed(String, output: String)
     case parseFailure(String)

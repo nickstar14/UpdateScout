@@ -237,7 +237,7 @@ enum LaunchAgent {
         await bootout()
         let result = try await Shell.run("/bin/launchctl", ["bootstrap", "gui/\(getuid())", plistURL.path])
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("launchctl bootstrap", output: result.combined)
+            throw PrismPackError.commandFailed("launchctl bootstrap", output: result.combined)
         }
     }
 

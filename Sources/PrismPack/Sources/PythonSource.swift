@@ -20,7 +20,7 @@ struct PythonSource: UpdateSource {
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { throw UpdateScoutError.parseFailure("install token \(item.installToken)") }
+        guard parts.count == 2 else { throw PrismPackError.parseFailure("install token \(item.installToken)") }
         let (kind, name) = (parts[0], parts[1])
         let tool: String, args: [String]
         switch kind {
@@ -34,18 +34,18 @@ struct PythonSource: UpdateSource {
         case "pip":
             tool = Self.userPython; args = ["-m", "pip", "install", "--user", "--upgrade", name]
         default:
-            throw UpdateScoutError.parseFailure("install token \(item.installToken)")
+            throw PrismPackError.parseFailure("install token \(item.installToken)")
         }
         let result = try await Shell.run(tool, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed(([(tool as NSString).lastPathComponent] + args).joined(separator: " "),
+            throw PrismPackError.commandFailed(([(tool as NSString).lastPathComponent] + args).joined(separator: " "),
                                                  output: result.combined)
         }
     }
 
     private static func require(_ tool: String) throws -> String {
         guard let path = Shell.which(tool) else {
-            throw UpdateScoutError.toolMissing(tool, hint: "It was removed after the last check.")
+            throw PrismPackError.toolMissing(tool, hint: "It was removed after the last check.")
         }
         return path
     }
@@ -64,10 +64,10 @@ struct PythonSource: UpdateSource {
     private func pipxOutdated() async throws -> [UpdateItem] {
         guard let pipx = Shell.which("pipx") else { return [] }
         let result = try await Shell.run(pipx, ["list", "--json"])
-        guard result.status == 0 else { throw UpdateScoutError.commandFailed("pipx list --json", output: result.combined) }
+        guard result.status == 0 else { throw PrismPackError.commandFailed("pipx list --json", output: result.combined) }
         guard let json = try? JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any],
               let venvs = json["venvs"] as? [String: Any]
-        else { throw UpdateScoutError.parseFailure("pipx list output") }
+        else { throw PrismPackError.parseFailure("pipx list output") }
 
         var installed: [(name: String, version: String)] = []
         for case let (name, venv as [String: Any]) in venvs {
@@ -107,7 +107,7 @@ struct PythonSource: UpdateSource {
         guard let uv = Shell.which("uv") else { return [] }
         let result = try await Shell.run(uv, ["tool", "list", "--outdated", "--show-version-specifiers"])
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("uv tool list --outdated", output: result.combined)
+            throw PrismPackError.commandFailed("uv tool list --outdated", output: result.combined)
         }
         return Self.parseUVList(result.stdout).map { tool in
             tool.pinned
@@ -147,10 +147,10 @@ struct PythonSource: UpdateSource {
                                          ["-m", "pip", "list", "--user", "--outdated", "--format=json",
                                           "--disable-pip-version-check"])
         guard result.status == 0 else {
-            throw UpdateScoutError.commandFailed("pip list --user --outdated", output: result.combined)
+            throw PrismPackError.commandFailed("pip list --user --outdated", output: result.combined)
         }
         guard let rows = try? JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [[String: Any]] else {
-            throw UpdateScoutError.parseFailure("pip list output")
+            throw PrismPackError.parseFailure("pip list output")
         }
         return rows.compactMap { row in
             guard let name = row["name"] as? String, let installed = row["version"] as? String,

@@ -1,5 +1,5 @@
 import Testing
-@testable import UpdateScout
+@testable import PrismPack
 
 /// Parsing the text and JSON the new package tools print.
 struct SourceParsingTests {

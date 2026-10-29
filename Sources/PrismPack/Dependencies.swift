@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import SwiftUI
 
-/// Tracks the external tools UpdateScout relies on, and installs the ones
+/// Tracks the external tools PrismPack relies on, and installs the ones
 /// that can be installed with one click (currently just mas via brew).
 @MainActor
 final class DependencyManager: ObservableObject {
@@ -49,7 +49,7 @@ final class DependencyManager: ObservableObject {
             do {
                 let result = try await Shell.run(brew, ["install", formula])
                 guard result.status == 0 else {
-                    throw UpdateScoutError.commandFailed("brew install \(formula)", output: result.combined)
+                    throw PrismPackError.commandFailed("brew install \(formula)", output: result.combined)
                 }
             } catch {
                 installError = error.localizedDescription
