@@ -18,7 +18,11 @@ struct SourceStyle {
         case "sparkle":    SourceStyle(symbol: "sparkles",             color: .yellow)
         case "custom":     SourceStyle(symbol: "slider.horizontal.3",  color: .green)
         case "pip":        SourceStyle(symbol: "terminal.fill",        color: .orange)
-        case "npm":        SourceStyle(symbol: "square.stack.3d.up.fill", color: .red)
+        case "npm":        SourceStyle(symbol: "square.stack.3d.up.fill", color: Theme.npmRed)
+        case "tools":      SourceStyle(symbol: "wrench.and.screwdriver.fill", color: .mint)
+        case "editors":    SourceStyle(symbol: "puzzlepiece.extension.fill", color: .indigo)
+        case "leftover":   SourceStyle(symbol: "trash.slash.fill",     color: Theme.leftoverPink)
+        case "hidden":     SourceStyle(symbol: "eye",                  color: Theme.navy)
         default:           SourceStyle(symbol: "arrow.down.circle.fill", color: .accentColor)
         }
     }
@@ -28,10 +32,11 @@ struct SourceStyle {
 struct GlassProminentButton: ViewModifier {
     let tint: Color
     func body(content: Content) -> some View {
+        // Bright hues are deepened so the white label stays readable.
         if #available(macOS 26.0, *) {
-            content.buttonStyle(.glassProminent).tint(tint)
+            content.buttonStyle(.glassProminent).tint(tint.prominentFill)
         } else {
-            content.buttonStyle(.borderedProminent).tint(tint)
+            content.buttonStyle(.borderedProminent).tint(tint.prominentFill)
         }
     }
 }
@@ -56,38 +61,109 @@ extension View {
 struct WarningBadge: View {
     let title: String
     let message: String
-    var symbol: String = "exclamationmark.triangle.fill"
+    /// A filled circle with a white glyph: crisp at badge size, unlike the
+    /// triangle, whose "!" got lost.
+    var symbol: String = "exclamationmark.circle.fill"
     var color: Color = .orange
     @State private var showing = false
 
     var body: some View {
         Button { showing.toggle() } label: {
             Image(systemName: symbol)
-                .foregroundStyle(color)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, color.prominentFill)
+                .font(.system(size: 17, weight: .semibold))
+                .shadow(color: .black.opacity(0.2), radius: 1.5, y: 0.5)
         }
         .buttonStyle(.plain)
         .help(message)
         .popover(isPresented: $showing, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
-                Label(title, systemImage: symbol)
-                    .font(.headline).foregroundStyle(color)
-                Text(message).font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(14)
-            .frame(width: 320, alignment: .leading)
+            WarningCard(title: title, message: message, symbol: symbol, color: color)
         }
     }
+}
+
+extension WarningBadge {
+    init(_ kind: WarningKind) {
+        self.init(title: kind.title, message: kind.message, symbol: kind.symbol, color: kind.color)
+    }
+}
+
+/// What a warning badge opens when clicked.
+struct WarningCard: View {
+    let title: String
+    let message: String
+    let symbol: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: symbol)
+                .font(.headline).foregroundStyle(color.readable)
+            Text(message).font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(width: 320, alignment: .leading)
+    }
+}
+
+/// Every warning a row can carry, in one place, so rows and the Button lab
+/// show the same thing.
+struct WarningKind {
+    let title: String
+    let message: String
+    var symbol = "exclamationmark.circle.fill"
+    var color: Color = .orange
+
+    static func majorUpgrade(_ jump: String) -> WarningKind {
+        WarningKind(title: "Major version change (\(jump))",
+                    message: "For paid apps a new major version is often a separate purchase rather than a free update. Check the vendor's terms before updating.")
+    }
+
+    static func restart(_ caveat: String) -> WarningKind {
+        WarningKind(title: "Requires restart", message: caveat,
+                    symbol: "arrow.clockwise.circle.fill", color: .yellow)
+    }
+
+    static let iosApp = WarningKind(
+        title: "iPhone / iPad app",
+        message: "This is an iOS app running on your Mac. mas and Homebrew can't update these. The button opens the App Store's Updates page, where you can update it.",
+        symbol: "iphone.circle.fill", color: .blue)
 }
 
 /// Shared surface colours. The system window background is near-black in dark
 /// mode and near-white in light; both make the glass look flat and harsh, so
 /// these sit closer to mid-grey while still reading as light or dark.
 enum Theme {
+    /// The Glass slider's wash leans toward the app icon's backgrounds:
+    /// silver in light, midnight in dark.
     static let wash = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(calibratedWhite: 0.30, alpha: 1)
-            : NSColor(calibratedWhite: 0.72, alpha: 1)
+            ? NSColor(displayP3Red: 0x14 / 255, green: 0x1a / 255, blue: 0x2e / 255, alpha: 1)
+            : NSColor(displayP3Red: 0xee / 255, green: 0xf1 / 255, blue: 0xf8 / 255, alpha: 1)
+    })
+
+    /// npm's red, a shade deeper than the system red so it stands apart
+    /// from Leftover drivers' pink.
+    static let npmRed = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 0.86, green: 0.24, blue: 0.22, alpha: 1)
+            : NSColor(displayP3Red: 0.72, green: 0.13, blue: 0.12, alpha: 1)
+    })
+
+    /// Leftover drivers: a clear pink, well away from npm's red.
+    static let leftoverPink = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 1.00, green: 0.50, blue: 0.75, alpha: 1)
+            : NSColor(displayP3Red: 0.96, green: 0.40, blue: 0.68, alpha: 1)
+    })
+
+    /// The Hidden section's colour, so no two sections share one.
+    static let navy = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 0.36, green: 0.45, blue: 0.80, alpha: 1)
+            : NSColor(displayP3Red: 0.17, green: 0.24, blue: 0.55, alpha: 1)
     })
 
     /// Mid-tone blue-grey for macOS items: deep enough to carry white button
@@ -111,12 +187,17 @@ enum Theme {
 /// up, which is what made the header logo look soft and pixelated.
 struct AppLogo: View {
     var size: CGFloat
+    /// Drop the transparent margin macOS icons carry (about a tenth on each
+    /// side), so the artwork itself fills `size`.
+    var trimmed = false
     @Environment(\.displayScale) private var scale
 
     var body: some View {
-        Image(nsImage: Self.rendered(points: size, scale: scale))
+        let drawn = trimmed ? (size / 0.82).rounded() : size
+        Image(nsImage: Self.rendered(points: drawn, scale: scale))
             .resizable()
             .interpolation(.high)
+            .frame(width: drawn, height: drawn)
             .frame(width: size, height: size)
     }
 
@@ -147,121 +228,229 @@ struct AppLogo: View {
     }
 }
 
-/// A section's container. The corner radius is half the header's height, so a
-/// collapsed section is exactly a capsule — the header pill. Expanded, the
-/// header keeps its solid fill right down to where that pill would end, then
-/// fades out fast so the cards sit on clear glass; a firmer outline traces the
-/// whole section, and an outer shadow lifts it off the window's glass.
+/// A section's container: tinted Liquid Glass in the section's colour, like
+/// the icon's front card. Clear glass, a thin white edge, a soft neutral
+/// shadow, and nothing glass stacked inside it (rows are plain).
 struct SectionPanel: ViewModifier {
-    static let headerHeight: CGFloat = 32
-    static var radius: CGFloat { headerHeight / 2 }
-
-    /// How far below the pill's edge the header band takes to fade out.
-    static let fadeLength: CGFloat = 28
-    /// Tint carried through the whole section under the header.
-    static let bodyTint: Double = 0.2
+    let color: Color
+    static let radius: CGFloat = 16
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        let band = Self.headerHeight + Self.fadeLength
         content
-            .background(alignment: .top) {
-                ZStack(alignment: .top) {
-                    // A faint tint through the whole section, so the pill and
-                    // the area under it read as one surface opening up rather
-                    // than a pill sitting above a hole.
-                    shape.fill(Theme.card.opacity(Self.bodyTint))
-                    // Solid to exactly where the collapsed pill ends, then an
-                    // eased fade down into the faint tint. Fixed height (not
-                    // relative to the panel), so it doesn't shift while the
-                    // section rolls; collapsed, the clip cuts it at the pill
-                    // edge and the pill is fully solid.
-                    LinearGradient(stops: [
-                        .init(color: Theme.card, location: 0),
-                        .init(color: Theme.card, location: Self.headerHeight / band),
-                        .init(color: Theme.card.opacity(0.72), location: (Self.headerHeight + 5) / band),
-                        .init(color: Theme.card.opacity(0.4), location: (Self.headerHeight + 12) / band),
-                        .init(color: Theme.card.opacity(0.14), location: (Self.headerHeight + 20) / band),
-                        .init(color: Theme.card.opacity(0), location: 1),
-                    ], startPoint: .top, endPoint: .bottom)
-                    .frame(height: band)
-                    // Drawn over a Color.clear that takes exactly the panel's
-                    // size, so the clip really is the panel. (A `.frame(maxHeight:
-                    // .infinity)` wrapper grows to fit its 60 pt child instead,
-                    // which left the fade hanging below a collapsed pill.)
-                    .modifier(PinnedTop())
-                    .clipShape(shape)
+            .background {
+                if #available(macOS 26.0, *) {
+                    // Fixed tint: the Glass slider changes only the window wash.
+                    Color.clear.glassEffect(.regular.tint(color.opacity(0.32)), in: shape)
+                } else {
+                    shape.fill(.regularMaterial)
+                    shape.fill(color.opacity(0.16))
                 }
             }
-            .overlay(shape.strokeBorder(Color.primary.opacity(0.22)))
-            .background { OuterShadow(shape: shape) }
+            .overlay(shape.strokeBorder(.white.opacity(0.28), lineWidth: 0.8))
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
     }
 }
 
-/// Lays content out at its own size, pinned to the top of a container that
-/// takes exactly the proposed size — so anything clipped afterwards is clipped
-/// to the container, not to the (possibly taller) content.
-private struct PinnedTop: ViewModifier {
-    func body(content: Content) -> some View {
-        Color.clear.overlay(alignment: .top) { content }
-    }
-}
-
-/// A shadow that only falls *outside* a shape. A plain `.shadow` on a mostly
-/// clear panel would darken its interior (or shadow the outline stroke on both
-/// sides); here the shape is drawn solid with its shadow and then masked so
-/// only the part beyond the shape's edge shows.
-private struct OuterShadow<S: Shape>: View {
-    let shape: S
+/// A section or package icon as a small Liquid Glass tile tinted with the
+/// section colour, like macOS 27's app icons. Solid colour before macOS 26.
+struct GlassIconTile: View {
+    let style: SourceStyle
+    var size: CGFloat = 32
 
     var body: some View {
-        shape
-            .fill(Color.black)
-            .shadow(color: .black.opacity(0.22), radius: 9, y: 4)
-            .mask { Outside(base: shape).fill(style: FillStyle(eoFill: true)) }
-            .allowsHitTesting(false)
-    }
-
-    /// Everything around a shape: a generous rectangle with the shape cut out.
-    /// A Shape (not a GeometryReader), so SwiftUI redraws it with the animated
-    /// frame on every animation frame; a GeometryReader jumped straight to the
-    /// final size mid-animation and let the black caster show through.
-    private struct Outside: Shape {
-        let base: S
-        func path(in rect: CGRect) -> Path {
-            var path = Path(rect.insetBy(dx: -40, dy: -40))
-            path.addPath(base.path(in: rect))
-            return path
-        }
-    }
-}
-
-/// The frosted "title sheet" behind the window's header: glass with a light
-/// tint, running past the top and side edges so only its rounded bottom is
-/// visible — the bottom corners curve straight into the window's sides, and
-/// the side outlines fall outside the window and are clipped away.
-struct TitleSheet: View {
-    static let bottomRadius: CGFloat = 22
-
-    var body: some View {
-        let shape = UnevenRoundedRectangle(bottomLeadingRadius: Self.bottomRadius,
-                                           bottomTrailingRadius: Self.bottomRadius,
-                                           style: .continuous)
-        ZStack {
-            if #available(macOS 26.0, *) {
-                Color.clear.glassEffect(.regular, in: shape)
-            } else {
-                shape.fill(.ultraThickMaterial)
+        let shape = RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+        Image(systemName: style.symbol)
+            .font(.system(size: size * 0.46, weight: .semibold))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+            .frame(width: size, height: size)
+            .background {
+                if #available(macOS 26.0, *) {
+                    // The colour underneath keeps the tile readable when the
+                    // system makes glass clearer; the glass gives it depth.
+                    shape.fill(style.color.opacity(0.78))
+                        .glassEffect(.regular.tint(style.color.opacity(0.55)), in: shape)
+                } else {
+                    shape.fill(style.color.gradient)
+                }
             }
-            // A heavy frost: a blur layer plus a strong tint, so the header
-            // reads as a solid sheet. Content scrolling up simply disappears
-            // beneath it, which is intended.
-            shape.fill(.thinMaterial)
-            shape.fill(Theme.card.opacity(0.9))
+            .overlay(shape.strokeBorder(.white.opacity(0.35), lineWidth: 0.6))
+    }
+}
+
+// MARK: - The prism sheen (primary actions only)
+
+/// The app icon's rainbow as a soft colour mesh: blurred blobs of the card
+/// colours over a lavender base, frosted so it reads as a tint. Used for the
+/// "up to date" prism and the password badge (not for buttons any more).
+struct PrismSheen: View {
+    enum Variant: String, CaseIterable, Identifiable {
+        case warmToCool = "B: warm to cool", aurora = "D: scattered aurora"
+        var id: String { rawValue }
+    }
+    var variant: Variant = .warmToCool
+    /// False drops the frost, for small badges that carry a white glyph.
+    var frosted = true
+    @Environment(\.colorScheme) private var scheme
+
+    private struct Blob { let color: Color; let x: CGFloat; let y: CGFloat; let size: CGFloat }
+    private static func p3(_ hex: UInt32) -> Color {
+        Color(.displayP3, red: Double(hex >> 16 & 0xff) / 255, green: Double(hex >> 8 & 0xff) / 255,
+              blue: Double(hex & 0xff) / 255)
+    }
+    static let red = p3(0xff453a), orange = p3(0xff9f0a), yellow = p3(0xffd60a)
+    static let green = p3(0x30d158), blue = p3(0x0a84ff), violet = p3(0xbf5af2)
+    static let lavender = p3(0xc9b8f0), midnight = p3(0x141a2e)
+
+    private var blobs: [Blob] {
+        switch variant {
+        case .warmToCool: [
+            .init(color: Self.red, x: 0.00, y: 0.00, size: 1.6), .init(color: Self.orange, x: 0.22, y: 0.90, size: 1.4),
+            .init(color: Self.yellow, x: 0.38, y: 0.10, size: 1.3), .init(color: Self.green, x: 0.62, y: 0.90, size: 1.3),
+            .init(color: Self.blue, x: 0.80, y: 0.15, size: 1.5), .init(color: Self.violet, x: 1.00, y: 1.00, size: 1.7)]
+        case .aurora: [
+            .init(color: Self.blue, x: 0.08, y: 0.20, size: 1.4), .init(color: Self.yellow, x: 0.30, y: 0.85, size: 1.3),
+            .init(color: Self.red, x: 0.50, y: 0.10, size: 1.2), .init(color: Self.violet, x: 0.68, y: 0.90, size: 1.4),
+            .init(color: Self.green, x: 0.85, y: 0.15, size: 1.3), .init(color: Self.orange, x: 0.98, y: 0.80, size: 1.3)]
         }
-        .overlay(shape.strokeBorder(Color.primary.opacity(0.14)))
-        .background { OuterShadow(shape: shape) }
-        .padding(.horizontal, -1)    // side outlines land just outside the window
-        .padding(.top, -60)          // run past the window's top edge
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            ZStack {
+                Self.lavender
+                ForEach(blobs.indices, id: \.self) { i in
+                    let blob = blobs[i]
+                    Circle().fill(blob.color)
+                        .frame(width: blob.size * h, height: blob.size * h)
+                        .position(x: blob.x * w, y: blob.y * h)
+                }
+            }
+            .blur(radius: 0.45 * h)
+            // The frost: 62% white in light, 62% midnight in dark.
+            .overlay((scheme == .dark ? Self.midnight : .white).opacity(frosted ? 0.62 : 0))
+        }
+    }
+}
+
+/// The primary-action button (Nick, 29 Oct): a real Liquid Glass button,
+/// with the system's own hover and press, and the icon's colours as a faint
+/// blur behind the glass. Used sparingly: Update All, the password sheet's
+/// Authorize, and Adopt all safe ones.
+struct PrismProminent: ViewModifier {
+    /// How strong the colour reads through the glass.
+    static let strength = 0.22
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .background { PrismBlur().allowsHitTesting(false) }
+        } else {
+            content
+                .buttonStyle(.bordered)
+                .background { PrismBlur().allowsHitTesting(false) }
+        }
+    }
+}
+
+/// The icon's card colours, left to right, blurred into a soft wash.
+struct PrismBlur: View {
+    static let spectrum: [Color] = [PrismSheen.red, PrismSheen.orange, PrismSheen.yellow,
+                                    PrismSheen.green, PrismSheen.blue, PrismSheen.violet]
+    var strength = PrismProminent.strength
+
+    var body: some View {
+        Capsule()
+            .fill(LinearGradient(colors: Self.spectrum, startPoint: .leading, endPoint: .trailing))
+            .blur(radius: 6)
+            .opacity(strength)
+            .padding(2)
+    }
+}
+
+extension View {
+    /// Update All, the password sheet's Authorize, and Adopt all safe ones.
+    func prismProminent() -> some View { modifier(PrismProminent()) }
+}
+
+extension Color {
+    /// This hue as text: deepened in light mode and lightened in dark mode,
+    /// so it reads on its own section's tint either way.
+    var readable: Color { adjusted(light: 0.4, dark: -0.4, brightOnly: false) }
+
+    /// This hue as a button fill under white text: bright hues (yellow, mint,
+    /// teal, green, orange) are deepened in both modes; dark hues stay.
+    var prominentFill: Color { adjusted(light: 0.3, dark: 0.2, brightOnly: true) }
+
+    private func adjusted(light: CGFloat, dark: CGFloat, brightOnly: Bool) -> Color {
+        let base = NSColor(self)
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            var resolved = base
+            appearance.performAsCurrentDrawingAppearance {
+                resolved = base.usingColorSpace(.sRGB) ?? base
+            }
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            var amount = isDark ? dark : light
+            if brightOnly {
+                let luminance = 0.2126 * resolved.redComponent + 0.7152 * resolved.greenComponent
+                    + 0.0722 * resolved.blueComponent
+                amount = luminance < 0.45 ? 0 : max(amount, luminance - 0.4)
+            }
+            // Positive deepens toward black, negative lightens toward white.
+            if amount > 0 { return resolved.blended(withFraction: amount, of: .black) ?? resolved }
+            if amount < 0 { return resolved.blended(withFraction: -amount, of: .white) ?? resolved }
+            return resolved
+        })
+    }
+}
+
+/// A segmented control whose selection is a Liquid Glass bubble that slides
+/// to the chosen segment, like the system's own on macOS 26 and later.
+struct GlassSegmented<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, label: String)]
+    @Namespace private var bubble
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options.indices, id: \.self) { i in
+                let option = options[i]
+                let selected = option.value == selection
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(.callout.weight(selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? .primary : .secondary)
+                        .padding(.horizontal, 14).padding(.vertical, 5)
+                        .frame(maxWidth: .infinity)
+                        .background {
+                            if selected {
+                                SelectionBubble()
+                                    .matchedGeometryEffect(id: "bubble", in: bubble)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.primary.opacity(0.07)))
+        .fixedSize()
+    }
+}
+
+private struct SelectionBubble: View {
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            Capsule().fill(.clear).glassEffect(.regular.interactive(), in: Capsule())
+                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+        } else {
+            Capsule().fill(.background).shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+        }
     }
 }

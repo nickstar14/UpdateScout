@@ -32,7 +32,7 @@ struct PasswordSheet: View {
                 .disabled(checking)
             if wrong {
                 Text("That password didn't work. Try again.")
-                    .font(.caption).foregroundStyle(.red)
+                    .font(.caption).foregroundStyle(Color.red.readable)
             }
             HStack {
                 Button("Skip \(request.count == 1 ? "it" : "those \(request.count)")") {
@@ -42,7 +42,7 @@ struct PasswordSheet: View {
                 Spacer()
                 if checking { ProgressView().controlSize(.small) }
                 Button("Authorize", action: authorize)
-                    .glassProminent(.accentColor)
+                    .prismProminent()
                     .keyboardShortcut(.defaultAction)
                     .disabled(password.isEmpty || checking)
             }

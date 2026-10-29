@@ -20,9 +20,10 @@ struct SettingsView: View {
             // In-content title, same treatment as the status window header;
             // fixed above the form so scrolling never runs into the titlebar.
             HStack(spacing: 12) {
-                AppLogo(size: 44)
+                AppLogo(size: 50, trimmed: true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("UpdateScout").font(.title2.weight(.semibold))
+                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout")
+                        .font(.title2.weight(.semibold))
                     Text("Version \(SelfUpdater.version)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -36,12 +37,12 @@ struct SettingsView: View {
                 .glass().controlSize(.small)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 34)   // clear the traffic lights
-            .padding(.bottom, 10)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
             settingsForm
         }
-        .frame(width: 400, height: 640)
-        .background(GlassBackground())
+        .frame(maxWidth: 620)
+        .frame(maxWidth: .infinity)
     }
 
     private var settingsForm: some View {
@@ -52,7 +53,7 @@ struct SettingsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 1) {
                                 Label(dep.name, systemImage: "exclamationmark.triangle")
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(Color.orange.readable)
                                 Text(dep.purpose).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -66,13 +67,13 @@ struct SettingsView: View {
                         }
                     }
                     if let error = deps.installError {
-                        Text(error).font(.caption).foregroundStyle(.red).lineLimit(3)
+                        Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
                     }
                 }
             } else {
                 Section("Setup") {
                     Label("All dependencies installed (Homebrew, mas-cli)", systemImage: "checkmark.circle")
-                        .foregroundStyle(.green).font(.callout)
+                        .foregroundStyle(Color.green.readable).font(.callout)
                 }
             }
 
@@ -123,19 +124,20 @@ struct SettingsView: View {
                     }
                 }
                 if let agentError {
-                    Text(agentError).font(.caption).foregroundStyle(.red)
+                    Text(agentError).font(.caption).foregroundStyle(Color.red.readable)
                 }
                 Text("Background checks only detect and notify — updates are always installed by you, per item.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Appearance") {
-                Picker("Theme", selection: $appearance) {
-                    ForEach(Appearance.allCases) { Text($0.label).tag($0) }
+                LabeledContent("Theme") {
+                    GlassSegmented(selection: $appearance,
+                                   options: Appearance.allCases.map { ($0, $0.label) })
                 }
-                .pickerStyle(.segmented)
                 .onChange(of: appearance) { _, value in
                     Prefs.appearance = value
+                    // Straight away: waiting for the bubble read as a hang.
                     Appearance.apply(value, animated: true)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -164,13 +166,18 @@ struct SettingsView: View {
 
             Section("Sources") {
                 ForEach(UpdateController.allSources, id: \.id) { source in
-                    Toggle(source.displayName, isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { !disabled.contains(source.id) },
                         set: { on in
                             if on { disabled.remove(source.id) } else { disabled.insert(source.id) }
                             Prefs.disabledSources = disabled
                         }
-                    ))
+                    )) {
+                        HStack(spacing: 8) {
+                            GlassIconTile(style: SourceStyle.forSource(source.id), size: 22)
+                            Text(source.displayName)
+                        }
+                    }
                 }
             }
 

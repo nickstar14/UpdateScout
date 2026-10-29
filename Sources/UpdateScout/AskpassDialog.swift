@@ -1,3 +1,4 @@
+import SwiftUI
 import AppKit
 
 extension Notification.Name {
@@ -9,7 +10,7 @@ extension Notification.Name {
 /// needs elevation and there is no terminal. Shows a native-styled auth
 /// dialog and prints the entry to stdout for sudo. Nothing is stored.
 enum AskpassDialog {
-    static func run() -> Never {
+    @MainActor static func run() -> Never {
         // During a batch the app already has the password: hand it to sudo
         // without showing anything.
         if let password = PasswordBroker.fetchPassword() {
@@ -76,45 +77,25 @@ enum AskpassDialog {
         exit(1) // sudo treats a non-zero askpass exit as "cancelled"
     }
 
-    /// A key badge in the same style as the main window's "N updates
-    /// available" badge — a faint halo ring around a solid disc — coloured with
-    /// the app icon's blue-to-violet gradient so the prompt is recognisably
-    /// UpdateScout's. The white glyph keeps contrast on any background.
-    static func circularKeyIcon() -> NSImage {
-        NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
-            // The app icon's blue-to-violet, weighted toward violet: indigo by
-            // the middle so the violet reads across the lower half of the disc.
-            guard let gradient = NSGradient(
-                colors: [
-                    NSColor(srgbRed: 0.31, green: 0.55, blue: 1.00, alpha: 1),   // #4F8DFF blue
-                    NSColor(srgbRed: 0.36, green: 0.36, blue: 0.90, alpha: 1),   // #5C5CE6 indigo
-                    NSColor(srgbRed: 0.48, green: 0.21, blue: 0.82, alpha: 1),   // #7A35D1 violet
-                ],
-                atLocations: [0.0, 0.42, 1.0],
-                colorSpace: .sRGB) else { return false }
-
-            // Faint outer halo — the gradient at low opacity, like the badge's
-            // `tint.opacity(0.15)` backing circle.
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current?.cgContext.setAlpha(0.22)
-            gradient.draw(in: NSBezierPath(ovalIn: rect), angle: -90)
-            NSGraphicsContext.restoreGraphicsState()
-
-            // Solid inner disc.
-            let disc = rect.insetBy(dx: 9, dy: 9)
-            gradient.draw(in: NSBezierPath(ovalIn: disc), angle: -90)
-
-            // White key.
-            let config = NSImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
-                .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-            if let key = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Password")?
-                .withSymbolConfiguration(config) {
-                let size = key.size
-                key.draw(in: NSRect(x: disc.midX - size.width / 2, y: disc.midY - size.height / 2,
-                                    width: size.width, height: size.height))
-            }
-            return true
+    /// The password prompt's badge: the app's prism sheen in a disc, with a
+    /// faint halo and the white key glyph.
+    @MainActor static func circularKeyIcon() -> NSImage {
+        let disc = SwiftUI.ZStack {
+            SwiftUI.Circle().fill(PrismSheen.lavender.opacity(0.3))
+            PrismSheen(frosted: false)
+                .clipShape(SwiftUI.Circle())
+                .padding(9)
+            SwiftUI.Image(systemName: "key.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
         }
+        .frame(width: 64, height: 64)
+        let renderer = ImageRenderer(content: disc)
+        renderer.scale = 2
+        let image = renderer.nsImage ?? NSImage(size: NSSize(width: 64, height: 64))
+        image.size = NSSize(width: 64, height: 64)
+        return image
     }
 
     /// Swaps between the secure and plain fields, keeping their text in sync.

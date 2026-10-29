@@ -19,6 +19,15 @@ struct Store {
         /// Set by the background agent while its check runs, so the menu bar
         /// app can show the check in progress.
         var checkStartedAt: Date?
+        /// "Ignore updates from this app": `sourceID|installToken`, no version,
+        /// so it holds across new versions without touching item ids.
+        var ignoredApps: Set<String> = []
+        /// "Ignore major upgrades only", same key. Minor updates still show.
+        var ignoredMajors: Set<String> = []
+        /// What happened, newest first, capped at `activityLimit`.
+        var activity: [ActivityEntry] = []
+
+        static let activityLimit = 200
 
         init() {}
 
@@ -32,6 +41,14 @@ struct Store {
             sourceErrors = try c.decodeIfPresent([String: String].self, forKey: .sourceErrors) ?? [:]
             leftoverKexts = try c.decodeIfPresent([KextBundle].self, forKey: .leftoverKexts) ?? []
             checkStartedAt = try c.decodeIfPresent(Date.self, forKey: .checkStartedAt)
+            ignoredApps = try c.decodeIfPresent(Set<String>.self, forKey: .ignoredApps) ?? []
+            ignoredMajors = try c.decodeIfPresent(Set<String>.self, forKey: .ignoredMajors) ?? []
+            activity = try c.decodeIfPresent([ActivityEntry].self, forKey: .activity) ?? []
+        }
+
+        mutating func log(_ entry: ActivityEntry) {
+            activity.insert(entry, at: 0)
+            if activity.count > Self.activityLimit { activity.removeLast(activity.count - Self.activityLimit) }
         }
     }
 
@@ -163,24 +180,74 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Switch appearance, crossfading each visible window from its old look to
-    /// its new one. A `CATransition` fade is captured by Core Animation from
-    /// the live layer tree, so it works on glass windows — unlike a bitmap
-    /// snapshot, and without the fade-out/fade-in "disappear" of animating the
-    /// window's alpha.
+    /// Switch appearance, crossfading each visible window from its old look
+    /// to its new one.
+    static var fadeDuration: CFTimeInterval = 0.6
+
+    /// Whether macOS itself is in dark mode, whatever the app is set to.
+    static var systemIsDark: Bool {
+        UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    }
+
+    /// Whether this setting ends up dark.
+    var isDark: Bool {
+        switch self {
+        case .system: Self.systemIsDark
+        case .light: false
+        case .dark: true
+        }
+    }
+
     @MainActor static func apply(_ value: Appearance, animated: Bool = false) {
-        if animated {
-            for window in NSApp.windows where window.isVisible {
-                guard let view = window.contentView?.superview ?? window.contentView else { continue }
-                view.wantsLayer = true
-                let fade = CATransition()
-                fade.type = .fade
-                fade.duration = 0.4
-                fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                view.layer?.add(fade, forKey: "appearanceCrossfade")
+        // Nothing will look different (Light while the Mac is light, say):
+        // just record the choice, with no fade.
+        let nowDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        guard animated, value.isDark != nowDark else { set(value); return }
+        // A quick veil in the window's background colour rises over each
+        // window, the switch happens under it, and it fades away in the new
+        // background colour. Parts of the window redraw a few milliseconds
+        // apart, and the glass sidebar can't be faded or snapshotted, so the
+        // switch is hidden rather than animated piece by piece.
+        let rise = fadeDuration * 0.4, fall = fadeDuration * 0.6
+        var veils: [CALayer] = []
+        for window in NSApp.windows where window.isVisible {
+            guard let frame = window.contentView?.superview else { continue }
+            frame.wantsLayer = true
+            let veil = CALayer()
+            veil.frame = frame.bounds
+            veil.zPosition = 10_000
+            veil.backgroundColor = background(in: window.effectiveAppearance)
+            veil.opacity = 0
+            frame.layer?.addSublayer(veil)
+            veils.append(veil)
+        }
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(rise)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeIn))
+        CATransaction.setCompletionBlock {
+            set(value)
+            // A turn of the runloop, so everything has redrawn under the veil.
+            DispatchQueue.main.async {
+                CATransaction.begin()
+                CATransaction.setAnimationDuration(fall)
+                CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+                CATransaction.setCompletionBlock { veils.forEach { $0.removeFromSuperlayer() } }
+                for veil in veils {
+                    veil.backgroundColor = background(in: NSApp.effectiveAppearance)
+                    veil.opacity = 0
+                }
+                CATransaction.commit()
             }
         }
-        set(value)
+        veils.forEach { $0.opacity = 0.85 }
+        CATransaction.commit()
+    }
+
+    /// The window background colour as it looks in `appearance`.
+    @MainActor private static func background(in appearance: NSAppearance) -> CGColor {
+        var color = NSColor.windowBackgroundColor.cgColor
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.windowBackgroundColor.cgColor }
+        return color
     }
 }
 
@@ -202,4 +269,25 @@ enum GlassStyle: String, CaseIterable, Identifiable {
         GlassStyle(rawValue: raw)
             ?? (raw == "middle" ? .regular : raw == "frosted" ? .tinted : .regular)
     }
+}
+
+/// One line in the Activity tab.
+struct ActivityEntry: Codable, Equatable, Identifiable {
+    enum Kind: String, Codable { case updated, failed, skipped, cancelled, checked }
+    var id = UUID()
+    var date = Date()
+    let kind: Kind
+    let title: String
+    var detail: String = ""
+    /// The update it's about, for Retry while that update is still listed.
+    var itemID: String? = nil
+    var sourceID: String? = nil
+    var seconds: Int? = nil
+    /// The last lines of output, for Show log on failures.
+    var log: String? = nil
+}
+
+extension UpdateItem {
+    /// Key for the per-app ignore lists: the app, not the version.
+    var appKey: String { "\(sourceID)|\(installToken)" }
 }

@@ -47,7 +47,7 @@ struct MajorUpgradeReview: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color.orange.readable)
                 .frame(width: 40, height: 40)
                 .background(Color.orange.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
@@ -67,13 +67,13 @@ struct MajorUpgradeReview: View {
         let isOpen = expanded.contains(item.id)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                AppIconView(appPath: item.appPath, style: style, size: 36)
+                RowIcon(name: item.name, appPath: item.appPath, sectionID: item.sectionID, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.name).font(.callout.weight(.semibold))
                     HStack(spacing: 4) {
                         Text(item.installedVersion).foregroundStyle(.secondary)
                         Image(systemName: "arrow.right").font(.system(size: 8)).foregroundStyle(.tertiary)
-                        Text(item.latestVersion).foregroundStyle(style.color).fontWeight(.medium)
+                        Text(item.latestVersion).foregroundStyle(style.color.readable).fontWeight(.medium)
                     }
                     .font(.caption.monospacedDigit())
                 }

@@ -8,7 +8,7 @@ struct UpdateDetailView: View {
     let item: UpdateItem
     @Environment(\.dismiss) private var dismiss
 
-    private var style: SourceStyle { SourceStyle.forSource(item.sourceID) }
+    private var style: SourceStyle { SourceStyle.forSource(item.sectionID) }
     private var sourceName: String {
         UpdateController.allSources.first { $0.id == item.sourceID }?.displayName ?? item.sourceID
     }
@@ -21,19 +21,17 @@ struct UpdateDetailView: View {
             if item.isMajorUpgrade || item.caveat != nil { notices }
             notesSection
             Divider()
+            ignoreGroup
+            Divider()
             footer
         }
         .padding(18)
-        .frame(width: 440)
+        .frame(width: 480)
     }
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: style.symbol)
-                .font(.system(size: 26))
-                .foregroundStyle(style.color)
-                .frame(width: 40, height: 40)
-                .background(style.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+            RowIcon(name: item.name, appPath: item.appPath, sectionID: item.sectionID, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name).font(.title3).bold()
                 Label(sourceName, systemImage: style.symbol)
@@ -54,7 +52,7 @@ struct UpdateDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Available").font(.caption).foregroundStyle(.secondary)
                 Text(item.latestVersion).font(.body.monospacedDigit()).bold()
-                    .foregroundStyle(style.color)
+                    .foregroundStyle(style.color.readable)
             }
             Spacer()
         }
@@ -66,7 +64,7 @@ struct UpdateDetailView: View {
             if let jump = item.majorUpgradeSummary {
                 Label("Major version change (\(jump)). For paid apps this is often a separate purchase — check the vendor's terms first.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.orange.readable)
             }
             if let caveat = item.caveat {
                 Label(caveat, systemImage: "info.circle.fill")
@@ -99,6 +97,33 @@ struct UpdateDetailView: View {
         }
     }
 
+    /// The three hide options. Hidden items show "Unhide" instead.
+    @ViewBuilder
+    private var ignoreGroup: some View {
+        if controller.isIgnored(item) {
+            HStack {
+                Label(controller.ignoreReason(item), systemImage: "eye.slash")
+                    .font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button("Unhide") { controller.unhide(item); dismiss() }.glass()
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Button("Hide this version") { controller.dismiss(item); dismiss() }
+                        .glass().controlSize(.small)
+                        .help("Hide \(item.latestVersion). The next version shows again.")
+                    Button("Hide all updates") { controller.ignoreApp(item); dismiss() }
+                        .glass().controlSize(.small)
+                        .help("Hide every update for \(item.name) until you unhide it.")
+                    Button("Hide major upgrades") { controller.ignoreMajors(item); dismiss() }
+                        .glass().controlSize(.small)
+                        .help("Keep offering minor fixes, never the next major version.")
+                }
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 8) {
             if let notesURL = item.releaseNotesURL.flatMap(URL.init(string:)) {
@@ -117,9 +142,16 @@ struct UpdateDetailView: View {
                 }
                 .glass()
             }
+            if let path = item.appPath {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                } label: {
+                    Label("Show in Finder", systemImage: "folder")
+                }
+                .glass()
+            }
             Spacer()
-            Button("Close") { dismiss() }.glass()
-            if !controller.isBusy(item) {
+            if !controller.isBusy(item) && !controller.isIgnored(item) {
                 Button {
                     dismiss(); controller.requestUpdate(item)
                 } label: {

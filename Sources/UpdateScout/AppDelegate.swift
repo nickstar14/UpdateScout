@@ -10,6 +10,7 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+        StatusItemController.shared.install()
     }
 
     /// User clicked (or actioned) a notification.

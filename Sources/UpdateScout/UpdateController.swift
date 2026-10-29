@@ -13,7 +13,7 @@ final class UpdateController: ObservableObject {
 
     @Published var state = Store.load()
     @Published var isChecking = false { didSet { updateSpinner() } }
-    /// Menu bar icon rotation while a check runs; 0 when idle.
+    /// Menu bar pulse frame while a check runs; 0 when idle.
     @Published private(set) var spinFrame = 0
     /// Item id → where its install is. Absent means idle.
     @Published var installStates: [String: InstallState] = [:]
@@ -22,6 +22,21 @@ final class UpdateController: ObservableObject {
     @Published var repairable: [String: (token: String, folder: URL)] = [:]
     /// Major upgrades waiting for the user to review them before they queue.
     @Published var review: ReviewRequest?
+    /// The page the main window shows.
+    @Published var page: Page = .updates
+
+    /// The Installed tab's list, read when the tab first opens.
+    @Published private(set) var installed: [InstalledPackage] = []
+    @Published private(set) var loadingInstalled = false
+
+    func loadInstalled() {
+        guard !loadingInstalled else { return }
+        loadingInstalled = true
+        Task {
+            installed = await Inventory.load()
+            loadingInstalled = false
+        }
+    }
 
     struct ReviewRequest: Identifiable {
         let id = UUID()
@@ -36,14 +51,27 @@ final class UpdateController: ObservableObject {
     }
 
     var visibleItems: [UpdateItem] {
-        state.items.filter { !state.dismissed.contains($0.id) }
+        state.items.filter { !isIgnored($0) }
+    }
+
+    /// Hidden by any of the three ignore options.
+    func isIgnored(_ item: UpdateItem) -> Bool {
+        state.dismissed.contains(item.id) || state.ignoredApps.contains(item.appKey)
+            || (item.isMajorUpgrade && state.ignoredMajors.contains(item.appKey))
+    }
+
+    /// Why a hidden item is hidden, for the Hidden section.
+    func ignoreReason(_ item: UpdateItem) -> String {
+        if state.ignoredApps.contains(item.appKey) { return "All updates hidden" }
+        if item.isMajorUpgrade && state.ignoredMajors.contains(item.appKey) { return "Major upgrades hidden" }
+        return "Hidden \(item.latestVersion)"
     }
     var visibleLeftovers: [KextBundle] {
         state.leftoverKexts.filter { !state.dismissed.contains($0.id) }
     }
     /// Items the user chose to ignore — still tracked so they can be brought back.
     var hiddenItems: [UpdateItem] {
-        state.items.filter { state.dismissed.contains($0.id) }
+        state.items.filter { isIgnored($0) }
     }
     var hiddenLeftovers: [KextBundle] {
         state.leftoverKexts.filter { state.dismissed.contains($0.id) }
@@ -51,6 +79,33 @@ final class UpdateController: ObservableObject {
 
     func unhide(id: String) {
         state = Store.mutate { $0.dismissed.remove(id) }
+    }
+
+    /// "Unhide": undo whichever ignore options hide this item.
+    func unhide(_ item: UpdateItem) {
+        state = Store.mutate {
+            $0.dismissed.remove(item.id)
+            $0.ignoredApps.remove(item.appKey)
+            $0.ignoredMajors.remove(item.appKey)
+        }
+    }
+
+    /// "Hide all updates from this app".
+    func ignoreApp(_ item: UpdateItem) {
+        state = Store.mutate { $0.ignoredApps.insert(item.appKey) }
+    }
+
+    /// "Hide major upgrades only".
+    func ignoreMajors(_ item: UpdateItem) {
+        state = Store.mutate { $0.ignoredMajors.insert(item.appKey) }
+    }
+
+    func clearActivity() {
+        state = Store.mutate { $0.activity.removeAll() }
+    }
+
+    private func log(_ entry: ActivityEntry) {
+        state = Store.mutate { $0.log(entry) }
     }
     /// Leftover id → progress text while a removal is in flight.
     @Published var removing: [String: String] = [:]
@@ -138,6 +193,10 @@ final class UpdateController: ObservableObject {
         Notifier.notifyNewUpdates(fresh)
     }
 
+    nonisolated static func sourceName(_ id: String) -> String {
+        allSources.first { $0.id == id }?.displayName ?? id
+    }
+
     /// Fold one check's results into the stored state. Shared with the
     /// headless background check; returns the items not notified about yet.
     nonisolated static func merge(items: [UpdateItem], errors: [String: String],
@@ -155,14 +214,21 @@ final class UpdateController: ObservableObject {
 
         let fresh = items.filter { !s.notified.contains($0.id) && !s.dismissed.contains($0.id) }
         s.notified.formUnion(fresh.map(\.id))
+        if !fresh.isEmpty {
+            let names = Set(fresh.map { sourceName($0.sourceID) }).sorted().joined(separator: ", ")
+            s.log(ActivityEntry(kind: .checked,
+                                title: fresh.count == 1 ? "Check found 1 new update" : "Check found \(fresh.count) new updates",
+                                detail: names))
+        }
         return fresh
     }
 
     // MARK: - Install
 
     private var pendingInstalls: [UpdateItem] = []
-    /// Lane of each running install, keyed by item id.
-    private var runningLanes: [String: String] = [:]
+    /// Lanes held by each running install, keyed by item id.
+    private var runningLanes: [String: Set<String>] = [:]
+    private var busyLanes: Set<String> { runningLanes.values.reduce(into: []) { $0.formUnion($1) } }
     /// Running installs that may show a password prompt.
     private var runningAdmin: Set<String> = []
     /// Queued items already checked for needing admin, and those that do.
@@ -251,6 +317,16 @@ final class UpdateController: ObservableObject {
         }
     }
 
+    /// Every lane an install holds: its own, plus, for a package manager
+    /// (Tools), the lane of the packages it manages.
+    nonisolated static func lanes(for item: UpdateItem) -> Set<String> {
+        var lanes: Set<String> = [lane(for: item.sourceID)]
+        if let tool = Tools.formula(of: item), let extra = Tools.packageLane(ofFormula: tool) {
+            lanes.insert(extra)
+        }
+        return lanes
+    }
+
     /// Start every queued install that may run now: up to the "Update at once"
     /// limit, one per lane. Items that need admin wait for the password sheet.
     /// Without a batch password, only one install that may prompt runs at a
@@ -270,15 +346,15 @@ final class UpdateController: ObservableObject {
                 installStates[item.id] = nil
                 continue
             }
-            let lane = Self.lane(for: item.sourceID)
+            let lanes = Self.lanes(for: item)
             let admin = !brokered && Self.mayPrompt(item, needsAdmin: adminItems.contains(item.id))
-            if runningLanes.values.contains(lane) || (admin && !runningAdmin.isEmpty)
+            if !busyLanes.isDisjoint(with: lanes) || (admin && !runningAdmin.isEmpty)
                 || (passwordRequest != nil && adminItems.contains(item.id)) {
                 index += 1
                 continue
             }
             pendingInstalls.remove(at: index)
-            runningLanes[item.id] = lane
+            runningLanes[item.id] = lanes
             if admin { runningAdmin.insert(item.id) }
             batchActive = true
             run(item, with: source)
@@ -357,6 +433,13 @@ final class UpdateController: ObservableObject {
             installStates[item.id] = .failed("Needs admin")
             forget(item)
         }
+        state = Store.mutate { s in
+            for item in skipped {
+                s.log(ActivityEntry(kind: .skipped, title: "\(item.name) \(item.latestVersion)",
+                                    detail: "\(Self.sourceName(item.sourceID)) · needed admin, password skipped",
+                                    itemID: item.id, sourceID: item.sourceID))
+            }
+        }
         passwordRequest = nil
         startReadyInstalls()
     }
@@ -367,7 +450,7 @@ final class UpdateController: ObservableObject {
     /// that fetch holds the lane. A failed fetch is harmless: each upgrade
     /// then downloads for itself.
     private func prefetchBrewDownloads() -> Bool {
-        guard !runningLanes.values.contains("brew") else { return false }
+        guard !busyLanes.contains("brew") else { return false }
         let batch = pendingInstalls.filter { Self.lane(for: $0.sourceID) == "brew" && !prefetched.contains($0.id) }
         var formulae: [String] = [], casks: [String] = []
         for item in batch {
@@ -386,7 +469,7 @@ final class UpdateController: ObservableObject {
         guard formulae.count + casks.count > 1, let brew = HomebrewSource.brewPath else { return false }
 
         let lane = "prefetch"
-        runningLanes[lane] = "brew"
+        runningLanes[lane] = ["brew"]
         batchActive = true
         for item in batch where Self.lane(for: item.sourceID) == "brew" && item.sourceID != "custom" {
             installStates[item.id] = .downloading(percent: nil, line: "Downloading with the rest of the batch…")
@@ -403,12 +486,19 @@ final class UpdateController: ObservableObject {
         return true
     }
 
+    /// The last lines each running install printed, for Show log.
+    private var outputTails: [String: [String]] = [:]
+
     private func run(_ item: UpdateItem, with source: any UpdateSource) {
         installStates[item.id] = .installing("Starting…")
+        outputTails[item.id] = []
+        let started = Date()
         let install = Task {
             try await Shell.$installTag.withValue(Self.processTag(item)) {
                 try await source.install(item) { line in
                     Task { @MainActor in
+                        self.outputTails[item.id, default: []].append(line)
+                        if self.outputTails[item.id]!.count > 40 { self.outputTails[item.id]!.removeFirst() }
                         guard let current = self.installStates[item.id], current.isActive,
                               current != .cancelling else { return }
                         self.installStates[item.id] = InstallState(progressLine: line)
@@ -421,15 +511,29 @@ final class UpdateController: ObservableObject {
             do {
                 try await install.value
                 installStates[item.id] = .done
-                state = Store.mutate { $0.items.removeAll { $0.id == item.id } }
+                let seconds = Int(Date().timeIntervalSince(started).rounded())
+                state = Store.mutate {
+                    $0.items.removeAll { $0.id == item.id }
+                    $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
+                                         detail: Self.sourceName(item.sourceID), itemID: item.id,
+                                         sourceID: item.sourceID, seconds: seconds))
+                }
             } catch {
                 // A user-cancelled install isn't an error worth showing.
                 installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
+                log(install.isCancelled
+                    ? ActivityEntry(kind: .cancelled, title: "\(item.name) \(item.latestVersion)",
+                                    detail: Self.sourceName(item.sourceID), itemID: item.id, sourceID: item.sourceID)
+                    : ActivityEntry(kind: .failed, title: "\(item.name) \(item.latestVersion)",
+                                    detail: "\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
+                                    itemID: item.id, sourceID: item.sourceID,
+                                    log: (outputTails[item.id] ?? []).joined(separator: "\n")))
                 if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
                     repairable[item.id] = (token, folder)
                 }
             }
             runningInstalls[item.id] = nil
+            outputTails[item.id] = nil
             runningLanes[item.id] = nil
             runningAdmin.remove(item.id)
             forget(item)
@@ -452,10 +556,10 @@ final class UpdateController: ObservableObject {
         queueAll(visibleItems.filter { $0.scriptedInstall && !$0.isPinned && !isBusy($0) })
     }
 
-    /// Queue every installable update from one source.
-    func updateAll(sourceID: String) {
+    /// Queue every installable update in one window section.
+    func updateAll(sectionID: String) {
         queueAll(visibleItems.filter {
-            $0.sourceID == sourceID && $0.scriptedInstall && !$0.isPinned && !isBusy($0)
+            $0.sectionID == sectionID && $0.scriptedInstall && !$0.isPinned && !isBusy($0)
         })
     }
 
@@ -536,12 +640,11 @@ final class UpdateController: ObservableObject {
     private func updateSpinner() {
         let spinning = isSpinning
         if spinning, spinTimer == nil {
-            // One spoke per tick, so a full turn takes a second, like the
-            // system spinner.
-            spinTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(MenuBarIcon.spokes), repeats: true) { [weak self] _ in
+            // Twelve frames a second: one pulse takes about 1.7 seconds.
+            spinTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    self.spinFrame = (self.spinFrame + 1) % MenuBarIcon.spokes
+                    self.spinFrame = (self.spinFrame + 1) % MenuBarIcon.frameCount
                     // Catch a stale background flag without waiting for a reload.
                     if !self.isChecking && !self.backgroundCheckRunning { self.updateSpinner() }
                 }

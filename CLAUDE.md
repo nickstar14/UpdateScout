@@ -54,10 +54,14 @@ build order and links to every other 2.0 doc.
 - **Two processes write `state.json`:** the app and the headless
   `--background-check` agent. Always go through `Store.mutate`, which locks,
   re-reads and applies only the change. Never save a stale in-memory copy.
-- **`MenuBarExtra` labels are flattened to an image.** View modifiers
-  (rotation and so on) and SwiftUI animations are dropped. Animate with
-  pre-drawn template frames, as in `Views/MenuBarIcon.swift`. Keep a single
-  status item so menu bar managers (Thaw, Ice, Bartender) keep its position.
+- **The status item is an `NSStatusItem`** (2.0), not a `MenuBarExtra`, so
+  left-click opens the window and right-click shows the menu. Its image can't
+  be animated: the checking pulse uses pre-drawn template frames, as in
+  `Views/MenuBarIcon.swift`. Keep a single status item and its `autosaveName`
+  so menu bar managers (Thaw, Ice, Bartender) keep its position.
+- **Testing 2.0 next to the installed 1.8.0:** the 1.8.0 background agent
+  rewrites `state.json` without 2.0's new fields (Activity log, hide lists).
+  Expect them to vanish in test builds; it's not a 2.0 bug.
 - **Sparkle release tracks** come from the installed version (see
   `VersionParts` in `Models.swift` and `AppcastParser` in
   `Sources/SparkleSource.swift`). Some feeds leave betas untagged, so the

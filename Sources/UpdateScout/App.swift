@@ -82,15 +82,10 @@ struct UpdateScoutApp: App {
         }
     }
 
+    // The status item is an NSStatusItem (StatusItemController), so left and
+    // right clicks can differ; SwiftUI still needs a scene, so an empty one
+    // that's never inserted.
     var body: some Scene {
-        MenuBarExtra {
-            MenuView()
-                .environmentObject(controller)
-        } label: {
-            // A spinner while any check runs (here or in the background
-            // agent), so a count that is about to change never reads as final.
-            MenuBarLabel(controller: controller)
-        }
-        .menuBarExtraStyle(.window)
+        MenuBarExtra("", isInserted: .constant(false)) { EmptyView() }
     }
 }

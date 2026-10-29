@@ -1,70 +1,123 @@
-import SwiftUI
 import AppKit
+import Combine
 
-/// The menu bar icon, one of three states:
-/// - checking: a spoked spinner, like the one beside "Checking…" in the window,
-/// - updates available: the circular arrows plus the count,
-/// - up to date: a checkmark.
+/// The menu bar glyph: a prism (a triangle with an off-centre ridge, so it
+/// reads as 3D and not as a warning sign), drawn as a template image so the
+/// system tints it for light, dark and tinted menu bars.
 ///
-/// A MenuBarExtra label is flattened into the status item's image, so view
-/// modifiers like rotation and SwiftUI animations are dropped. The spinner is
-/// therefore drawn as separate template images, one per frame, and the
-/// controller steps through them on a timer.
+/// While a check runs the prism pulses by stepping its alpha between 1.0 and
+/// about 0.35. Status item images can't be animated, so the pulse is a set of
+/// pre-drawn frames that the controller steps through on a timer.
 enum MenuBarIcon {
-    static let spokes = 12
+    static let frameCount = 20
 
-    /// Frames are cached: the timer asks for one twelve times a second.
-    @MainActor private static var frames: [NSImage] = (0..<spokes).map(spinnerFrame)
-
-    @MainActor static func spinner(frame: Int) -> NSImage {
-        frames[frame % spokes]
+    @MainActor private static var frames: [NSImage] = (0..<frameCount).map { frame in
+        let phase = Double(frame) / Double(frameCount) * 2 * .pi
+        return prism(alpha: 0.35 + 0.65 * (0.5 + 0.5 * cos(phase)))
     }
+    @MainActor static let still = prism(alpha: 1)
 
-    /// Spoke `frame` is the darkest; the ones behind it fade out, so the
-    /// bright spoke appears to travel clockwise as `frame` increases.
-    private static func spinnerFrame(_ frame: Int) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            let center = NSPoint(x: rect.midX, y: rect.midY)
-            for i in 0..<spokes {
-                // 0 is twelve o'clock, increasing clockwise.
-                let angle = .pi / 2 - Double(i) * 2 * .pi / Double(spokes)
-                let behind = (frame - i + spokes) % spokes
-                let alpha = max(0.18, 1 - Double(behind) / Double(spokes - 2))
-                let path = NSBezierPath()
-                path.lineWidth = 1.7
-                path.lineCapStyle = .round
-                path.move(to: NSPoint(x: center.x + 3.6 * cos(angle), y: center.y + 3.6 * sin(angle)))
-                path.line(to: NSPoint(x: center.x + 7.4 * cos(angle), y: center.y + 7.4 * sin(angle)))
-                NSColor.black.withAlphaComponent(alpha).setStroke()
-                path.stroke()
-            }
+    @MainActor static func pulse(frame: Int) -> NSImage { frames[frame % frameCount] }
+
+    private static func prism(alpha: Double) -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            let apex = NSPoint(x: 9, y: 2.2)
+            let left = NSPoint(x: 1.6, y: 15.4), right = NSPoint(x: 16.4, y: 15.4)
+            let ridge = NSPoint(x: 10.6, y: 12.3)
+            let ink = NSColor.black.withAlphaComponent(alpha)
+
+            // The shaded face, right of the ridge, at partial alpha.
+            let face = NSBezierPath()
+            face.move(to: apex); face.line(to: ridge); face.line(to: right); face.close()
+            ink.withAlphaComponent(alpha * 0.38).setFill()
+            face.fill()
+
+            let outline = NSBezierPath()
+            outline.move(to: apex); outline.line(to: right); outline.line(to: left); outline.close()
+            outline.lineWidth = 1.5
+            outline.lineJoinStyle = .round
+            ink.setStroke()
+            outline.stroke()
+
+            let edges = NSBezierPath()
+            edges.move(to: apex); edges.line(to: ridge)
+            edges.move(to: left); edges.line(to: ridge); edges.line(to: right)
+            edges.lineWidth = 1.1
+            edges.lineCapStyle = .round
+            edges.lineJoinStyle = .round
+            edges.stroke()
             return true
         }
-        // Template, so the menu bar tints it for light, dark and tinted bars.
         image.isTemplate = true
-        image.accessibilityDescription = "Checking for updates"
         return image
     }
 }
 
-/// The MenuBarExtra label. One status item for every state, so menu bar
-/// managers (Thaw, Ice, Bartender) keep it where the user placed it.
-struct MenuBarLabel: View {
-    @ObservedObject var controller: UpdateController
+/// The one status item. Left-click opens the window (or brings it to the
+/// front); right-click or Control-click shows a plain native menu. A
+/// MenuBarExtra can't tell the two clicks apart, hence an NSStatusItem.
+@MainActor
+final class StatusItemController: NSObject {
+    static let shared = StatusItemController()
+    private var item: NSStatusItem?
+    private var observation: AnyCancellable?
 
-    var body: some View {
-        if controller.isSpinning {
-            Image(nsImage: MenuBarIcon.spinner(frame: controller.spinFrame))
-        } else if controller.badgeCount > 0 {
-            HStack(spacing: 3) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .accessibilityLabel("Updates available")
-                Text("\(controller.badgeCount)")
-            }
+    func install() {
+        guard item == nil else { return }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // A stable name, so menu bar managers (Thaw, Ice, Bartender) and
+        // macOS keep the position the user chose.
+        item.autosaveName = "UpdateScoutStatusItem"
+        if let button = item.button {
+            button.target = self
+            button.action = #selector(clicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.imagePosition = .imageLeading
+        }
+        self.item = item
+        let controller = UpdateController.shared
+        observation = controller.objectWillChange.sink { [weak self] _ in
+            // objectWillChange fires before the change lands.
+            DispatchQueue.main.async { self?.refresh() }
+        }
+        refresh()
+    }
+
+    private func refresh() {
+        guard let button = item?.button else { return }
+        let controller = UpdateController.shared
+        let count = controller.badgeCount
+        button.image = controller.isSpinning ? MenuBarIcon.pulse(frame: controller.spinFrame) : MenuBarIcon.still
+        button.title = count > 0 ? "\(count)" : ""
+        button.setAccessibilityLabel(controller.isSpinning ? "Checking for updates"
+                                     : count > 0 ? "\(count) updates available" : "Up to date")
+    }
+
+    @objc private func clicked() {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            showMenu()
         } else {
-            Image(systemName: "checkmark.circle")
-                .accessibilityLabel("Up to date")
+            UpdatesWindow.shared.show()
         }
     }
+
+    private func showMenu() {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout"
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open \(name)", action: #selector(openWindow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Check Now", action: #selector(checkNow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit \(name)", action: #selector(quit), keyEquivalent: "q").target = self
+        item?.menu = menu
+        item?.button?.performClick(nil)
+        // Detach again, or the next left-click would open the menu too.
+        item?.menu = nil
+    }
+
+    @objc private func openWindow() { UpdatesWindow.shared.show() }
+    @objc private func checkNow() { UpdateController.shared.checkNow() }
+    @objc private func openSettings() { SettingsWindow.show() }
+    @objc private func quit() { NSApp.terminate(nil) }
 }
