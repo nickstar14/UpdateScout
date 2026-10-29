@@ -134,7 +134,7 @@ struct MASSource: UpdateSource {
         guard let mas = Shell.which("mas") else {
             throw UpdateScoutError.toolMissing("mas-cli", hint: "Run `brew install mas`.")
         }
-        let result = try await Shell.run(mas, ["upgrade", item.installToken], tag: "install", lineHandler: progress)
+        let result = try await Shell.run(mas, ["upgrade", item.installToken], tag: Shell.installTag, lineHandler: progress)
         let sudoBlocked = result.combined.contains("sudo: a terminal is required")
         if result.status == 0 && !sudoBlocked {
             // mas can "succeed" without doing anything when its cached update
@@ -186,7 +186,7 @@ struct MASSource: UpdateSource {
             let priv = try await Shell.runPrivileged(
                 "'\(mas)' upgrade \(item.installToken)",
                 reason: "UpdateScout is trying to install an update to \(item.name).",
-                tag: "install") { line in
+                tag: Shell.installTag) { line in
                     let text = line.trimmingCharacters(in: .whitespaces)
                     guard !text.isEmpty else { return }
                     tracker.noteOutput()

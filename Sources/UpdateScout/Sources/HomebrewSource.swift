@@ -131,7 +131,7 @@ struct HomebrewSource: UpdateSource {
         } else {
             args = ["upgrade", name]
         }
-        let result = try await Shell.run(brew, args, tag: "install", lineHandler: progress)
+        let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
             if kind == "cask", let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: name) {
                 throw UpdateScoutError.staleCaskUpgrade(token: name, folder: folder)

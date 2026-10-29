@@ -119,7 +119,7 @@ struct UpdateDetailView: View {
             }
             Spacer()
             Button("Close") { dismiss() }.glass()
-            if controller.installing[item.id] == nil {
+            if !controller.isBusy(item) {
                 Button {
                     dismiss(); controller.requestUpdate(item)
                 } label: {

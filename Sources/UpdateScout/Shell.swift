@@ -27,6 +27,10 @@ enum Shell {
         var combined: String { stdout + (stderr.isEmpty ? "" : "\n" + stderr) }
     }
 
+    /// Process tag for install work. The install queue sets a per-item value
+    /// around each install, so cancelling one item kills only its processes.
+    @TaskLocal static var installTag = "install"
+
     /// Run an executable directly (no shell interpretation of arguments).
     /// `environment` adds or overrides variables for this one process.
     @discardableResult

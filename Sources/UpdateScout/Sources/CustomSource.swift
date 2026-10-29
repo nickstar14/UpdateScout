@@ -140,7 +140,7 @@ struct CustomSource: UpdateSource {
                 item.name, output: "This entry changed in custom_sources.json since the last check. Check Now, then try again.")
         }
 
-        let result = try await Shell.run("/bin/sh", ["-c", cmd], tag: "install", lineHandler: progress)
+        let result = try await Shell.run("/bin/sh", ["-c", cmd], tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed(cmd, output: result.combined)
         }

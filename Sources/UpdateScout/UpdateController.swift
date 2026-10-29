@@ -14,10 +14,8 @@ final class UpdateController: ObservableObject {
     @Published var isChecking = false { didSet { updateSpinner() } }
     /// Menu bar icon rotation while a check runs; 0 when idle.
     @Published private(set) var spinFrame = 0
-    /// Item ids with an install in flight → latest progress line.
-    @Published var installing: [String: String] = [:]
-    /// Item id → error message from a failed install.
-    @Published var installErrors: [String: String] = [:]
+    /// Item id → where its install is. Absent means idle.
+    @Published var installStates: [String: InstallState] = [:]
     /// Failed installs that UpdateScout knows how to fix: item id → (cask
     /// token, leftover staging folder). The card offers Repair for these.
     @Published var repairable: [String: (token: String, folder: URL)] = [:]
@@ -163,25 +161,29 @@ final class UpdateController: ObservableObject {
 
     private var pendingInstalls: [UpdateItem] = []
     private var isProcessingQueue = false
-    private var cancelRequested = false
-    /// The install running now, so Cancel can stop work that isn't a child
-    /// process (a Sparkle download).
-    private var currentInstall: Task<Void, Error>?
+    /// Running installs by item id, so Cancel can stop work that isn't a
+    /// child process (a Sparkle download).
+    private var runningInstalls: [String: Task<Void, Error>] = [:]
 
-    /// Cancel a queued or in-flight install. Kills the child process (and any
-    /// pending auth prompt it spawned); the item stays in the list for retry.
+    /// True while an item is queued or running (not failed or done).
+    func isBusy(_ item: UpdateItem) -> Bool { installStates[item.id]?.isActive == true }
+
+    /// Cancel a queued or in-flight install. Kills that item's child processes
+    /// (and any pending auth prompt they spawned); other installs carry on and
+    /// the item stays in the list for retry.
     func cancelInstall(_ item: UpdateItem) {
-        if installing[item.id] == "Queued…" {
+        if installStates[item.id] == .queued {
             pendingInstalls.removeAll { $0.id == item.id }
-            installing[item.id] = nil
+            installStates[item.id] = nil
             return
         }
-        guard installing[item.id] != nil else { return }
-        cancelRequested = true
-        installing[item.id] = "Cancelling…"
-        currentInstall?.cancel()
-        ProcessRegistry.shared.terminate(tag: "install")
+        guard isBusy(item), let task = runningInstalls[item.id] else { return }
+        installStates[item.id] = .cancelling
+        task.cancel()
+        ProcessRegistry.shared.terminate(tag: Self.processTag(item))
     }
+
+    private static func processTag(_ item: UpdateItem) -> String { "install|\(item.id)" }
 
     /// Fix a cask stuck on a half-finished upgrade: move the leftover staging
     /// folder to the Trash (recoverable, not deleted), then reinstall.
@@ -195,13 +197,12 @@ final class UpdateController: ObservableObject {
             update(item)
             return
         }
-        installing[item.id] = "Moving the leftover upgrade folder to the Trash…"
-        installErrors[item.id] = nil
+        installStates[item.id] = .installing("Moving the leftover upgrade folder to the Trash…")
         NSWorkspace.shared.recycle([folder]) { _, error in
             Task { @MainActor in
-                self.installing[item.id] = nil
+                self.installStates[item.id] = nil
                 if let error {
-                    self.installErrors[item.id] = "Couldn't move \(folder.lastPathComponent) to the Trash: \(error.localizedDescription)"
+                    self.installStates[item.id] = .failed("Couldn't move \(folder.lastPathComponent) to the Trash: \(error.localizedDescription)")
                     return
                 }
                 self.repairable[item.id] = nil
@@ -216,11 +217,10 @@ final class UpdateController: ObservableObject {
             if let url = item.url.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
             return
         }
-        guard installing[item.id] == nil else { return }
+        guard !isBusy(item) else { return }
         // Installs run strictly one at a time: parallel `brew` processes fight
         // over Homebrew's cache lock and all but the first fail.
-        installing[item.id] = "Queued…"
-        installErrors[item.id] = nil
+        installStates[item.id] = .queued
         repairable[item.id] = nil
         pendingInstalls.append(item)
         processQueue()
@@ -233,32 +233,34 @@ final class UpdateController: ObservableObject {
             while !pendingInstalls.isEmpty {
                 let item = pendingInstalls.removeFirst()
                 guard let source = Self.allSources.first(where: { $0.id == item.sourceID }) else {
-                    installing[item.id] = nil
+                    installStates[item.id] = nil
                     continue
                 }
-                cancelRequested = false
-                installing[item.id] = "Starting…"
+                installStates[item.id] = .installing("Starting…")
                 let install = Task {
-                    try await source.install(item) { line in
-                        Task { @MainActor in
-                            if self.installing[item.id] != nil { self.installing[item.id] = line }
+                    try await Shell.$installTag.withValue(Self.processTag(item)) {
+                        try await source.install(item) { line in
+                            Task { @MainActor in
+                                guard let current = self.installStates[item.id], current.isActive,
+                                      current != .cancelling else { return }
+                                self.installStates[item.id] = InstallState(progressLine: line)
+                            }
                         }
                     }
                 }
-                currentInstall = install
-                defer { currentInstall = nil }
+                runningInstalls[item.id] = install
                 do {
                     try await install.value
-                    installing[item.id] = nil
+                    installStates[item.id] = .done
                     state = Store.mutate { $0.items.removeAll { $0.id == item.id } }
                 } catch {
-                    installing[item.id] = nil
                     // A user-cancelled install isn't an error worth showing.
-                    if !cancelRequested { installErrors[item.id] = error.localizedDescription }
+                    installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
                     if case UpdateScoutError.staleCaskUpgrade(let token, let folder) = error {
                         repairable[item.id] = (token, folder)
                     }
                 }
+                runningInstalls[item.id] = nil
             }
             isProcessingQueue = false
             // Re-detect once the queue drains so completed/externally-updated
@@ -279,13 +281,13 @@ final class UpdateController: ObservableObject {
 
     /// Queue every visible scripted update; they still run one at a time.
     func updateAll() {
-        queueAll(visibleItems.filter { $0.scriptedInstall && installing[$0.id] == nil })
+        queueAll(visibleItems.filter { $0.scriptedInstall && !isBusy($0) })
     }
 
     /// Queue every installable update from one source.
     func updateAll(sourceID: String) {
         queueAll(visibleItems.filter {
-            $0.sourceID == sourceID && $0.scriptedInstall && installing[$0.id] == nil
+            $0.sourceID == sourceID && $0.scriptedInstall && !isBusy($0)
         })
     }
 

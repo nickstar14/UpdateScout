@@ -75,8 +75,9 @@ struct UpdateCard: View {
     @State private var showingDetails = false
 
     private var style: SourceStyle { SourceStyle.forSource(item.sourceID) }
-    private var progress: String? { controller.installing[item.id] }
-    private var error: String? { controller.installErrors[item.id] }
+    private var installState: InstallState? { controller.installStates[item.id] }
+    private var progress: InstallState? { installState?.isActive == true ? installState : nil }
+    private var error: String? { installState?.errorMessage }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -128,13 +129,19 @@ struct UpdateCard: View {
             if let progress {
                 VStack(spacing: 4) {
                     HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
+                        if case .downloading(let percent?, _) = progress {
+                            ProgressView(value: Double(percent), total: 100).frame(width: 60)
+                        } else if progress == .needsAdmin {
+                            Image(systemName: "lock.fill").foregroundStyle(.orange)
+                        } else {
+                            ProgressView().controlSize(.small)
+                        }
                         Button { controller.cancelInstall(item) } label: {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain).help("Cancel")
                     }
-                    Text(progress).font(.caption2).foregroundStyle(.secondary)
+                    Text(progress.label).font(.caption2).foregroundStyle(.secondary)
                         .lineLimit(2).multilineTextAlignment(.center)
                         .frame(height: 26)
                 }
@@ -158,7 +165,7 @@ struct UpdateCard: View {
                         .frame(maxWidth: .infinity)
                         .help("Moves Homebrew's leftover upgrade folder to the Trash and reinstalls")
                     } else {
-                        Button(item.actionLabel) { controller.requestUpdate(item) }
+                        Button(error == nil ? item.actionLabel : "Retry") { controller.requestUpdate(item) }
                             .glassProminent(style.color)
                             .controlSize(.small)
                             .frame(maxWidth: .infinity)

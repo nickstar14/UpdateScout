@@ -61,7 +61,7 @@ struct CaskOracleSource: UpdateSource {
             throw UpdateScoutError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
         let args = ["install", "--cask", item.installToken, "--force"]
-        let result = try await Shell.run(brew, args, tag: "install", lineHandler: progress)
+        let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
         guard result.status == 0 else {
             if let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: item.installToken) {
                 throw UpdateScoutError.staleCaskUpgrade(token: item.installToken, folder: folder)

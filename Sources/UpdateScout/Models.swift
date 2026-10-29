@@ -254,3 +254,59 @@ extension UpdateItem {
         return "\(old) → \(new)"
     }
 }
+
+/// Where one item's install is. The queue keeps one per item, so each can be
+/// cancelled, retried or shown on its own.
+enum InstallState: Equatable {
+    case queued
+    /// Percent is nil when the tool doesn't say how far along it is.
+    case downloading(percent: Int?, line: String)
+    case installing(String)
+    /// Waiting on the password prompt.
+    case needsAdmin
+    case cancelling
+    case failed(String)
+    case done
+
+    /// Queued or running; Update and Update All skip these.
+    var isActive: Bool {
+        switch self {
+        case .failed, .done: return false
+        default: return true
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .queued: return "Queued…"
+        case .downloading(_, let line), .installing(let line): return line
+        case .needsAdmin: return "Needs your password…"
+        case .cancelling: return "Cancelling…"
+        case .failed(let message): return message
+        case .done: return "Done"
+        }
+    }
+
+    var errorMessage: String? {
+        if case .failed(let message) = self { return message }
+        return nil
+    }
+
+    private static let percent = try! NSRegularExpression(pattern: "(\\d{1,3})(?:\\.\\d+)?%")
+
+    /// Classify a progress line from a source's install.
+    init(progressLine raw: String) {
+        let line = raw.trimmingCharacters(in: .whitespaces)
+        if line.localizedCaseInsensitiveContains("password") {
+            self = .needsAdmin
+        } else if line.localizedCaseInsensitiveContains("download") {
+            let ns = line as NSString
+            let pct = Self.percent.matches(in: line, range: NSRange(location: 0, length: ns.length)).last
+                .flatMap { Int(ns.substring(with: $0.range(at: 1))) }
+                .map { min($0, 100) }
+            self = .downloading(percent: pct, line: line)
+        } else {
+            self = .installing(line)
+        }
+    }
+}

@@ -173,7 +173,7 @@ enum SparkleInstaller {
             """
             let result = try await Shell.runPrivileged(
                 command, reason: "UpdateScout needs to replace \(target.deletingPathExtension().lastPathComponent) with its update.",
-                tag: "install")
+                tag: Shell.installTag)
             guard result.status == 0, fm.fileExists(atPath: target.path) else {
                 throw UpdateScoutError.commandFailed(
                     "replace \(target.lastPathComponent)",
