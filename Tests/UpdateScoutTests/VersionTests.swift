@@ -51,4 +51,13 @@ struct VersionTests {
     @Test func itemIDFormat() {
         #expect(item("homebrew", "cask:docker", from: "1", to: "2").id == "homebrew|cask:docker|App|2")
     }
+
+    /// Betas see the beta channel; releases see only untagged appcast items.
+    @Test func selfUpdateChannels() {
+        #expect(SelfUpdaterDelegate.channels(forVersion: "2.0.0-beta.1") == ["beta"])
+        #expect(SelfUpdaterDelegate.channels(forVersion: "2.0.0-rc.2") == ["beta"])
+        #expect(SelfUpdaterDelegate.channels(forVersion: "2.0.0-alpha.1") == ["beta"])
+        #expect(SelfUpdaterDelegate.channels(forVersion: "2.0.0").isEmpty)
+        #expect(SelfUpdaterDelegate.channels(forVersion: "1.8.0").isEmpty)
+    }
 }

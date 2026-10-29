@@ -13,6 +13,16 @@ final class SelfUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         guard let base = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String else { return nil }
         return base + "?t=\(Int(Date().timeIntervalSince1970))"
     }
+
+    /// A running beta (any prerelease marker) also sees items tagged
+    /// `sparkle:channel` beta; a release sees only untagged items.
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        Self.channels(forVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+    }
+
+    static func channels(forVersion version: String) -> Set<String> {
+        VersionParts(version).track > 0 ? ["beta"] : []
+    }
 }
 
 @MainActor
