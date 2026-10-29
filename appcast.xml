@@ -6,6 +6,40 @@
         <description>UpdateScout release feed</description>
         <language>en</language>
         <item>
+            <title>Version 1.8.0</title>
+            <pubDate>Wed, 28 Oct 2026 21:52:00 -0500</pubDate>
+            <description><![CDATA[<h2>A menu bar that stays current</h2>
+<ul>
+<li>The menu bar count now updates on its own when a background check finishes, without clicking the icon.</li>
+<li>New menu bar icons: a spinner while checking, the arrows with a count when updates are available, and a checkmark when everything is up to date.</li>
+</ul>
+<h2>Review major upgrades</h2>
+<ul>
+<li><b>Update All</b> no longer installs major-version jumps silently. A review sheet lists them with their release notes, and each one is opt-in.</li>
+<li>Tick "I've reviewed these" to <b>Proceed</b>, or choose <b>Skip these, update the rest</b>.</li>
+</ul>
+<h2>Release tracks</h2>
+<ul>
+<li>Apps on a beta or alpha are kept on that track, and stable apps are only offered stable releases.</li>
+<li>Updates that need a newer macOS than yours are no longer offered.</li>
+<li>More accurate version comparison (for example, 3.0.0 now ranks above 3.0.0-beta.4).</li>
+</ul>
+<h2>Safety and reliability</h2>
+<ul>
+<li>If the driver check fails, no drivers are listed as safe to remove, and removing one now asks first.</li>
+<li>The password prompt says what it is for.</li>
+<li>Cancel now stops app downloads, and an app that won't quit is no longer replaced while running.</li>
+<li>Fixed the background check and the app overwriting each other's results.</li>
+</ul>
+<p>Note: ignored and already-notified updates reset once with this version.</p>]]></description>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v1.8.0/UpdateScout-1.8.0.zip"
+                sparkle:version="25"
+                sparkle:shortVersionString="1.8.0"
+                sparkle:edSignature="F9Y1ucVQ3YyxjrhOznCBpMEaiJVfL7R7sFfiqF4fkPzMjXHPxFQo46qbWx0jynXH1xmwT+bdOnGcPBafQp7VDw==" length="3948490"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.7.2</title>
             <pubDate>Thu, 24 Sep 2026 15:42:11 -0500</pubDate>
             <description><![CDATA[<ul><li>The <b>Repair</b> button is now text only, so its label is no longer cut off to "Re…" on the narrow update cards.</li></ul>]]></description>
