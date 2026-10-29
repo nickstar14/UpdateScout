@@ -124,6 +124,44 @@ protocol UpdateSource: Sendable {
     func detect() async throws -> [UpdateItem]
     /// Perform the update for one item previously returned by detect().
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws
+
+    // Optional capabilities (2.0). The defaults below mean "not supported", so
+    // a source only implements what its tool can do.
+
+    /// Find packages to install (Discover).
+    func search(_ query: String) async throws -> [PackageInfo]
+    /// Look up one package by exact name.
+    func info(_ name: String) async throws -> PackageInfo?
+    /// Remove an installed item.
+    func uninstall(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws
+    /// Release channels an item can switch between (empty: no choice).
+    func channels(for item: UpdateItem) -> [String]
+    /// True when installing this item will ask for an admin password.
+    func needsAdmin(_ item: UpdateItem) -> Bool
+}
+
+/// A package as a source describes it outside the update list.
+struct PackageInfo: Hashable, Sendable {
+    let name: String
+    let version: String
+    var summary: String? = nil
+    var homepage: String? = nil
+}
+
+extension UpdateSource {
+    func search(_ query: String) async throws -> [PackageInfo] { [] }
+    func info(_ name: String) async throws -> PackageInfo? { nil }
+    func uninstall(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
+        throw UpdateScoutError.unsupported("\(displayName) can't remove items")
+    }
+    func channels(for item: UpdateItem) -> [String] { [] }
+    func needsAdmin(_ item: UpdateItem) -> Bool { false }
+}
+
+extension UpdateItem {
+    /// Pinned to an exact version by the user (uv tools). Only an explicit
+    /// click moves it; Update All and section updates leave it alone.
+    var isPinned: Bool { installToken.hasPrefix("uvpin:") }
 }
 
 enum UpdateScoutError: LocalizedError {
@@ -132,6 +170,7 @@ enum UpdateScoutError: LocalizedError {
     case parseFailure(String)
     /// A cask stuck on a half-finished earlier upgrade — see BrewRepair.
     case staleCaskUpgrade(token: String, folder: URL)
+    case unsupported(String)
 
     var errorDescription: String? {
         switch self {
@@ -140,6 +179,7 @@ enum UpdateScoutError: LocalizedError {
             let tail = output.split(separator: "\n").suffix(4).joined(separator: "\n")
             return "`\(cmd)` failed:\n\(tail)"
         case .parseFailure(let what): return "Could not parse \(what)"
+        case .unsupported(let what): return what
         case .staleCaskUpgrade(let token, _):
             return "Homebrew is stuck on an earlier upgrade of \(token) that never finished. Repair moves its leftover folder to the Trash and reinstalls it cleanly."
         }

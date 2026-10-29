@@ -7,7 +7,8 @@ final class UpdateController: ObservableObject {
 
     nonisolated static let allSources: [any UpdateSource] = [
         HomebrewSource(), MASSource(), SystemUpdateSource(),
-        CaskOracleSource(), ComponentsSource(), SparkleSource(), CustomSource()
+        CaskOracleSource(), ComponentsSource(), SparkleSource(), CustomSource(),
+        PythonSource(), NPMSource()
     ]
 
     @Published var state = Store.load()
@@ -281,13 +282,13 @@ final class UpdateController: ObservableObject {
 
     /// Queue every visible scripted update; they still run one at a time.
     func updateAll() {
-        queueAll(visibleItems.filter { $0.scriptedInstall && !isBusy($0) })
+        queueAll(visibleItems.filter { $0.scriptedInstall && !$0.isPinned && !isBusy($0) })
     }
 
     /// Queue every installable update from one source.
     func updateAll(sourceID: String) {
         queueAll(visibleItems.filter {
-            $0.sourceID == sourceID && $0.scriptedInstall && !isBusy($0)
+            $0.sourceID == sourceID && $0.scriptedInstall && !$0.isPinned && !isBusy($0)
         })
     }
 

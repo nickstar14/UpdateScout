@@ -17,6 +17,8 @@ struct SourceStyle {
         case "components": SourceStyle(symbol: "cpu.fill",             color: .purple)
         case "sparkle":    SourceStyle(symbol: "sparkles",             color: .yellow)
         case "custom":     SourceStyle(symbol: "slider.horizontal.3",  color: .green)
+        case "pip":        SourceStyle(symbol: "terminal.fill",        color: .orange)
+        case "npm":        SourceStyle(symbol: "square.stack.3d.up.fill", color: .red)
         default:           SourceStyle(symbol: "arrow.down.circle.fill", color: .accentColor)
         }
     }
