@@ -24,6 +24,11 @@ Open it in Icon Composer and tune from there.
   to 0.94/0.48/0.42.
 - **Groups (4, top to bottom):** Prism, Front (translucent glass), Cards
   (light translucency), Background.
+- **Prism depth:** the prism's two faces have Liquid Glass on and the Prism
+  group has a full-strength neutral shadow. That gives a soft shadow under
+  its base and bright glass edges, so it reads as the top layer, especially
+  in Clear and Tinted. A stronger shadow without glass was tried and
+  barely showed.
 
 `appearances.png` shows all six modes, rendered with Apple's own
 `ictool` (inside Icon Composer.app) at the macOS 27 design generation. So

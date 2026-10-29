@@ -6,7 +6,7 @@
       "layers": [
         {
           "name": "10-prism-shade",
-          "glass": false,
+          "glass": true,
           "opacity": 1.0,
           "blend-mode": "normal",
           "image-name-specializations": [
@@ -25,7 +25,7 @@
         },
         {
           "name": "09-prism-light",
-          "glass": false,
+          "glass": true,
           "opacity": 1.0,
           "blend-mode": "normal",
           "image-name-specializations": [
@@ -41,7 +41,7 @@
       ],
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.5
+        "opacity": 1
       },
       "specular": true,
       "translucency": {

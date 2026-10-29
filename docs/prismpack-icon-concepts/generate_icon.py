@@ -53,8 +53,11 @@ def main():
     (ICON / "Assets").mkdir(parents=True)
     cards = ["01-card-red", "02-card-orange", "03-card-yellow", "04-card-green", "05-card-blue", "06-card-violet"]
     groups = [   # top of the stack first, as Icon Composer stores them
-        {"name": "Prism", "layers": [layer("10-prism-shade", False), layer("09-prism-light", False)],
-         "shadow": NEUTRAL, "specular": True, "translucency": {"enabled": False, "value": 0.5}},
+        # Glass and a full-strength shadow lift the prism off the cards, so it
+        # reads as the top layer even in Clear and Tinted.
+        {"name": "Prism", "layers": [layer("10-prism-shade", True), layer("09-prism-light", True)],
+         "shadow": {"kind": "neutral", "opacity": 1}, "specular": True,
+         "translucency": {"enabled": False, "value": 0.5}},
         {"name": "Front", "layers": [layer("08-front-sheen", False, 0.5, hide_in_mono=True),
                                      layer("07-front-card", True)],
          "shadow": NEUTRAL, "specular": True, "translucency": {"enabled": True, "value": 0.5}},
