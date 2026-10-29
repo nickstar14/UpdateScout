@@ -151,7 +151,7 @@ private struct Sidebar: View {
             HStack(spacing: 10) {
                 AppLogo(size: 52, trimmed: true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout")
+                    Text(AppIdentity.name)
                         .font(.title2.weight(.semibold))
                     Text("Version \(SelfUpdater.version)").font(.caption).foregroundStyle(.secondary)
                 }

@@ -12,7 +12,7 @@ struct PasswordSheet: View {
     @FocusState private var focused: Bool
 
     private var appName: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout"
+        AppIdentity.name
     }
     private var updates: String { request.count == 1 ? "1 update needs" : "\(request.count) updates need" }
 

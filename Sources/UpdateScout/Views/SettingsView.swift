@@ -22,7 +22,7 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 AppLogo(size: 50, trimmed: true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout")
+                    Text(AppIdentity.name)
                         .font(.title2.weight(.semibold))
                     Text("Version \(SelfUpdater.version)")
                         .font(.caption).foregroundStyle(.secondary)
@@ -91,7 +91,7 @@ struct SettingsView: View {
             }
 
             Section("Background checking") {
-                Toggle("Start UpdateScout at login", isOn: $launchAtLogin)
+                Toggle("Start \(AppIdentity.name) at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
                         catch { agentError = error.localizedDescription }
@@ -193,7 +193,7 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("There is no unified API for third-party driver updates on macOS — vendors like DisplayLink ship their own installers with no auto-update. UpdateScout uses Homebrew's cask database as a version oracle for those, and the custom-sources file for anything without a cask.")
+                Text("There is no unified API for third-party driver updates on macOS — vendors like DisplayLink ship their own installers with no auto-update. \(AppIdentity.name) uses Homebrew's cask database as a version oracle for those, and the custom-sources file for anything without a cask.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

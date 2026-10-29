@@ -1,4 +1,4 @@
-# UpdateScout
+# PrismPack (formerly UpdateScout)
 
 A Swift (SwiftPM) macOS menu bar update manager. It finds updates from
 Homebrew, the Mac App Store (`mas`), Sparkle feeds, macOS updates and custom
@@ -30,8 +30,13 @@ build order and links to every other 2.0 doc.
 
 ## Build, test, release
 
-- **Build:** `scripts/build-app.sh` writes `build/UpdateScout.app`. With
-  `--install`, it also copies the app to `/Applications`.
+- **Build:** `scripts/build-app.sh` writes `build/PrismPack.app` (named from
+  `CFBundleName`; the executable inside is still `UpdateScout`). With
+  `--install`, it also copies the app to `/Applications/PrismPack.app` and
+  removes `/Applications/UpdateScout.app`.
+- **Rename, Part 1 (2.0):** only the display and bundle name changed. The bundle
+  ID `com.nickszun.updatescout`, executable `UpdateScout`, launchd label, data
+  folder `Application Support/UpdateScout/` and preference keys stay until Part 2.
 - **Compile check:** `swift build`.
 - **Running a test build:**
   - Quit the installed copy first. Both copies share the bundle ID and
@@ -40,7 +45,7 @@ build order and links to every other 2.0 doc.
     points the real launchd agent (`com.nickszun.updatescout.check`) at that
     build.
 - **Trigger a background check by hand:**
-  `/Applications/UpdateScout.app/Contents/MacOS/UpdateScout --background-check`
+  `/Applications/PrismPack.app/Contents/MacOS/UpdateScout --background-check`
 - **Release:**
   `scripts/release.sh <version> <notes.html> <notes.md>`
   - It bumps `CFBundleVersion`, builds, zips and EdDSA-signs the app.

@@ -1,4 +1,7 @@
-# UpdateScout
+# PrismPack
+
+*Formerly **UpdateScout**. Version 2.0 renamed the app; settings, history and
+the background check carry over.*
 
 Menu bar app that finds available updates across everything on the Mac and lets
 you install each one with a click. Nothing installs silently — every update is
@@ -19,7 +22,7 @@ user-initiated, per item.
 
 ```bash
 scripts/build-app.sh --install   # builds and copies to /Applications
-open /Applications/UpdateScout.app
+open /Applications/PrismPack.app
 ```
 
 Requires Xcode command line tools. Homebrew is expected; `mas` is optional
@@ -37,6 +40,10 @@ not on every check. "Ignore this version" suppresses an item until a newer
 version appears.
 
 ## Files
+
+These keep the UpdateScout names so nothing moves in the rename: the bundle ID
+`com.nickszun.updatescout`, the executable `UpdateScout`, the launch agent label
+and the data folder.
 
 - State: `~/Library/Application Support/UpdateScout/state.json`
 - Custom sources: `~/Library/Application Support/UpdateScout/custom_sources.json`

@@ -167,7 +167,7 @@ enum Askpass {
         // Re-invoke our own binary in --askpass mode, which shows a
         // native-styled auth dialog (AskpassDialog). Rewritten every time so
         // the path tracks wherever the app currently lives.
-        let exe = Bundle.main.executablePath ?? "/Applications/UpdateScout.app/Contents/MacOS/UpdateScout"
+        let exe = Bundle.main.executablePath ?? "/Applications/PrismPack.app/Contents/MacOS/UpdateScout"
         let script = "#!/bin/sh\nexec \"\(exe)\" --askpass\n"
         if (try? String(contentsOf: url, encoding: .utf8)) != script {
             try? script.write(to: url, atomically: true, encoding: .utf8)

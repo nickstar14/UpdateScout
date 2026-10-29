@@ -271,7 +271,7 @@ struct UpToDateView: View {
             Text("Everything is up to date").font(compact ? .headline : .title2.weight(.semibold))
             if !compact {
                 Text("PrismPack checks again on its own. Check Now looks right away.".replacingOccurrences(
-                    of: "PrismPack", with: Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout"))
+                    of: "PrismPack", with: AppIdentity.name))
                     .font(.callout).foregroundStyle(.secondary)
             }
         }

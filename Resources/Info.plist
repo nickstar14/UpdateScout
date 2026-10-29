@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>UpdateScout</string>
+	<string>PrismPack</string>
 	<key>CFBundleExecutable</key>
 	<string>UpdateScout</string>
 	<key>CFBundleIconFile</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.nickszun.updatescout</string>
 	<key>CFBundleName</key>
-	<string>UpdateScout</string>
+	<string>PrismPack</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

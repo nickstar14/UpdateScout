@@ -164,6 +164,13 @@ extension UpdateItem {
     var isPinned: Bool { installToken.hasPrefix("uvpin:") }
 }
 
+/// The app's display name, from Info.plist. The bundle ID, executable, launchd
+/// label, data folder and preference keys keep the UpdateScout names (rename
+/// plan, Plan A); only what people see follows this.
+enum AppIdentity {
+    static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "PrismPack"
+}
+
 enum UpdateScoutError: LocalizedError {
     case toolMissing(String, hint: String)
     case commandFailed(String, output: String)

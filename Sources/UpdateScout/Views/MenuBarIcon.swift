@@ -103,7 +103,7 @@ final class StatusItemController: NSObject {
     }
 
     private func showMenu() {
-        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "UpdateScout"
+        let name = AppIdentity.name
         let menu = NSMenu()
         menu.addItem(withTitle: "Open \(name)", action: #selector(openWindow), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Check Now", action: #selector(checkNow), keyEquivalent: "").target = self

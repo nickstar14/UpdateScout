@@ -189,7 +189,7 @@ struct MASSource: UpdateSource {
 
             let priv = try await Shell.runPrivileged(
                 "'\(mas)' upgrade \(item.installToken)",
-                reason: "UpdateScout is trying to install an update to \(item.name).",
+                reason: "\(AppIdentity.name) is trying to install an update to \(item.name).",
                 tag: Shell.installTag) { line in
                     let text = line.trimmingCharacters(in: .whitespaces)
                     guard !text.isEmpty else { return }

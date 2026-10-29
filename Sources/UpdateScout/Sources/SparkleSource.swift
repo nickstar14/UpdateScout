@@ -67,11 +67,13 @@ struct SparkleSource: UpdateSource {
         // has an embedded Sparkle updater built for exactly that, so hand off
         // to it (it shows release notes and relaunches us cleanly).
         if appPath == Bundle.main.bundlePath {
-            return UpdateItem(sourceID: id, name: name,
+            // Named from the bundle, not the folder: Sparkle keeps the old
+            // folder name on disk after the rename.
+            return UpdateItem(sourceID: id, name: AppIdentity.name,
                               installedVersion: installed,
                               latestVersion: latestVersion,
                               url: latest.link ?? feed.absoluteString,
-                              caveat: "Opens UpdateScout's own updater.",
+                              caveat: "Opens \(AppIdentity.name)'s own updater.",
                               installToken: Self.selfUpdateToken,
                               scriptedInstall: true,
                               releaseNotes: latest.notes, releaseNotesURL: latest.notesLink,
@@ -100,7 +102,7 @@ struct SparkleSource: UpdateSource {
         guard !appPath.isEmpty else { return }   // "Get…" rows just open item.url
 
         if appPath == Self.selfUpdateToken {
-            progress("Opening UpdateScout's updater…")
+            progress("Opening \(AppIdentity.name)'s updater…")
             await MainActor.run { SelfUpdater.checkForUpdates() }
             return
         }

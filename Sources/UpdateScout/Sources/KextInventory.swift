@@ -85,7 +85,7 @@ enum KextInventory {
         let quoted = "'" + kext.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
         let result = try await Shell.runPrivileged(
             "/bin/rm -rf \(quoted) && /usr/bin/touch '\(directory)'",
-            reason: "UpdateScout is trying to remove the leftover driver \(kext.name).", tag: Shell.installTag)
+            reason: "\(AppIdentity.name) is trying to remove the leftover driver \(kext.name).", tag: Shell.installTag)
         guard result.status == 0 else {
             throw UpdateScoutError.commandFailed("rm -rf \(kext.name).kext", output: result.combined)
         }
