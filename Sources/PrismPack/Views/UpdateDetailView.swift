@@ -27,6 +27,8 @@ struct UpdateDetailView: View {
         }
         .padding(18)
         .frame(width: 480)
+        // Uninstall needs the Installed list to know how the item got here.
+        .onAppear { if controller.installed.isEmpty, !controller.loadingInstalled { controller.loadInstalled() } }
     }
 
     private var header: some View {
@@ -39,6 +41,15 @@ struct UpdateDetailView: View {
                     .labelStyle(.titleOnly)
             }
             Spacer()
+            // At the top, so the footer has room for the other buttons.
+            if !controller.isBusy(item) && !controller.isIgnored(item) {
+                Button {
+                    dismiss(); controller.requestUpdate(item)
+                } label: {
+                    Label(item.actionLabelLong, systemImage: item.actionSymbol)
+                }
+                .glassProminent(style.color)
+            }
         }
     }
 
@@ -151,13 +162,8 @@ struct UpdateDetailView: View {
                 .glass()
             }
             Spacer()
-            if !controller.isBusy(item) && !controller.isIgnored(item) {
-                Button {
-                    dismiss(); controller.requestUpdate(item)
-                } label: {
-                    Label(item.actionLabelLong, systemImage: item.actionSymbol)
-                }
-                .glassProminent(style.color)
+            if !controller.isBusy(item), let pkg = controller.installedPackage(for: item), let removal = Removal(pkg) {
+                UninstallButton(removal: removal, updateID: item.id)
             }
         }
     }
@@ -197,10 +203,16 @@ struct UpdateDetailView: View {
                 return AttributedString(plain)
             }
         }
-        // Inline Markdown (bold, code, links) with line breaks kept; headings
-        // and list markers stay as written, which reads fine in plain text.
+        // Inline Markdown (bold, code, links) with line breaks kept. Headings
+        // ("## What's new") become bold lines and list dashes become bullets,
+        // since inline parsing would print their markers as written.
+        let lines = notes.components(separatedBy: "\n").map { line -> String in
+            if let m = line.firstMatch(of: #/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/#) { return "**\(m.1)**" }
+            if let m = line.firstMatch(of: #/^(\s*)[-*+]\s+(.*)$/#) { return "\(m.1)• \(m.2)" }
+            return line
+        }
         if let md = try? AttributedString(
-            markdown: notes,
+            markdown: lines.joined(separator: "\n"),
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
             return md
         }

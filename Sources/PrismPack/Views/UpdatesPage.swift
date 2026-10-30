@@ -20,7 +20,7 @@ struct UpdatesPage: View {
 
     /// Section order: the 1.8.0 sources, then what 2.0 adds.
     static let order = ["homebrew", "mas", "macos", "caskOracle", "components", "sparkle", "custom",
-                        "tools", "pip", "npm", "editors"]
+                        "tools", "pip", "npm", "cargo", "gem", "editors"]
 
     private var grouped: [(id: String, items: [UpdateItem])] {
         let visible = controller.visibleItems
@@ -44,7 +44,6 @@ struct UpdatesPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if Migration.showsRenameBanner { renameBanner }
             let nothingToDo = controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty
             let hiddenCount = controller.hiddenItems.count + controller.hiddenLeftovers.count
             if nothingToDo && hiddenCount == 0 {
@@ -73,8 +72,11 @@ struct UpdatesPage: View {
                     .animation(Self.roll, value: showHidden)
                 }
             }
-            errorSummary
         }
+        // The banner and the error summary stay put; sections scroll under
+        // them in glass.
+        .pinnedHeader { if Migration.showsRenameBanner { renameBanner } }
+        .pinnedHeader(edge: .bottom) { errorSummary }
         .toolbar { UpdatesToolbar() }
         .navigationSubtitle(subtitle)
     }
@@ -93,7 +95,6 @@ struct UpdatesPage: View {
         // row: per-app rows would offer a button that can't do anything.
         let handoff = group.items.filter { !$0.scriptedInstall && $0.sourceID == "mas" }
         let rows = group.items.filter { !handoff.contains($0) }
-        if group.id == "tools" { HomebrewToolRow(); Divider() }
         ForEach(rows) { item in
             UpdateRow(item: item)
             if item.id != rows.last?.id || !handoff.isEmpty { Divider() }

@@ -67,8 +67,8 @@ struct RenameWelcome: View {
         let name = AppIdentity.name
         return VStack(alignment: .leading, spacing: 10) {
             Text("UpdateScout is now \(name).").font(.headline)
-            Text("Version 2.0 is much more than an updater. Alongside updates, \(name) now helps you find and install new apps and look after the software you already have. The old name no longer covered all of that.")
-            Text("Finding a name that fit, and that nobody else was using, took a while. We chose \(name) because a prism gathers many colours of light into one. \(name) does the same for your software: Homebrew, the App Store, Sparkle apps, Python, npm and more, brought together in one place.")
+            Text("Version 2.0 is much more than an updater. Alongside updates, \(name) now helps you find and install new apps, and look after everything you already have. The old name no longer covered all of that.")
+            Text("Finding a name that fit, and that nobody else was using, took a while. We chose \(name) because a prism takes a single beam of white light and reveals every colour inside it. \(name) does the same for your Mac: one window that shows all your software, from Homebrew, the App Store and Sparkle apps to Python, npm, Rust and more, each in its own colour.")
             Text("Your settings and history carried over.").foregroundStyle(.primary)
         }
         .font(.callout).foregroundStyle(.secondary)
@@ -76,18 +76,21 @@ struct RenameWelcome: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// What's new in 2.0. Draft for Nick to approve before a beta; Discover,
-    /// adoption and duplicates land in Phases 6 and 7, so keep this in step.
+    /// What's new in 2.0, checked against the 1.8.0 code (30 Oct 2026). Draft
+    /// for Nick to approve before a beta. Only what's built: add adoption,
+    /// duplicates, channels and auto-update rules when Phases 7 and 8 land.
     static let changes: [(symbol: String, title: String, detail: String)] = [
         ("macwindow", "A new window", "A sidebar with Updates, Discover, Installed, Activity and Settings, in the macOS 27 Liquid Glass look."),
-        ("square.stack.3d.up.fill", "Sections you can fold", "Each source has its own colour and icon, folds away, and has its own Update all button."),
-        ("arrow.down.circle", "Several updates at once", "Updates run side by side, each with its own progress and Cancel. Choose how many in Settings."),
+        ("triangle", "A new menu bar prism", "Click it to open the window. Right-click for Check Now, Settings and Quit. It replaces the old pop-up menu."),
+        ("magnifyingglass", "Discover", "Find and install new apps and tools from Homebrew, npm, PyPI, crates.io, RubyGems and the editor extension stores. Browse what's popular this month, what's new, and apps by category."),
+        ("square.stack.3d.up.fill", "More kinds of updates", "New sections for Python (pipx and uv), npm, Rust, Ruby gems, and extensions for VS Code, VSCodium and Cursor, plus a Tools section for the package managers themselves."),
+        ("arrow.down.circle", "Several updates at once", "Updates run side by side, each with its own progress and Cancel, while each package manager still does one thing at a time. Choose how many in Settings."),
         ("key.fill", "One password per batch", "Enter it once for a whole batch. It's kept in memory for that batch only and never saved."),
-        ("terminal.fill", "Python and npm", "pipx, uv tools and global npm packages, plus a Tools section for the package managers themselves."),
-        ("magnifyingglass", "Discover", "Search for new apps and tools across Homebrew, npm and more, and install them in one click."),
-        ("checkmark.circle", "Installed and Activity", "See everything installed in one list, and a history of what was updated, skipped or failed."),
-        ("info.circle", "App details", "Click an app for its versions and release notes, and to hide one version, all updates, or only major upgrades."),
-        ("triangle", "A new menu bar prism", "Click it to open the window. Right-click for Check Now, Settings and Quit."),
+        ("checkmark.circle", "Installed", "Everything on your Mac in one list, showing where each item came from and whether it's up to date."),
+        ("trash", "Uninstall", "Remove an app or package from its card, the right way for wherever it came from. Other apps go to the Trash, so you can put them back."),
+        ("clock.arrow.circlepath", "Activity", "A history of checks, updates, installs and removals. Failures keep their log, and you can retry them."),
+        ("eye.slash", "More ways to hide updates", "Hide one version as before, or now every update from an app, or only its major upgrades. Unhide them any time."),
+        ("flask", "Betas for testers", "A beta of \(AppIdentity.name) is offered the next beta. Everyone else only gets full releases."),
     ]
 
     private var changelog: some View {
@@ -125,6 +128,9 @@ struct RenameWelcome: View {
                                          startPoint: .leading, endPoint: .trailing))
                     .frame(width: Self.beamLength, height: 6)
                     .shadow(color: glow, radius: 8)
+                    // White on the light sheet barely shows: a soft dark edge
+                    // gives it a shape. Dark mode doesn't need it.
+                    .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.28), radius: 2.5, y: 1)
                     .scaleEffect(x: beam ? 1 : 0, anchor: .leading)
                 Color.clear.frame(width: Self.beamLength, height: 6)
             }

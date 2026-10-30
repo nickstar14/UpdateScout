@@ -45,7 +45,8 @@ enum Shell {
         // (sudo only consults SUDO_ASKPASS when -A is passed; brew adds it
         // itself, but mas does not).
         var env = ProcessInfo.processInfo.environment
-        let extra = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        let extra = (["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"] + userToolDirs)
+            .joined(separator: ":")
         env["PATH"] = Askpass.shimDir + ":" + (env["PATH"].map { $0 + ":" } ?? "") + extra
         // Keep brew quiet and non-interactive.
         env["HOMEBREW_NO_AUTO_UPDATE"] = env["HOMEBREW_NO_AUTO_UPDATE"] ?? "1"
@@ -57,6 +58,10 @@ enum Shell {
         env.merge(environment) { _, new in new }
         process.environment = env
 
+        // Nothing to answer with: a tool that stops to ask a question (gem
+        // uninstall, a confirm prompt) reads end-of-input and fails, rather
+        // than waiting forever on the app's own input.
+        process.standardInput = FileHandle.nullDevice
         let outPipe = Pipe(), errPipe = Pipe()
         process.standardOutput = outPipe
         process.standardError = errPipe
@@ -96,8 +101,15 @@ enum Shell {
     }
 
     /// Locate a tool in the usual places; nil if not installed.
+    /// Per-user tool folders, searched after the system ones: rustup puts
+    /// cargo in ~/.cargo/bin, and uv's own installer puts uv in ~/.local/bin.
+    static var userToolDirs: [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["\(home)/.cargo/bin", "\(home)/.local/bin"]
+    }
+
     static func which(_ tool: String) -> String? {
-        for dir in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"] {
+        for dir in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"] + userToolDirs {
             let p = dir + "/" + tool
             if FileManager.default.isExecutableFile(atPath: p) { return p }
         }
@@ -204,8 +216,24 @@ enum Net {
     }()
 
     static func fetch(_ url: URL) async throws -> (Data, URLResponse) {
-        var request = URLRequest(url: url)
+        try await fetch(URLRequest(url: url))
+    }
+
+    /// Every request names the app: crates.io refuses ones without a User-Agent.
+    static func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        var request = request
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("\(AppIdentity.name) (github.com/nickstar14/UpdateScout)", forHTTPHeaderField: "User-Agent")
         return try await session.data(for: request)
+    }
+
+    /// GET a URL and decode its JSON; throws on a non-200 answer.
+    static func json(_ url: URL) async throws -> Any {
+        let (data, response) = try await fetch(url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw PrismPackError.commandFailed(url.host ?? url.absoluteString,
+                                                 output: "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+        return try JSONSerialization.jsonObject(with: data)
     }
 }

@@ -31,19 +31,26 @@ struct Store {
 
         init() {}
 
-        // Hand-rolled so state files written before a field existed still load.
+        // Hand-rolled so state files written before a field existed still
+        // load, and field by field, so one value this build doesn't
+        // understand (an Activity kind from a newer build, say) loses only
+        // that value. A whole-file failure would start from an empty state,
+        // and the next save would wipe the hidden lists and history.
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            lastCheck = try c.decodeIfPresent(Date.self, forKey: .lastCheck)
-            items = try c.decodeIfPresent([UpdateItem].self, forKey: .items) ?? []
-            dismissed = try c.decodeIfPresent(Set<String>.self, forKey: .dismissed) ?? []
-            notified = try c.decodeIfPresent(Set<String>.self, forKey: .notified) ?? []
-            sourceErrors = try c.decodeIfPresent([String: String].self, forKey: .sourceErrors) ?? [:]
-            leftoverKexts = try c.decodeIfPresent([KextBundle].self, forKey: .leftoverKexts) ?? []
-            checkStartedAt = try c.decodeIfPresent(Date.self, forKey: .checkStartedAt)
-            ignoredApps = try c.decodeIfPresent(Set<String>.self, forKey: .ignoredApps) ?? []
-            ignoredMajors = try c.decodeIfPresent(Set<String>.self, forKey: .ignoredMajors) ?? []
-            activity = try c.decodeIfPresent([ActivityEntry].self, forKey: .activity) ?? []
+            func field<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+                ((try? c.decodeIfPresent(T.self, forKey: key)) ?? nil) ?? fallback
+            }
+            lastCheck = field(.lastCheck, nil as Date?)
+            items = field(.items, [])
+            dismissed = field(.dismissed, [])
+            notified = field(.notified, [])
+            sourceErrors = field(.sourceErrors, [:])
+            leftoverKexts = field(.leftoverKexts, [])
+            checkStartedAt = field(.checkStartedAt, nil as Date?)
+            ignoredApps = field(.ignoredApps, [])
+            ignoredMajors = field(.ignoredMajors, [])
+            activity = field(.activity, [Lossy<ActivityEntry>]()).compactMap(\.value)
         }
 
         mutating func log(_ entry: ActivityEntry) {
@@ -62,10 +69,18 @@ struct Store {
     private static var stateURL: URL { supportDirectory.appendingPathComponent("state.json") }
 
     static func load() -> State {
-        guard let data = FileManager.default.contents(atPath: stateURL.path),
-              let state = try? decoder.decode(State.self, from: data) else { return State() }
+        guard let data = FileManager.default.contents(atPath: stateURL.path) else { return State() }
+        guard let state = try? decode(data) else {
+            // Unreadable as a whole: keep a copy before the next save
+            // replaces it, so nothing is lost for good.
+            let backup = supportDirectory.appendingPathComponent("state.unreadable.json")
+            if !FileManager.default.fileExists(atPath: backup.path) { try? data.write(to: backup) }
+            return State()
+        }
         return state
     }
+
+    static func decode(_ data: Data) throws -> State { try decoder.decode(State.self, from: data) }
 
     private static func save(_ state: State) {
         guard let data = try? encoder.encode(state) else { return }
@@ -271,9 +286,16 @@ enum GlassStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// Decodes one element of a list, or nil when it can't, so one bad entry
+/// doesn't sink the whole list.
+struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+}
+
 /// One line in the Activity tab.
 struct ActivityEntry: Codable, Equatable, Identifiable {
-    enum Kind: String, Codable { case updated, failed, skipped, cancelled, checked }
+    enum Kind: String, Codable { case updated, installed, removed, failed, skipped, cancelled, checked }
     var id = UUID()
     var date = Date()
     let kind: Kind

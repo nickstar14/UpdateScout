@@ -11,11 +11,13 @@ enum Tools {
         if name == "node" || name.hasPrefix("node@") { return "npm" }
         if ["pipx", "uv", "python"].contains(name) || name.hasPrefix("python@") { return "pip" }
         if name == "mas" { return "mas" }
+        if name == "rust" { return "cargo" }
+        if name == "ruby" { return "gem" }
         return nil
     }
 
     static func isTool(formula name: String) -> Bool {
-        packageLane(ofFormula: name) != nil || name == "rust"
+        packageLane(ofFormula: name) != nil
     }
 
     /// The formula name when this item is a tool, else nil.

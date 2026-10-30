@@ -20,7 +20,7 @@ struct ButtonLabPage: View {
     ]
 
     private let sections = ["homebrew", "mas", "macos", "caskOracle", "components", "sparkle", "custom",
-                            "tools", "pip", "npm", "editors", "leftover", "hidden"]
+                            "tools", "pip", "npm", "cargo", "gem", "editors", "leftover", "hidden"]
 
     var body: some View {
         ScrollView {

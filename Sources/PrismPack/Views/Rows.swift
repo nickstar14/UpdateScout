@@ -29,7 +29,7 @@ struct RowIcon: View {
     var size: CGFloat = 32
 
     /// Sections whose items are packages, not apps.
-    static let packageSections: Set<String> = ["pip", "npm", "tools", "editors", "custom"]
+    static let packageSections: Set<String> = ["pip", "npm", "cargo", "gem", "tools", "editors", "custom"]
 
     var body: some View {
         if let path = appPath, let image = IconCache.shared.icon(forApp: path) {
@@ -221,26 +221,6 @@ struct AppStoreHandoffRow: View {
                 NSWorkspace.shared.open(URL(string: "macappstore://showUpdatesPage")!)
             }
             .glassProminent(.blue).controlSize(.small)
-        }
-        .padding(.vertical, 6)
-    }
-}
-
-/// Homebrew itself, at the top of Tools: it refreshes on every check.
-struct HomebrewToolRow: View {
-    @EnvironmentObject var controller: UpdateController
-
-    var body: some View {
-        HStack(spacing: 10) {
-            GlassIconTile(style: SourceStyle.forSource("homebrew"), size: 29).frame(width: 32, height: 32)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Homebrew").font(.body.weight(.semibold))
-                Text(controller.state.lastCheck.map { "Refreshed \($0.formatted(.relative(presentation: .named))) · updates itself on every check" }
-                     ?? "Updates itself on every check")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            StatusPill(text: "Up to date", color: .green)
         }
         .padding(.vertical, 6)
     }

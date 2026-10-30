@@ -33,4 +33,41 @@ struct SourceParsingTests {
                                 url: nil, caveat: nil, installToken: "uvpin:ruff", scriptedInstall: true)
         #expect(pinned.isPinned)
     }
+
+    @Test func cargoInstallList() {
+        let text = """
+        cargo-edit v0.13.0:
+            cargo-add
+            cargo-rm
+        ripgrep v14.1.0:
+            rg
+        mytool v0.1.0 (/Users/me/src/mytool):
+            mytool
+        """
+        let crates = CargoSource.parseList(text)
+        #expect(crates.map(\.name) == ["cargo-edit", "ripgrep"])
+        #expect(crates.last?.version == "14.1.0")
+    }
+
+    @Test func gemOutdatedSkipsBundledGems() {
+        let outdated = GemSource.parseOutdated("rake (13.0.6 < 13.2.1)\njson (2.7.2 < 2.9.1)\n")
+        #expect(outdated.map(\.name) == ["rake", "json"])
+        #expect(outdated.first?.latest == "13.2.1")
+        let bundled = GemSource.defaultOnly("json (default: 2.7.2)\nrake (13.0.6)\nbigdecimal (3.1.8, default: 3.1.6)\n")
+        #expect(bundled == ["json"])
+    }
+
+    @Test func editorExtensionList() {
+        let exts = EditorExtensionsSource.parseList("esbenp.prettier-vscode@12.4.0\nms-python.python@2026.4.0\nnoise\n")
+        #expect(exts.map(\.id) == ["esbenp.prettier-vscode", "ms-python.python"])
+        #expect(exts.first?.version == "12.4.0")
+    }
+
+    @Test func extensionEngineRange() {
+        #expect(EditorExtensionsSource.engineAllows("^1.90.0", editor: "1.144.0"))
+        #expect(!EditorExtensionsSource.engineAllows("^1.150.0", editor: "1.144.0"))
+        #expect(EditorExtensionsSource.engineAllows(">=1.80", editor: "1.80.0"))
+        #expect(EditorExtensionsSource.engineAllows("*", editor: "1.0"))
+        #expect(EditorExtensionsSource.engineAllows("^1.90.0", editor: nil))
+    }
 }

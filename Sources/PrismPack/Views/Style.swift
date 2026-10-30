@@ -21,6 +21,8 @@ struct SourceStyle {
         case "npm":        SourceStyle(symbol: "square.stack.3d.up.fill", color: Theme.npmRed)
         case "tools":      SourceStyle(symbol: "wrench.and.screwdriver.fill", color: .mint)
         case "editors":    SourceStyle(symbol: "puzzlepiece.extension.fill", color: .indigo)
+        case "cargo":      SourceStyle(symbol: "gearshape.2.fill",     color: Theme.rustCopper)
+        case "gem":        SourceStyle(symbol: "diamond.fill",         color: Theme.rubyCrimson)
         case "leftover":   SourceStyle(symbol: "trash.slash.fill",     color: Theme.leftoverPink)
         case "hidden":     SourceStyle(symbol: "eye",                  color: Theme.navy)
         default:           SourceStyle(symbol: "arrow.down.circle.fill", color: .accentColor)
@@ -157,6 +159,21 @@ enum Theme {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(displayP3Red: 1.00, green: 0.50, blue: 0.75, alpha: 1)
             : NSColor(displayP3Red: 0.96, green: 0.40, blue: 0.68, alpha: 1)
+    })
+
+    /// Rust (cargo): copper, between Homebrew's brown and pip's orange.
+    static let rustCopper = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 0.89, green: 0.52, blue: 0.33, alpha: 1)
+            : NSColor(displayP3Red: 0.66, green: 0.30, blue: 0.14, alpha: 1)
+    })
+
+    /// Ruby (gems): a crimson that leans to magenta, apart from npm's red
+    /// and Leftover drivers' pink.
+    static let rubyCrimson = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 0.93, green: 0.30, blue: 0.52, alpha: 1)
+            : NSColor(displayP3Red: 0.68, green: 0.06, blue: 0.36, alpha: 1)
     })
 
     /// The Hidden section's colour, so no two sections share one.
@@ -451,6 +468,58 @@ private struct SelectionBubble: View {
                 .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
         } else {
             Capsule().fill(.background).shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+        }
+    }
+}
+
+// MARK: - Search field
+
+/// A search box on a Liquid Glass capsule: magnifying glass, plain text
+/// field, and a clear button once something is typed. Material on macOS 15.
+struct GlassSearchField: View {
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField(prompt, text: $text).textFieldStyle(.plain)
+            if !text.isEmpty {
+                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help("Clear")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background {
+            if #available(macOS 26.0, *) {
+                Capsule().fill(.clear).glassEffect(.regular.interactive(), in: Capsule())
+            } else {
+                Capsule().fill(.regularMaterial)
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
+            }
+        }
+    }
+}
+
+// MARK: - Pinned page header
+
+extension View {
+    /// Pins `header` at one edge of a page's scroll view the way macOS 26's
+    /// own windows do (System Settings' toolbar): the content scrolls under
+    /// it, and the system draws the Liquid Glass scroll edge effect there.
+    /// Apple's recommended route is `safeAreaBar`, which extends the scroll
+    /// view's edge effect; the style is set explicitly because `automatic`
+    /// has resolved to `hard` on some SDKs. macOS 15 gets a material bar.
+    @ViewBuilder
+    func pinnedHeader<Header: View>(edge: VerticalEdge = .top, @ViewBuilder _ header: () -> Header) -> some View {
+        let bar = header()
+        if #available(macOS 26.0, *) {
+            self.safeAreaBar(edge: edge, spacing: 0) { bar }
+                .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
+        } else {
+            self.safeAreaInset(edge: edge, spacing: 0) { bar.background(.bar) }
         }
     }
 }

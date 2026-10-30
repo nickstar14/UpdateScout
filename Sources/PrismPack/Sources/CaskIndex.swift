@@ -13,28 +13,50 @@ enum CaskIndex {
     }
 
     static func load() async throws -> [CaskInfo] {
-        let cacheURL = Store.supportDirectory.appendingPathComponent("cask-index.json")
+        try await parse(rawData())
+    }
+
+    static let cacheURL = Store.supportDirectory.appendingPathComponent("cask-index.json")
+
+    /// The cask JSON, from the cache when it's under a day old, else freshly
+    /// downloaded (or the stale cache when offline). Discover reads the same file.
+    static func rawData() async throws -> Data {
         let fm = FileManager.default
         let maxAge: TimeInterval = 24 * 3600
 
-        var data: Data? = nil
         if let attrs = try? fm.attributesOfItem(atPath: cacheURL.path),
            let modified = attrs[.modificationDate] as? Date,
-           Date().timeIntervalSince(modified) < maxAge {
-            data = fm.contents(atPath: cacheURL.path)
+           Date().timeIntervalSince(modified) < maxAge,
+           let cached = fm.contents(atPath: cacheURL.path) {
+            return cached
         }
-        if data == nil {
-            let url = URL(string: "https://formulae.brew.sh/api/cask.json")!
-            let (downloaded, response) = try await Net.fetch(url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                // Fall back to a stale cache if we're offline.
-                if let stale = fm.contents(atPath: cacheURL.path) { return try parse(stale) }
-                throw PrismPackError.parseFailure("cask index download")
+        // The update check and Discover often ask at the same moment: they
+        // share one download instead of fetching 19 MB twice.
+        if let downloaded = await Download.shared.data() { return downloaded }
+        // Fall back to a stale cache if we're offline.
+        if let stale = fm.contents(atPath: cacheURL.path) { return stale }
+        throw PrismPackError.parseFailure("cask index download")
+    }
+
+    /// One download at a time, shared by everyone waiting on it.
+    private actor Download {
+        static let shared = Download()
+        private var running: Task<Data?, Never>?
+
+        func data() async -> Data? {
+            if let running { return await running.value }
+            let task = Task<Data?, Never> {
+                let url = URL(string: "https://formulae.brew.sh/api/cask.json")!
+                guard let (data, response) = try? await Net.fetch(url),
+                      (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+                try? data.write(to: CaskIndex.cacheURL, options: .atomic)
+                return data
             }
-            try? downloaded.write(to: cacheURL, options: .atomic)
-            data = downloaded
+            running = task
+            let result = await task.value
+            running = nil
+            return result
         }
-        return try parse(data!)
     }
 
     private static func parse(_ data: Data) throws -> [CaskInfo] {

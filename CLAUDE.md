@@ -71,6 +71,10 @@ build order and links to every other 2.0 doc.
   `VersionParts` in `Models.swift` and `AppcastParser` in
   `Sources/SparkleSource.swift`). Some feeds leave betas untagged, so the
   version markers count too.
+- **Probes and tests touch the real data folder.** `Store.supportDirectory`
+  comes from FileManager, which ignores a `HOME` override, so a test or probe
+  that loads Discover or the stores reads and writes
+  `~/Library/Application Support/UpdateScout/`. Ask Nick before running one.
 - **Item IDs include the install token.** Changing the ID format resets
   users' ignored and notified lists.
 - **Liquid Glass:** `build-app.sh` patches the linked-SDK version so AppKit

@@ -12,7 +12,7 @@ struct HomebrewSource: UpdateSource {
     /// The cask token of a Homebrew-managed item, if it is a cask.
     static func caskToken(of item: UpdateItem) -> String? {
         switch item.sourceID {
-        case "homebrew":
+        case "homebrew", "discover":
             return item.installToken.hasPrefix("cask:") ? String(item.installToken.dropFirst(5)) : nil
         case "caskOracle", "components":
             return item.installToken

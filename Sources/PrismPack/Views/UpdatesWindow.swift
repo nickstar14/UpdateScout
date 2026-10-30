@@ -103,7 +103,7 @@ struct MainView: View {
                 Group {
                     switch controller.page {
                     case .updates: UpdatesPage()
-                    case .discover: DiscoverPlaceholder()
+                    case .discover: DiscoverPage()
                     case .installed: InstalledPage()
                     case .activity: ActivityPage()
                     case .settings: SettingsView()
@@ -178,14 +178,6 @@ private struct Sidebar: View {
         case .updates: controller.visibleItems.count
         default: 0
         }
-    }
-}
-
-/// Discover arrives in phase 6; until then its page says so.
-private struct DiscoverPlaceholder: View {
-    var body: some View {
-        ContentUnavailableView("Discover is coming", systemImage: "magnifyingglass",
-                               description: Text("Search and install apps and tools from Homebrew, npm, crates.io and more. Built in a later phase."))
     }
 }
 

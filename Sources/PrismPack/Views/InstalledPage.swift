@@ -36,18 +36,7 @@ struct InstalledPage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Filter installed apps and packages", text: $filter)
-                .textFieldStyle(.roundedBorder)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(chips, id: \.id) { c in
-                        Button(c.title) { chip = c.id }
-                            .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.small)
-                            .tint(chip == c.id ? .accentColor : nil)
-                    }
-                }
-            }
+        Group {
             if controller.installed.isEmpty && controller.loadingInstalled {
                 ProgressView("Reading what's installed…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -58,7 +47,18 @@ struct InstalledPage: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .padding(16)
+        // The filter and chips stay put; the list scrolls under them in glass.
+        .pinnedHeader {
+            VStack(alignment: .leading, spacing: 10) {
+                GlassSearchField(prompt: "Filter installed apps and packages", text: $filter)
+                ChipFlow(spacing: 6) {
+                    ForEach(chips, id: \.id) { c in
+                        ChipButton(title: c.title, selected: chip == c.id, size: .small) { chip = c.id }
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
+        }
         .navigationSubtitle("\(controller.installed.count) items")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -99,7 +99,7 @@ private struct InstalledRow: View {
                 if let item {
                     UpdateDetailView(item: item).environmentObject(controller)
                 } else {
-                    InstalledDetail(pkg: pkg, sectionTitle: sectionTitle)
+                    InstalledDetail(pkg: pkg, sectionTitle: sectionTitle).environmentObject(controller)
                 }
             }
             if pkg.sourceID != "unmanaged" { StatusPill(text: sectionTitle, color: .secondary) }
@@ -141,11 +141,15 @@ private struct InstalledDetail: View {
                 Text("Nothing here updates this app. It may update itself.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            if let path = pkg.appPath {
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-                } label: { Label("Show in Finder", systemImage: "folder") }
-                .glass()
+            HStack {
+                if let path = pkg.appPath {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                    } label: { Label("Show in Finder", systemImage: "folder") }
+                    .glass()
+                }
+                Spacer()
+                if let removal = Removal(pkg) { UninstallButton(removal: removal) }
             }
         }
         .padding(18)
@@ -222,6 +226,8 @@ struct ActivityPage: View {
     private func pill(_ kind: ActivityEntry.Kind) -> StatusPill {
         switch kind {
         case .updated: StatusPill(text: "Updated", color: .green)
+        case .installed: StatusPill(text: "Installed", color: .green)
+        case .removed: StatusPill(text: "Removed", color: .secondary)
         case .failed: StatusPill(text: "Failed", color: .red)
         case .skipped: StatusPill(text: "Skipped", color: .orange)
         case .cancelled: StatusPill(text: "Cancelled", color: .secondary)

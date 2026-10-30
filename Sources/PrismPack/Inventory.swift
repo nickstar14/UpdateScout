@@ -20,7 +20,10 @@ enum Inventory {
         async let mas = appStore()
         async let python = pythonTools()
         async let npm = npmGlobal()
-        let managed = await brew + mas + python + npm
+        async let cargo = rustCrates()
+        async let gems = rubyGems()
+        async let extensions = editorExtensions()
+        let managed = await brew + mas + python + npm + cargo + gems + extensions
         let apps = applications(excluding: managed)
         return (managed + apps).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
@@ -95,6 +98,37 @@ enum Inventory {
             return InstalledPackage(name: name, version: version, sourceID: "npm",
                                     detail: NPMSource.skipped.contains(name) ? "updated with node" : nil)
         }
+    }
+
+    private static func rustCrates() async -> [InstalledPackage] {
+        guard let cargo = Shell.which("cargo"), let result = try? await Shell.run(cargo, ["install", "--list"]) else { return [] }
+        return CargoSource.parseList(result.stdout).map {
+            InstalledPackage(name: $0.name, version: $0.version, sourceID: "cargo")
+        }
+    }
+
+    /// Homebrew Ruby's gems, without the ones bundled with Ruby itself.
+    private static func rubyGems() async -> [InstalledPackage] {
+        guard let gem = GemSource.gem, let result = try? await Shell.run(gem, ["list", "--local"]) else { return [] }
+        let bundled = GemSource.defaultOnly(result.stdout)
+        let pattern = #/^(\S+) \((?:default: )?([^,)\s]+)/#
+        return result.stdout.split(separator: "\n").compactMap { line in
+            guard let m = line.firstMatch(of: pattern), !bundled.contains(String(m.1)) else { return nil }
+            return InstalledPackage(name: String(m.1), version: String(m.2), sourceID: "gem")
+        }
+    }
+
+    private static func editorExtensions() async -> [InstalledPackage] {
+        var found: [InstalledPackage] = []
+        for editor in EditorExtensionsSource.editors() {
+            for ext in (try? await EditorExtensionsSource.installed(in: editor)) ?? [] {
+                // Named as the update rows name them, so the two match up.
+                let name = editor.key == "code" ? ext.id : "\(ext.id) (\(editor.name))"
+                found.append(InstalledPackage(name: name, version: ext.version, sourceID: "editors",
+                                              detail: editor.name))
+            }
+        }
+        return found
     }
 
     /// Apps in /Applications and ~/Applications. An app with a Sparkle feed

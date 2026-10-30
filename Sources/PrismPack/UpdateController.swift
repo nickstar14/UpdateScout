@@ -8,7 +8,7 @@ final class UpdateController: ObservableObject {
     nonisolated static let allSources: [any UpdateSource] = [
         HomebrewSource(), MASSource(), SystemUpdateSource(),
         CaskOracleSource(), ComponentsSource(), SparkleSource(), CustomSource(),
-        PythonSource(), NPMSource()
+        PythonSource(), NPMSource(), CargoSource(), GemSource(), EditorExtensionsSource()
     ]
 
     @Published var state = Store.load()
@@ -194,7 +194,13 @@ final class UpdateController: ObservableObject {
     }
 
     nonisolated static func sourceName(_ id: String) -> String {
-        allSources.first { $0.id == id }?.displayName ?? id
+        source(for: id)?.displayName ?? id
+    }
+
+    /// The source that installs an item: one of the update sources, or
+    /// Discover's installer (not listed in Settings, never detects).
+    nonisolated static func source(for id: String) -> (any UpdateSource)? {
+        allSources.first { $0.id == id } ?? (id == "discover" ? DiscoverInstaller() : id == "remove" ? Remover() : nil)
     }
 
     /// Fold one check's results into the stored state. Shared with the
@@ -295,6 +301,37 @@ final class UpdateController: ObservableObject {
         }
     }
 
+    /// Queue a removal. `updateID` is the update row it came from, if any,
+    /// which goes once the removal succeeds.
+    func uninstall(_ removal: Removal, updateID: String? = nil) {
+        let job = removal.item
+        removalUpdates[job.id] = updateID
+        update(job)
+    }
+
+    /// Update rows a running removal clears when it succeeds.
+    private var removalUpdates: [String: String] = [:]
+
+    private func finishRemoval(_ job: UpdateItem, seconds: Int) {
+        let updateID = removalUpdates.removeValue(forKey: job.id)
+        let removal = Removal(token: job.installToken, name: job.name)
+        state = Store.mutate {
+            if let updateID { $0.items.removeAll { $0.id == updateID } }
+            if removal.kind == "app" { $0.items.removeAll { $0.appPath == removal.target } }
+            $0.log(ActivityEntry(kind: .removed, title: job.name, detail: DiscoverInstaller.sourceTitle(of: job.installToken),
+                                 itemID: job.id, sourceID: job.sourceID, seconds: seconds))
+        }
+        // Finished Discover installs would still say Installed.
+        for (id, state) in installStates where id.hasPrefix("discover|") && state == .done { installStates[id] = nil }
+        loadInstalled()
+    }
+
+    /// The Installed entry an update row is about, for its Uninstall button.
+    func installedPackage(for item: UpdateItem) -> InstalledPackage? {
+        if let path = item.appPath, let pkg = installed.first(where: { $0.appPath == path }) { return pkg }
+        return installed.first { $0.sourceID == item.sectionID && $0.name.caseInsensitiveCompare(item.name) == .orderedSame }
+    }
+
     func update(_ item: UpdateItem) {
         if !item.scriptedInstall {
             if let url = item.url.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
@@ -320,6 +357,15 @@ final class UpdateController: ObservableObject {
     /// Every lane an install holds: its own, plus, for a package manager
     /// (Tools), the lane of the packages it manages.
     nonisolated static func lanes(for item: UpdateItem) -> Set<String> {
+        if item.sourceID == "discover" || item.sourceID == "remove" {
+            // Installing or removing a tool blocks its packages' lane too.
+            var lanes: Set<String> = [DiscoverInstaller.lane(of: item.installToken)]
+            if item.installToken.hasPrefix("formula:"),
+               let extra = Tools.packageLane(ofFormula: String(item.installToken.dropFirst("formula:".count))) {
+                lanes.insert(extra)
+            }
+            return lanes
+        }
         var lanes: Set<String> = [lane(for: item.sourceID)]
         if let tool = Tools.formula(of: item), let extra = Tools.packageLane(ofFormula: tool) {
             lanes.insert(extra)
@@ -341,7 +387,7 @@ final class UpdateController: ObservableObject {
         var index = 0
         while index < pendingInstalls.count, runningLanes.count < Prefs.updateConcurrency {
             let item = pendingInstalls[index]
-            guard let source = Self.allSources.first(where: { $0.id == item.sourceID }) else {
+            guard let source = Self.source(for: item.sourceID) else {
                 pendingInstalls.remove(at: index)
                 installStates[item.id] = nil
                 continue
@@ -391,7 +437,7 @@ final class UpdateController: ObservableObject {
             await HomebrewSource.lookUpInstallerCasks(casks)
             for item in items {
                 classified.insert(item.id)
-                if Self.allSources.first(where: { $0.id == item.sourceID })?.needsAdmin(item) == true {
+                if Self.source(for: item.sourceID)?.needsAdmin(item) == true {
                     adminItems.insert(item.id)
                 }
             }
@@ -435,7 +481,7 @@ final class UpdateController: ObservableObject {
         }
         state = Store.mutate { s in
             for item in skipped {
-                s.log(ActivityEntry(kind: .skipped, title: "\(item.name) \(item.latestVersion)",
+                s.log(ActivityEntry(kind: .skipped, title: item.logTitle,
                                     detail: "\(Self.sourceName(item.sourceID)) · needed admin, password skipped",
                                     itemID: item.id, sourceID: item.sourceID))
             }
@@ -512,19 +558,32 @@ final class UpdateController: ObservableObject {
                 try await install.value
                 installStates[item.id] = .done
                 let seconds = Int(Date().timeIntervalSince(started).rounded())
-                state = Store.mutate {
-                    $0.items.removeAll { $0.id == item.id }
-                    $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
-                                         detail: Self.sourceName(item.sourceID), itemID: item.id,
-                                         sourceID: item.sourceID, seconds: seconds))
+                if item.sourceID == "remove" {
+                    finishRemoval(item, seconds: seconds)
+                } else if item.sourceID == "discover" {
+                    // A finished removal of the same thing would still say Removed.
+                    for (id, done) in installStates where id.hasPrefix("remove|") && done == .done { installStates[id] = nil }
+                    state = Store.mutate {
+                        $0.log(ActivityEntry(kind: .installed, title: item.logTitle,
+                                             detail: DiscoverInstaller.sourceTitle(of: item.installToken),
+                                             itemID: item.id, sourceID: item.sourceID, seconds: seconds))
+                    }
+                    loadInstalled()
+                } else {
+                    state = Store.mutate {
+                        $0.items.removeAll { $0.id == item.id }
+                        $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
+                                             detail: Self.sourceName(item.sourceID), itemID: item.id,
+                                             sourceID: item.sourceID, seconds: seconds))
+                    }
                 }
             } catch {
                 // A user-cancelled install isn't an error worth showing.
                 installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
                 log(install.isCancelled
-                    ? ActivityEntry(kind: .cancelled, title: "\(item.name) \(item.latestVersion)",
+                    ? ActivityEntry(kind: .cancelled, title: item.logTitle,
                                     detail: Self.sourceName(item.sourceID), itemID: item.id, sourceID: item.sourceID)
-                    : ActivityEntry(kind: .failed, title: "\(item.name) \(item.latestVersion)",
+                    : ActivityEntry(kind: .failed, title: item.logTitle,
                                     detail: "\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
                                     itemID: item.id, sourceID: item.sourceID,
                                     log: (outputTails[item.id] ?? []).joined(separator: "\n")))
@@ -712,4 +771,10 @@ extension Swift.Result where Failure == Error {
         do { self = .success(try await body()) }
         catch { self = .failure(error) }
     }
+}
+
+extension UpdateItem {
+    /// "Name 1.2.3" for the Activity log; just the name when there's no
+    /// version (removals).
+    var logTitle: String { latestVersion.isEmpty ? name : "\(name) \(latestVersion)" }
 }
