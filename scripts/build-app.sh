@@ -36,8 +36,10 @@ vtool -set-build-version macos 15.0 "$SDK_VERSION" -replace \
 # layered Assets.car icon natively with Liquid Glass; a bare .icns is treated
 # as a legacy icon and drawn inside a grey squircle frame. actool also emits a
 # flattened AppIcon.icns as the fallback for older macOS.
-xcrun actool Resources/AppIcon.icon \
-    --compile "$APP/Contents/Resources" \
+# Full paths: actool runs through a helper that can keep an earlier build's
+# working directory, so relative paths may land in another checkout.
+xcrun actool "$PWD/Resources/AppIcon.icon" \
+    --compile "$PWD/$APP/Contents/Resources" \
     --platform macosx --minimum-deployment-target 15.0 \
     --app-icon AppIcon \
     --output-partial-info-plist "$(mktemp)" \

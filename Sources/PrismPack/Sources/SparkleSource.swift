@@ -23,20 +23,28 @@ struct SparkleSource: UpdateSource {
         let fm = FileManager.default
         var candidates: [(name: String, path: String, version: String, build: String?, feed: URL)] = []
 
+        var apps: [URL] = []
         for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
             guard let entries = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir),
                                                            includingPropertiesForKeys: nil) else { continue }
-            for appURL in entries where appURL.pathExtension == "app" {
-                let plistURL = appURL.appendingPathComponent("Contents/Info.plist")
-                guard let data = fm.contents(atPath: plistURL.path),
-                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                      let feedString = plist["SUFeedURL"] as? String,
-                      let feed = URL(string: feedString), feed.scheme?.hasPrefix("http") == true,
-                      let installed = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
-                else { continue }
-                let name = (appURL.lastPathComponent as NSString).deletingPathExtension
-                candidates.append((name, appURL.path, installed, plist["CFBundleVersion"] as? String, feed))
-            }
+            apps += entries.filter { $0.pathExtension == "app" }
+        }
+        // PrismPack always lists itself, wherever it runs from (Nick, Phase 5);
+        // its Update opens the built-in Sparkle updater.
+        let me = Bundle.main.bundleURL
+        if me.pathExtension == "app", !apps.contains(where: { $0.standardizedFileURL.path == me.standardizedFileURL.path }) {
+            apps.append(me)
+        }
+        for appURL in apps {
+            let plistURL = appURL.appendingPathComponent("Contents/Info.plist")
+            guard let data = fm.contents(atPath: plistURL.path),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                  let feedString = plist["SUFeedURL"] as? String,
+                  let feed = URL(string: feedString), feed.scheme?.hasPrefix("http") == true,
+                  let installed = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
+            else { continue }
+            let name = (appURL.lastPathComponent as NSString).deletingPathExtension
+            candidates.append((name, appURL.path, installed, plist["CFBundleVersion"] as? String, feed))
         }
 
         // Fetch appcasts concurrently; ignore individual feed failures.

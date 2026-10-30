@@ -2,16 +2,20 @@ import SwiftUI
 
 /// One-time pop-up for people upgrading from UpdateScout (rename plan,
 /// section 7; Nick asked for a pop-up with a prism effect instead of a banner).
-/// A white beam slowly charges the old icon, it bursts into the new one, and
-/// the light falls away below as the icon's six colours, behind the name as
-/// it changes. The rays then breathe gently. Reduce Motion shows the end state.
+/// A white beam travels in from the edge and hits the old icon, which explodes
+/// into a ball of white light; the ball clears to reveal the new icon, and the
+/// prism splits the light into the icon's six colours, shining down behind the
+/// name as it changes. The rays then breathe gently (Nick's sequence). Reduce
+/// Motion shows the end state.
 struct RenameWelcome: View {
     let dismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var scheme
     @State private var beam = false
-    @State private var charged = false
-    @State private var burst = false
+    @State private var hit = false
+    @State private var ball = false
+    @State private var ballGone = false
     @State private var morphed = false
     @State private var spread = false
     @State private var renamed = false
@@ -24,6 +28,9 @@ struct RenameWelcome: View {
     /// start here.
     private static let iconCentre: CGFloat = 58
     private static let rayLength: CGFloat = 200
+    /// Long enough to start at the pop-up's left edge (the icon sits 250 pt in).
+    private static let beamLength: CGFloat = 262
+    private static let beamAngle: Double = 12
 
     var body: some View {
         VStack(spacing: 10) {
@@ -104,34 +111,44 @@ struct RenameWelcome: View {
         }
     }
 
-    /// The beam comes in from the upper left, the icon in the middle, and the
+    /// The beam comes in from the left edge, the icon in the middle, and the
     /// spectrum shines down beneath it, behind the name.
     private var stage: some View {
         ZStack(alignment: .top) {
             rays
-            // Incoming white light. The HStack's centre is the beam's end, so
-            // rotating it keeps that end on the icon.
+            // Incoming white light, bright at its head. The HStack's centre is
+            // where the beam ends, so rotating it keeps that end on the icon,
+            // and growing from the leading edge makes the head travel inward.
             HStack(spacing: 0) {
                 Capsule()
-                    .fill(LinearGradient(colors: [.white.opacity(0), .white],
+                    .fill(LinearGradient(colors: [.white.opacity(0.15), .white],
                                          startPoint: .leading, endPoint: .trailing))
-                    .frame(width: 210, height: 6)
-                    .shadow(color: .white, radius: 8)
-                    .scaleEffect(x: beam ? 1 : 0, anchor: .trailing)
-                Color.clear.frame(width: 210, height: 6)
+                    .frame(width: Self.beamLength, height: 6)
+                    .shadow(color: glow, radius: 8)
+                    .scaleEffect(x: beam ? 1 : 0, anchor: .leading)
+                Color.clear.frame(width: Self.beamLength, height: 6)
             }
-            .rotationEffect(.degrees(22))
-            .opacity(settled ? 0.3 : (beam ? 1 : 0))
+            .rotationEffect(.degrees(Self.beamAngle))
+            .opacity(ballGone ? 0.3 : (beam ? 1 : 0))
             .offset(y: Self.iconCentre - 3)
-            // Charge, then a burst of light when the icons swap.
-            Circle()
-                .fill(RadialGradient(colors: [.white, .white.opacity(0)], center: .center,
-                                     startRadius: 0, endRadius: 90))
-                .frame(width: 180, height: 180)
-                .scaleEffect(burst ? 2.4 : (charged ? 1 : 0.3))
-                .opacity(burst ? 0 : (charged ? 0.95 : 0))
-                .offset(y: Self.iconCentre - 90)
             icons.offset(y: Self.iconCentre - Self.iconSize / 2)
+            // The explosion: a ball of white light that covers the swap, and a
+            // shock ring, both clearing outward.
+            Circle()
+                .fill(RadialGradient(colors: [.white, .white, .white.opacity(0)], center: .center,
+                                     startRadius: 0, endRadius: 75))
+                .frame(width: 150, height: 150)
+                .shadow(color: glow, radius: 20)
+                .scaleEffect(ballGone ? 3 : (ball ? 1.3 : 0.05))
+                .opacity(ballGone ? 0 : (ball ? 1 : 0))
+                .offset(y: Self.iconCentre - 75)
+            Circle()
+                .stroke(.white, lineWidth: 3)
+                .frame(width: 120, height: 120)
+                .shadow(color: glow, radius: 6)
+                .scaleEffect(ballGone ? 3.4 : (ball ? 0.9 : 0.2))
+                .opacity(ballGone ? 0 : (ball ? 0.9 : 0))
+                .offset(y: Self.iconCentre - 60)
             ZStack {
                 Text("UpdateScout")
                     .opacity(renamed ? 0 : 1).blur(radius: renamed ? 8 : 0)
@@ -146,6 +163,12 @@ struct RenameWelcome: View {
         }
     }
 
+    /// White light needs a halo to show on the light pop-up; in dark mode it
+    /// glows white.
+    private var glow: Color {
+        scheme == .dark ? .white : Color(.displayP3, red: 0.62, green: 0.66, blue: 0.86).opacity(0.7)
+    }
+
     private var icons: some View {
         ZStack {
             if let legacy = Self.legacyIcon {
@@ -153,13 +176,11 @@ struct RenameWelcome: View {
                     .resizable().interpolation(.high)
                     .frame(width: Self.iconSize, height: Self.iconSize)
                     .opacity(morphed ? 0 : 1)
-                    .blur(radius: morphed ? 12 : 0)
-                    .scaleEffect(morphed ? 0.7 : (charged ? 1.06 : 1))
+                    .scaleEffect(hit ? 1.1 : 1)
             }
             AppLogo(size: Self.iconSize)
                 .opacity(morphed || Self.legacyIcon == nil ? 1 : 0)
-                .blur(radius: morphed ? 0 : 12)
-                .scaleEffect(morphed ? 1 : 1.3)
+                .scaleEffect(ballGone ? 1 : 1.2)
                 .shadow(color: .white.opacity(settled ? 0.5 : 0), radius: 12)
         }
     }
@@ -187,15 +208,25 @@ struct RenameWelcome: View {
 
     private func play() async {
         guard !reduceMotion else {
-            beam = true; morphed = true; spread = true; renamed = true; settled = true
+            beam = true; morphed = true; ballGone = true; spread = true; renamed = true; settled = true
             return
         }
-        try? await Task.sleep(for: .milliseconds(500))
-        withAnimation(.easeInOut(duration: 1.4)) { beam = true; charged = true }
-        try? await Task.sleep(for: .milliseconds(1400))
-        withAnimation(.easeOut(duration: 1.0)) { burst = true }
-        withAnimation(.spring(duration: 0.9, bounce: 0.35)) { morphed = true }
-        try? await Task.sleep(for: .milliseconds(300))
+        try? await Task.sleep(for: .milliseconds(450))
+        // The beam travels in, speeding up toward the icon.
+        withAnimation(.easeIn(duration: 1.2)) { beam = true }
+        try? await Task.sleep(for: .milliseconds(1200))
+        // Impact: the old icon jolts and explodes into white light.
+        withAnimation(.spring(duration: 0.25, bounce: 0.5)) { hit = true }
+        withAnimation(.easeOut(duration: 0.35)) { ball = true }
+        try? await Task.sleep(for: .milliseconds(400))
+        // Swap the icons while the ball covers them.
+        var swap = Transaction(); swap.disablesAnimations = true
+        withTransaction(swap) { morphed = true }
+        try? await Task.sleep(for: .milliseconds(350))
+        // The ball clears outward, revealing the new icon.
+        withAnimation(.easeOut(duration: 1.0)) { ballGone = true }
+        try? await Task.sleep(for: .milliseconds(450))
+        // The prism splits the light into colour.
         withAnimation(.spring(duration: 1.8, bounce: 0.15)) { spread = true }
         try? await Task.sleep(for: .milliseconds(500))
         withAnimation(.easeInOut(duration: 0.9)) { renamed = true }

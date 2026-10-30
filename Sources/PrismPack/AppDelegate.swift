@@ -13,8 +13,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Relaunching from the renamed bundle: the new copy does the rest.
         if Migration.runAtLaunch() { return }
         StatusItemController.shared.install()
-        // The rename pop-up lives in the main window, so open it once.
-        if UserDefaults.standard.bool(forKey: Migration.noticeKey) {
+        // The rename pop-up lives in the main window, so open it once; and
+        // after an update relaunch, come back to the window.
+        let defaults = UserDefaults.standard
+        let reopen = defaults.bool(forKey: SelfUpdater.reopenWindowKey)
+        defaults.removeObject(forKey: SelfUpdater.reopenWindowKey)
+        if reopen || defaults.bool(forKey: Migration.noticeKey) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { UpdatesWindow.shared.show() }
         }
     }

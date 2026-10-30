@@ -20,6 +20,12 @@ final class SelfUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         Self.channels(forVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
     }
 
+    /// Sparkle is about to restart us after "Install and Relaunch": reopen the
+    /// window on the way back up, rather than only the menu bar icon.
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        UserDefaults.standard.set(true, forKey: SelfUpdater.reopenWindowKey)
+    }
+
     static func channels(forVersion version: String) -> Set<String> {
         VersionParts(version).track > 0 ? ["beta"] : []
     }
@@ -28,6 +34,8 @@ final class SelfUpdaterDelegate: NSObject, SPUUpdaterDelegate {
 @MainActor
 enum SelfUpdater {
     private static let delegate = SelfUpdaterDelegate()
+    /// Set just before Sparkle relaunches the app; cleared on the next launch.
+    nonisolated static let reopenWindowKey = "reopenWindowAfterUpdate"
 
     static let controller = SPUStandardUpdaterController(
         startingUpdater: true,
