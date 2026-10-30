@@ -12,6 +12,7 @@ struct InstalledPage: View {
         let sources = UpdatesPage.order.filter(present.contains).map { ($0, UpdatesPage.title(of: $0)) }
         return [("all", "All"), ("updates", "Updates available")] + sources
             + (present.contains("unmanaged") ? [("unmanaged", "Not managed")] : [])
+            + (controller.duplicates.isEmpty ? [] : [("duplicates", "Duplicates")])
             + [("ignored", "Hidden")]
     }
 
@@ -30,6 +31,7 @@ struct InstalledPage: View {
             case "all": return true
             case "updates": return item.map { !controller.isIgnored($0) } ?? false
             case "ignored": return item.map(controller.isIgnored) ?? false
+            case "duplicates": return pkg.appPath.map { controller.duplicateGroup(for: $0) != nil } ?? false
             default: return pkg.sourceID == chip
             }
         }
@@ -66,7 +68,20 @@ struct InstalledPage: View {
                     .disabled(controller.loadingInstalled)
             }
         }
-        .onAppear { if controller.installed.isEmpty { controller.loadInstalled() } }
+        .onAppear {
+            if controller.installed.isEmpty { controller.loadInstalled() }
+            takeChipRequest()
+        }
+        .onChange(of: controller.installedChipRequest) { takeChipRequest() }
+    }
+}
+
+extension InstalledPage {
+    /// Updates' "Review in Installed" asks for the Duplicates chip.
+    private func takeChipRequest() {
+        guard let request = controller.installedChipRequest else { return }
+        chip = request
+        controller.installedChipRequest = nil
     }
 }
 
@@ -110,7 +125,14 @@ private struct InstalledRow: View {
 
     @ViewBuilder
     private var status: some View {
-        if let item, controller.isIgnored(item) {
+        if let path = pkg.appPath, controller.duplicateGroup(for: path) != nil {
+            StatusPill(text: "Duplicate", color: .orange)
+        }
+        if let candidate = controller.adoptionCandidate(at: pkg.appPath) {
+            Button("Can adopt") { controller.showingAdoptionReview = true }
+                .glass().controlSize(.small)
+                .help("\(candidate.verdict.title): Homebrew could keep this app up to date")
+        } else if let item, controller.isIgnored(item) {
             Button("Unhide") { controller.unhide(item) }.glass().controlSize(.small)
         } else if let item {
             StatusPill(text: "Update to \(item.latestVersion)", color: .orange)
@@ -124,8 +146,14 @@ private struct InstalledRow: View {
 
 /// The card for something with no update listed.
 private struct InstalledDetail: View {
+    @EnvironmentObject var controller: UpdateController
     let pkg: InstalledPackage
     let sectionTitle: String
+
+    /// The cask token, for Homebrew-managed apps.
+    private var cask: String? {
+        pkg.detail.flatMap { $0.hasPrefix("cask ") ? String($0.dropFirst(5)) : nil }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -140,6 +168,26 @@ private struct InstalledDetail: View {
             if pkg.sourceID == "unmanaged" {
                 Text("Nothing here updates this app. It may update itself.")
                     .font(.callout).foregroundStyle(.secondary)
+            }
+            if let cask, controller.selfUpdatingCasks.contains(cask) {
+                Text("This app also updates itself. Either it or Homebrew can update it.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let cask, let vendor = controller.state.adoptedBehind[cask] {
+                Label("Homebrew is behind the vendor's release (\(vendor)).", systemImage: "exclamationmark.circle")
+                    .font(.callout).foregroundStyle(Color.orange.readable)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let path = pkg.appPath, let group = controller.duplicateGroup(for: path) {
+                DuplicateActions(group: group, path: path)
+            }
+            if let path = pkg.appPath, controller.duplicateGroup(for: path) == nil,
+               let token = controller.state.storeSwitches[path] {
+                SwitchToHomebrewButton(cask: token, appPath: path, name: pkg.name)
+            }
+            if let cask, let path = pkg.appPath, controller.state.adopted[cask] != nil {
+                StopManagingButton(cask: cask, appPath: path, name: pkg.name)
             }
             HStack {
                 if let path = pkg.appPath {
@@ -232,6 +280,7 @@ struct ActivityPage: View {
         case .skipped: StatusPill(text: "Skipped", color: .orange)
         case .cancelled: StatusPill(text: "Cancelled", color: .secondary)
         case .checked: StatusPill(text: "Checked", color: .blue)
+        case .adopted: StatusPill(text: "Adopted", color: .teal)
         }
     }
 }

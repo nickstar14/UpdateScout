@@ -163,6 +163,12 @@ struct UpdateRow: View {
         if let running {
             HStack(spacing: 8) {
                 switch running {
+                case _ where controller.moveProgress[item.id] != nil && running != .queued && running != .cancelling:
+                    // Long moves show their step and real download size.
+                    MoveProgressView(progress: controller.moveProgress[item.id]!, compact: true)
+                        .frame(width: 170)
+                        .onTapGesture { MoveProgressWindow.shared.show(jobID: item.id) }
+                        .help("Click for the steps")
                 case .downloading(let percent?, _):
                     ProgressView(value: Double(percent), total: 100).frame(width: 90)
                     Text("\(percent)%").font(.caption.monospacedDigit()).foregroundStyle(.secondary)

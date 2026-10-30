@@ -26,6 +26,21 @@ struct Store {
         var ignoredMajors: Set<String> = []
         /// What happened, newest first, capped at `activityLimit`.
         var activity: [ActivityEntry] = []
+        /// Apps Homebrew could take over (Phase 7), from the last check.
+        var adoptionCandidates: [AdoptionCandidate] = []
+        /// "Not now": hide key → when it may be suggested again (30 days).
+        var adoptionSnoozed: [String: Date] = [:]
+        /// "Never for this app".
+        var adoptionNever: Set<String> = []
+        /// Candidates already in a digest notification, and when the last went out.
+        var adoptionNotified: Set<String> = []
+        var adoptionDigestAt: Date?
+        /// Casks PrismPack moved under Homebrew: token → the app's bundle id.
+        var adopted: [String: String] = [:]
+        /// Adopted casks now behind the vendor's own release: token → that release.
+        var adoptedBehind: [String: String] = [:]
+        /// App Store apps Homebrew could install instead: app path → cask token.
+        var storeSwitches: [String: String] = [:]
 
         static let activityLimit = 200
 
@@ -51,6 +66,24 @@ struct Store {
             ignoredApps = field(.ignoredApps, [])
             ignoredMajors = field(.ignoredMajors, [])
             activity = field(.activity, [Lossy<ActivityEntry>]()).compactMap(\.value)
+            adoptionCandidates = field(.adoptionCandidates, [Lossy<AdoptionCandidate>]()).compactMap(\.value)
+            adoptionSnoozed = field(.adoptionSnoozed, [:])
+            adoptionNever = field(.adoptionNever, [])
+            adoptionNotified = field(.adoptionNotified, [])
+            adoptionDigestAt = field(.adoptionDigestAt, nil as Date?)
+            adopted = field(.adopted, [:])
+            adoptedBehind = field(.adoptedBehind, [:])
+            storeSwitches = field(.storeSwitches, [:])
+        }
+
+        /// Candidates not snoozed or turned down, which is what the banner counts.
+        var visibleAdoptions: [AdoptionCandidate] {
+            adoptionCandidates.filter { !isAdoptionHidden($0) }
+        }
+
+        func isAdoptionHidden(_ candidate: AdoptionCandidate, now: Date = Date()) -> Bool {
+            adoptionNever.contains(candidate.hideKey)
+                || (adoptionSnoozed[candidate.hideKey].map { $0 > now } ?? false)
         }
 
         mutating func log(_ entry: ActivityEntry) {
@@ -159,6 +192,18 @@ enum Prefs {
         if minutes < 60 { return "\(minutes) minutes" }
         let hours = minutes / 60
         return hours == 1 ? "1 hour" : "\(hours) hours"
+    }
+
+    /// "Suggest apps that can move under Homebrew" (adoption, Phase 7).
+    static var adoptionEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "adoptionEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "adoptionEnabled") }
+    }
+
+    /// "Include apps that already update themselves".
+    static var adoptionIncludeSelfUpdating: Bool {
+        get { UserDefaults.standard.bool(forKey: "adoptionIncludeSelfUpdating") }
+        set { UserDefaults.standard.set(newValue, forKey: "adoptionIncludeSelfUpdating") }
     }
 
     static var showDockIcon: Bool {
@@ -295,7 +340,7 @@ struct Lossy<T: Decodable>: Decodable {
 
 /// One line in the Activity tab.
 struct ActivityEntry: Codable, Equatable, Identifiable {
-    enum Kind: String, Codable { case updated, installed, removed, failed, skipped, cancelled, checked }
+    enum Kind: String, Codable { case updated, installed, removed, failed, skipped, cancelled, checked, adopted }
     var id = UUID()
     var date = Date()
     let kind: Kind

@@ -9,6 +9,7 @@ struct PasswordSheet: View {
     @State private var password = ""
     @State private var checking = false
     @State private var wrong = false
+    @State private var revealed = false
     @FocusState private var focused: Bool
 
     private var appName: String {
@@ -18,18 +19,35 @@ struct PasswordSheet: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(nsImage: AskpassDialog.circularKeyIcon())
-                .resizable().frame(width: 52, height: 52)
+            AppIconKeyBadge(size: 64)
             Text("\(appName) needs your password").font(.headline)
             Text("\(updates) administrator access. Enter it once and \(appName) uses it for this batch only. Nothing is saved.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            SecureField("Password", text: $password)
+            // The eye shows or hides what's typed, as in the password dialog.
+            HStack(spacing: 6) {
+                Group {
+                    if revealed {
+                        TextField("Password", text: $password)
+                    } else {
+                        SecureField("Password", text: $password)
+                    }
+                }
                 .textFieldStyle(.roundedBorder)
                 .focused($focused)
                 .onSubmit(authorize)
                 .disabled(checking)
+                Button {
+                    revealed.toggle()
+                    focused = true
+                } label: {
+                    Image(systemName: revealed ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+                .help(revealed ? "Hide password" : "Show password")
+                .accessibilityLabel(revealed ? "Hide password" : "Show password")
+            }
             if wrong {
                 Text("That password didn't work. Try again.")
                     .font(.caption).foregroundStyle(Color.red.readable)

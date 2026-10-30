@@ -8,7 +8,8 @@ final class UpdateController: ObservableObject {
     nonisolated static let allSources: [any UpdateSource] = [
         HomebrewSource(), MASSource(), SystemUpdateSource(),
         CaskOracleSource(), ComponentsSource(), SparkleSource(), CustomSource(),
-        PythonSource(), NPMSource(), CargoSource(), GemSource(), EditorExtensionsSource()
+        PythonSource(), NPMSource(), CargoSource(), GemSource(), EditorExtensionsSource(),
+        GitHubReleasesSource()
     ]
 
     @Published var state = Store.load()
@@ -26,6 +27,13 @@ final class UpdateController: ObservableObject {
     @Published var page: Page = .updates
 
     /// The Installed tab's list, read when the tab first opens.
+    /// The same app found twice, from the last check (Phase 7).
+    @Published var duplicates: [DuplicateGroup] = []
+    /// Installed casks Homebrew marks as updating themselves (both can update them).
+    @Published var selfUpdatingCasks: Set<String> = []
+    @Published var showingAdoptionReview = false
+    /// A chip Installed should select when it next shows ("duplicates").
+    @Published var installedChipRequest: String?
     @Published private(set) var installed: [InstalledPackage] = []
     @Published private(set) var loadingInstalled = false
 
@@ -129,8 +137,18 @@ final class UpdateController: ObservableObject {
         Task {
             async let detection = Self.runDetection(sources: enabledSources)
             async let leftovers = KextInventory.partition().leftover
+            async let adoption = Adoption.scanIfEnabled()
+            async let caskRecords = Duplicates.caskRecords()
             let (items, errors) = await detection
             apply(items: items, errors: errors, leftovers: await leftovers)
+            if let scan = await adoption {
+                var digest: [AdoptionCandidate] = []
+                state = Store.mutate { digest = Adoption.merge(scan, into: &$0) }
+                Notifier.notifyAdoptionDigest(digest)
+            }
+            let records = await caskRecords
+            duplicates = await Duplicates.scan(records: records)
+            selfUpdatingCasks = Set(records.filter(\.autoUpdates).map(\.token))
             isChecking = false
             if checkQueued {
                 checkQueued = false
@@ -200,7 +218,8 @@ final class UpdateController: ObservableObject {
     /// The source that installs an item: one of the update sources, or
     /// Discover's installer (not listed in Settings, never detects).
     nonisolated static func source(for id: String) -> (any UpdateSource)? {
-        allSources.first { $0.id == id } ?? (id == "discover" ? DiscoverInstaller() : id == "remove" ? Remover() : nil)
+        allSources.first { $0.id == id }
+            ?? (id == "discover" ? DiscoverInstaller() : id == "remove" ? Remover() : id == "adopt" ? Adopter() : nil)
     }
 
     /// Fold one check's results into the stored state. Shared with the
@@ -326,6 +345,93 @@ final class UpdateController: ObservableObject {
         loadInstalled()
     }
 
+    // MARK: - Adoption and duplicates (Phase 7)
+
+    /// Queue one adoption job. Never runs on its own: only from a click.
+    func adopt(_ candidate: AdoptionCandidate) {
+        let action = candidate.method == .inPlace ? "adopt" : "replace"
+        update(Adopter.Job(action: action, cask: candidate.token, appPath: candidate.appPath).item(name: candidate.name))
+    }
+
+    /// "Adopt all safe ones": only Recommended, in-place, password-free.
+    func adoptAllSafe() {
+        for candidate in state.visibleAdoptions where candidate.isSafe { adopt(candidate) }
+    }
+
+    /// Replace an App Store copy with Homebrew's (only from a click).
+    func switchToHomebrew(cask: String, appPath: String, name: String) {
+        update(Adopter.Job(action: "switch", cask: cask, appPath: appPath).item(name: name))
+    }
+
+    /// "Stop managing with Homebrew" for an adopted app, or a duplicate's
+    /// "Stop Homebrew tracking it". Removes Homebrew's record only.
+    func stopManaging(cask: String, appPath: String, name: String) {
+        update(Adopter.Job(action: "untrack", cask: cask, appPath: appPath).item(name: name))
+    }
+
+    /// The queue item for a candidate, for its progress and errors.
+    func adoptionJob(_ candidate: AdoptionCandidate) -> UpdateItem {
+        let action = candidate.method == .inPlace ? "adopt" : "replace"
+        return Adopter.Job(action: action, cask: candidate.token, appPath: candidate.appPath).item(name: candidate.name)
+    }
+
+    func snoozeAdoption(_ candidate: AdoptionCandidate) {
+        state = Store.mutate { $0.adoptionSnoozed[candidate.hideKey] = Date().addingTimeInterval(Adoption.snoozeInterval) }
+    }
+
+    func neverAdopt(_ candidate: AdoptionCandidate) {
+        state = Store.mutate { $0.adoptionNever.insert(candidate.hideKey) }
+    }
+
+    func unhideAdoption(_ candidate: AdoptionCandidate) {
+        state = Store.mutate {
+            $0.adoptionNever.remove(candidate.hideKey)
+            $0.adoptionSnoozed[candidate.hideKey] = nil
+        }
+    }
+
+    /// The shown candidate for an installed app, for Installed's "Can adopt".
+    func adoptionCandidate(at path: String?) -> AdoptionCandidate? {
+        guard let path, Prefs.adoptionEnabled else { return nil }
+        return state.visibleAdoptions.first { $0.appPath.lowercased() == path.lowercased() && $0.verdict != .notBetter }
+    }
+
+    /// The duplicate group an app belongs to, as the copy kept or an extra.
+    func duplicateGroup(for path: String) -> DuplicateGroup? {
+        // Case-blind: a cask's app found by token can differ in case from the folder.
+        let key = path.lowercased()
+        return duplicates.first { $0.keep.lowercased() == key || $0.extras.contains { $0.lowercased() == key } }
+    }
+
+    /// Snoozed or turned-down candidates, for the Hidden section.
+    var hiddenAdoptions: [AdoptionCandidate] {
+        state.adoptionCandidates.filter { state.isAdoptionHidden($0) }
+    }
+
+    private func finishAdoption(_ job: UpdateItem, seconds: Int) {
+        guard let parsed = Adopter.Job(token: job.installToken) else { return }
+        let bundleID = Adoption.facts(at: parsed.appPath)?.bundleID
+        state = Store.mutate { s in
+            s.adoptionCandidates.removeAll { $0.appPath == parsed.appPath }
+            s.storeSwitches[parsed.appPath] = nil
+            if parsed.action == "untrack" {
+                s.adopted[parsed.cask] = nil
+                s.adoptedBehind[parsed.cask] = nil
+                s.log(ActivityEntry(kind: .removed, title: job.name,
+                                    detail: "Homebrew stopped managing it (cask \(parsed.cask)). The app stays.",
+                                    itemID: job.id, sourceID: job.sourceID, seconds: seconds))
+            } else {
+                s.adopted[parsed.cask] = bundleID ?? ""
+                s.log(ActivityEntry(kind: .adopted, title: job.name,
+                                    detail: ["adopt": "Adopted in place", "switch": "Moved from the App Store"][parsed.action, default: "Replaced"]
+                                        + " · cask \(parsed.cask)",
+                                    itemID: job.id, sourceID: job.sourceID, seconds: seconds))
+            }
+        }
+        duplicates.removeAll { if case .twoStores(let cask) = $0.kind { return cask == parsed.cask }; return false }
+        loadInstalled()
+    }
+
     /// The Installed entry an update row is about, for its Uninstall button.
     func installedPackage(for item: UpdateItem) -> InstalledPackage? {
         if let path = item.appPath, let pkg = installed.first(where: { $0.appPath == path }) { return pkg }
@@ -349,7 +455,7 @@ final class UpdateController: ObservableObject {
     /// (custom commands may call brew too), and each other manager has its own.
     nonisolated static func lane(for sourceID: String) -> String {
         switch sourceID {
-        case "homebrew", "caskOracle", "components", "custom": return "brew"
+        case "homebrew", "caskOracle", "components", "custom", "adopt": return "brew"
         default: return sourceID
         }
     }
@@ -453,7 +559,7 @@ final class UpdateController: ObservableObject {
         let count: Int
     }
     /// Set while the password sheet should show.
-    @Published var passwordRequest: PasswordRequest?
+    @Published var passwordRequest: PasswordRequest? { didSet { updateSpinner() } }
 
     private func requestPasswordIfNeeded() {
         guard Prefs.askPasswordOncePerBatch, passwordRequest == nil, !PasswordBroker.shared.isActive else { return }
@@ -461,6 +567,9 @@ final class UpdateController: ObservableObject {
         guard waiting > 0 else { return }
         passwordRequest = PasswordRequest(count: waiting)
         UpdatesWindow.shared.show()
+        // Bounce the Dock icon until the user comes to it (Nick, 30 Oct 2026).
+        // Only possible while the Dock icon is shown.
+        NSApp.requestUserAttention(.criticalRequest)
     }
 
     /// The sheet's Authorize. False when the password is wrong.
@@ -535,14 +644,24 @@ final class UpdateController: ObservableObject {
     /// The last lines each running install printed, for Show log.
     private var outputTails: [String: [String]] = [:]
 
+    /// Long moves in progress, by job id (MoveProgress).
+    @Published var moveProgress: [String: MoveProgress] = [:]
+
     private func run(_ item: UpdateItem, with source: any UpdateSource) {
         installStates[item.id] = .installing("Starting…")
         outputTails[item.id] = []
+        if let plan = MoveProgress.plan(for: item) {
+            moveProgress[item.id] = plan
+            MoveProgressWindow.shared.show(jobID: item.id)
+        }
         let started = Date()
         let install = Task {
             try await Shell.$installTag.withValue(Self.processTag(item)) {
                 try await source.install(item) { line in
                     Task { @MainActor in
+                        self.moveProgress[item.id]?.take(line)
+                        // Step markers are for the progress view only.
+                        if line.hasPrefix("§") { return }
                         self.outputTails[item.id, default: []].append(line)
                         if self.outputTails[item.id]!.count > 40 { self.outputTails[item.id]!.removeFirst() }
                         guard let current = self.installStates[item.id], current.isActive,
@@ -557,9 +676,12 @@ final class UpdateController: ObservableObject {
             do {
                 try await install.value
                 installStates[item.id] = .done
+                moveProgress[item.id]?.finished = true
                 let seconds = Int(Date().timeIntervalSince(started).rounded())
                 if item.sourceID == "remove" {
                     finishRemoval(item, seconds: seconds)
+                } else if item.sourceID == "adopt" {
+                    finishAdoption(item, seconds: seconds)
                 } else if item.sourceID == "discover" {
                     // A finished removal of the same thing would still say Removed.
                     for (id, done) in installStates where id.hasPrefix("remove|") && done == .done { installStates[id] = nil }
@@ -580,6 +702,8 @@ final class UpdateController: ObservableObject {
             } catch {
                 // A user-cancelled install isn't an error worth showing.
                 installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
+                moveProgress[item.id]?.finished = true
+                moveProgress[item.id]?.failure = install.isCancelled ? "Cancelled." : error.localizedDescription
                 log(install.isCancelled
                     ? ActivityEntry(kind: .cancelled, title: item.logTitle,
                                     detail: Self.sourceName(item.sourceID), itemID: item.id, sourceID: item.sourceID)
@@ -696,8 +820,15 @@ final class UpdateController: ObservableObject {
 
     var isSpinning: Bool { isChecking || backgroundCheckRunning }
 
+    /// Waiting for the password with no Dock icon to bounce: the menu bar
+    /// prism pulses instead (Nick, 30 Oct 2026).
+    var needsAttention: Bool { passwordRequest != nil && !Prefs.showDockIcon }
+
+    /// The menu bar prism pulses while checking or while it needs attention.
+    var isPulsing: Bool { isSpinning || needsAttention }
+
     private func updateSpinner() {
-        let spinning = isSpinning
+        let spinning = isPulsing
         if spinning, spinTimer == nil {
             // Twelve frames a second: one pulse takes about 1.7 seconds.
             spinTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
@@ -705,7 +836,7 @@ final class UpdateController: ObservableObject {
                     guard let self else { return }
                     self.spinFrame = (self.spinFrame + 1) % MenuBarIcon.frameCount
                     // Catch a stale background flag without waiting for a reload.
-                    if !self.isChecking && !self.backgroundCheckRunning { self.updateSpinner() }
+                    if !self.isPulsing { self.updateSpinner() }
                 }
             }
         } else if !spinning, let timer = spinTimer {

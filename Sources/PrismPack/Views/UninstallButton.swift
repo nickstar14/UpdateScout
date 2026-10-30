@@ -38,6 +38,7 @@ struct UninstallButton: View {
 
     private func confirm() {
         let alert = NSAlert()
+        alert.icon = AskpassDialog.badgeIcon(symbol: "exclamationmark")
         alert.messageText = "\(removal.actionTitle) \(removal.name)?"
         alert.informativeText = removal.explanation
         alert.alertStyle = .warning

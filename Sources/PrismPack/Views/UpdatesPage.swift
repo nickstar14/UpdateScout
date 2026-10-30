@@ -20,7 +20,7 @@ struct UpdatesPage: View {
 
     /// Section order: the 1.8.0 sources, then what 2.0 adds.
     static let order = ["homebrew", "mas", "macos", "caskOracle", "components", "sparkle", "custom",
-                        "tools", "pip", "npm", "cargo", "gem", "editors"]
+                        "github", "tools", "pip", "npm", "cargo", "gem", "editors"]
 
     private var grouped: [(id: String, items: [UpdateItem])] {
         let visible = controller.visibleItems
@@ -46,6 +46,7 @@ struct UpdatesPage: View {
         VStack(spacing: 0) {
             let nothingToDo = controller.visibleItems.isEmpty && controller.visibleLeftovers.isEmpty
             let hiddenCount = controller.hiddenItems.count + controller.hiddenLeftovers.count
+                + controller.hiddenAdoptions.count
             if nothingToDo && hiddenCount == 0 {
                 UpToDateView()
             } else {
@@ -75,7 +76,13 @@ struct UpdatesPage: View {
         }
         // The banner and the error summary stay put; sections scroll under
         // them in glass.
-        .pinnedHeader { if Migration.showsRenameBanner { renameBanner } }
+        .pinnedHeader {
+            VStack(spacing: 0) {
+                if Migration.showsRenameBanner { renameBanner }
+                AdoptionBanner()
+                DuplicatesNote()
+            }
+        }
         .pinnedHeader(edge: .bottom) { errorSummary }
         .toolbar { UpdatesToolbar() }
         .navigationSubtitle(subtitle)
@@ -190,8 +197,9 @@ struct UpdatesPage: View {
     private var hiddenSection: some View {
         let items = controller.hiddenItems
         let kexts = controller.hiddenLeftovers
-        if !items.isEmpty || !kexts.isEmpty {
-            section("hidden", count: items.count + kexts.count, expanded: showHidden,
+        let adoptions = controller.hiddenAdoptions
+        if !items.isEmpty || !kexts.isEmpty || !adoptions.isEmpty {
+            section("hidden", count: items.count + kexts.count + adoptions.count, expanded: showHidden,
                     onToggle: { withAnimation(Self.roll) { showHidden.toggle() } }) {
                 // Dividers only between rows, never after the last one.
                 ForEach(items) { item in
@@ -200,7 +208,11 @@ struct UpdatesPage: View {
                 }
                 ForEach(kexts) { kext in
                     HiddenLeftoverRow(kext: kext)
-                    if kext.id != kexts.last?.id { Divider() }
+                    if kext.id != kexts.last?.id || !adoptions.isEmpty { Divider() }
+                }
+                ForEach(adoptions) { candidate in
+                    HiddenAdoptionRow(candidate: candidate)
+                    if candidate.id != adoptions.last?.id { Divider() }
                 }
             }
         }

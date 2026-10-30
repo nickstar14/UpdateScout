@@ -2,7 +2,8 @@ import Foundation
 
 /// One installed thing, for the Installed tab.
 struct InstalledPackage: Identifiable, Hashable, Sendable {
-    var id: String { "\(sourceID)|\(name)" }
+    /// The path too: two copies of one app share a name and source.
+    var id: String { "\(sourceID)|\(name)|\(appPath ?? "")" }
     let name: String
     let version: String
     /// The section it belongs to ("homebrew", "pip", …), or "unmanaged" for
@@ -138,6 +139,7 @@ enum Inventory {
         // Lowercased: a path found by name can differ in case from the
         // folder listing on the case-insensitive disk.
         let claimed = Set(managed.compactMap { $0.appPath?.lowercased() })
+        let github = Set(GitHubApps.load().map { $0.appPath.lowercased() })
         let fm = FileManager.default
         var found: [InstalledPackage] = []
         for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
@@ -150,8 +152,8 @@ enum Inventory {
                 let name = (entry as NSString).deletingPathExtension
                 let version = plist["CFBundleShortVersionString"] as? String ?? plist["CFBundleVersion"] as? String ?? "?"
                 let sparkle = plist["SUFeedURL"] != nil
-                found.append(InstalledPackage(name: name, version: version,
-                                              sourceID: sparkle ? "sparkle" : "unmanaged", appPath: path))
+                let source = github.contains(path.lowercased()) ? "github" : sparkle ? "sparkle" : "unmanaged"
+                found.append(InstalledPackage(name: name, version: version, sourceID: source, appPath: path))
             }
         }
         return found

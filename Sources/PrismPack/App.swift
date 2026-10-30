@@ -23,13 +23,19 @@ struct Main {
             let sources = UpdateController.allSources.filter { !Prefs.disabledSources.contains($0.id) }
             async let detection = UpdateController.runDetection(sources: sources)
             async let leftovers = KextInventory.partition().leftover
+            // Adoption only reads here: it never adopts headless.
+            async let adoption = Adoption.scanIfEnabled()
             let (items, errors) = await detection
             let kexts = await leftovers
+            let scan = await adoption
             var fresh: [UpdateItem] = []
+            var digest: [AdoptionCandidate] = []
             Store.mutate { s in
                 fresh = UpdateController.merge(items: items, errors: errors, leftovers: kexts, into: &s)
+                if let scan { digest = Adoption.merge(scan, into: &s) }
             }
             Notifier.notifyNewUpdates(fresh)
+            Notifier.notifyAdoptionDigest(digest)
             // Give the notification a moment to post before exiting.
             try? await Task.sleep(for: .seconds(2))
             semaphore.signal()

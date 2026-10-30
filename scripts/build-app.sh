@@ -21,6 +21,7 @@ cp "$BIN" "$APP/Contents/MacOS/$EXE_NAME"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # The 1.8.0 icon, for the one-time rename pop-up's "before" picture.
 cp Resources/LegacyIcon.png "$APP/Contents/Resources/LegacyIcon.png"
+cp Resources/AppIconDark.png "$APP/Contents/Resources/AppIconDark.png"
 
 # SwiftPM records the *deployment target* (15.0) as the linked-SDK version in
 # LC_BUILD_VERSION. AppKit uses that field to pick the UI generation, so the

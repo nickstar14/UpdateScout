@@ -10,6 +10,24 @@ enum CaskIndex {
         let homepage: String?
         /// .app bundle filenames this cask installs, plus its human-readable names.
         let appNames: [String]
+        /// Facts adoption checks (Phase 7). Defaults keep other callers simple.
+        /// The .app bundle filenames alone, without the human names.
+        var apps: [String] = []
+        /// Installs by running a pkg (needs the admin password).
+        var pkg = false
+        /// Marked by Homebrew as updating itself.
+        var autoUpdates = false
+        /// Bundle ids from the cask's `uninstall quit:` and `pkgutil:` stanzas.
+        var quitIDs: [String] = []
+        var pkgutilIDs: [String] = []
+        /// The download, for the size shown in the adoption sheet.
+        var url: String?
+        /// `depends_on macos: >= …`, when set.
+        var minimumMacOS: String?
+        /// `depends_on arch: intel` (can't run natively here).
+        var intelOnly = false
+        /// The tap it comes from (adoption only trusts homebrew/cask).
+        var tap: String?
     }
 
     static func load() async throws -> [CaskInfo] {
@@ -74,19 +92,45 @@ enum CaskIndex {
                   obj["disabled"] as? Bool != true
             else { continue }
 
-            var appNames: [String] = obj["name"] as? [String] ?? []
+            var apps: [String] = []
+            var pkg = false
+            var quitIDs: [String] = [], pkgutilIDs: [String] = []
             if let artifacts = obj["artifacts"] as? [[String: Any]] {
                 for artifact in artifacts {
-                    if let apps = artifact["app"] as? [Any] {
-                        appNames += apps.compactMap { $0 as? String }
+                    if let found = artifact["app"] as? [Any] {
+                        apps += found.compactMap { $0 as? String }
+                    }
+                    if artifact["pkg"] != nil { pkg = true }
+                    for stanza in artifact["uninstall"] as? [[String: Any]] ?? [] {
+                        quitIDs += strings(stanza["quit"])
+                        pkgutilIDs += strings(stanza["pkgutil"])
                     }
                 }
             }
-            casks.append(CaskInfo(token: token, version: version,
-                                  homepage: obj["homepage"] as? String,
-                                  appNames: appNames))
+            let depends = obj["depends_on"] as? [String: Any] ?? [:]
+            let macos = (depends["macos"] as? [String: Any])?[">="] as? [String]
+            let arch = depends["arch"] as? [[String: Any]] ?? []
+            var info = CaskInfo(token: token, version: version,
+                                homepage: obj["homepage"] as? String,
+                                appNames: (obj["name"] as? [String] ?? []) + apps)
+            info.apps = apps
+            info.pkg = pkg
+            info.autoUpdates = obj["auto_updates"] as? Bool == true
+            info.quitIDs = quitIDs
+            info.pkgutilIDs = pkgutilIDs
+            info.url = obj["url"] as? String
+            info.minimumMacOS = macos?.first
+            info.intelOnly = !arch.isEmpty && arch.allSatisfy { $0["type"] as? String == "intel" }
+            info.tap = obj["tap"] as? String
+            casks.append(info)
         }
         return casks
+    }
+
+    /// A stanza value that may be one string or a list of them.
+    private static func strings(_ value: Any?) -> [String] {
+        if let one = value as? String { return [one] }
+        return (value as? [Any])?.compactMap { $0 as? String } ?? []
     }
 }
 

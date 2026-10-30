@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var passwordOnce = Prefs.askPasswordOncePerBatch
     @AppStorage(Prefs.glassTintKey) private var glassTint: Double = 0.35
     @State private var showDockIcon = Prefs.showDockIcon
+    @State private var adoptionEnabled = Prefs.adoptionEnabled
+    @State private var adoptionSelfUpdating = Prefs.adoptionIncludeSelfUpdating
 
     var body: some View {
         VStack(spacing: 0) {
@@ -87,6 +89,22 @@ struct SettingsView: View {
                 Toggle("Ask for my password once per batch", isOn: $passwordOnce)
                     .onChange(of: passwordOnce) { _, value in Prefs.askPasswordOncePerBatch = value }
                 Text("Kept in memory for that batch only, then wiped. Never saved. When off, each installer asks for itself.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("Homebrew adoption") {
+                Toggle("Suggest apps that can move under Homebrew", isOn: $adoptionEnabled)
+                    .onChange(of: adoptionEnabled) { _, value in
+                        Prefs.adoptionEnabled = value
+                        UpdateController.shared.checkNow()
+                    }
+                Toggle("Include apps that already update themselves", isOn: $adoptionSelfUpdating)
+                    .disabled(!adoptionEnabled)
+                    .onChange(of: adoptionSelfUpdating) { _, value in
+                        Prefs.adoptionIncludeSelfUpdating = value
+                        UpdateController.shared.checkNow()
+                    }
+                Text("Only apps with no updater are suggested by default, and only when Homebrew's version is current. \(AppIdentity.name) never changes an app without asking, and sends at most one notification a week.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -180,6 +198,8 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            GitHubAppsSection()
 
             Section("Custom sources") {
                 HStack {

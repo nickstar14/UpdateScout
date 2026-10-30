@@ -77,8 +77,9 @@ struct RenameWelcome: View {
     }
 
     /// What's new in 2.0, checked against the 1.8.0 code (30 Oct 2026). Draft
-    /// for Nick to approve before a beta. Only what's built: add adoption,
-    /// duplicates, channels and auto-update rules when Phases 7 and 8 land.
+    /// for Nick to approve before a beta. Only what's built: Phase 7's
+    /// adoption and duplicates are in; add channels and auto-update rules
+    /// when Phase 8 lands.
     static let changes: [(symbol: String, title: String, detail: String)] = [
         ("macwindow", "A new window", "A sidebar with Updates, Discover, Installed, Activity and Settings, in the macOS 27 Liquid Glass look."),
         ("triangle", "A new menu bar prism", "Click it to open the window. Right-click for Check Now, Settings and Quit. It replaces the old pop-up menu."),
@@ -88,6 +89,8 @@ struct RenameWelcome: View {
         ("key.fill", "One password per batch", "Enter it once for a whole batch. It's kept in memory for that batch only and never saved."),
         ("checkmark.circle", "Installed", "Everything on your Mac in one list, showing where each item came from and whether it's up to date."),
         ("trash", "Uninstall", "Remove an app or package from its card, the right way for wherever it came from. Other apps go to the Trash, so you can put them back."),
+        ("mug.fill", "Move apps under Homebrew", "\(AppIdentity.name) spots apps nothing keeps up to date that Homebrew could, checks that Homebrew is really better for each one, and moves it only when you click. You can undo it later."),
+        ("square.on.square", "Duplicates", "Two copies of one app, or an App Store app Homebrew also tracks, are pointed out with a one-click fix. Nothing is removed without asking, and copies go to the Trash."),
         ("clock.arrow.circlepath", "Activity", "A history of checks, updates, installs and removals. Failures keep their log, and you can retry them."),
         ("eye.slash", "More ways to hide updates", "Hide one version as before, or now every update from an app, or only its major upgrades. Unhide them any time."),
         ("flask", "Betas for testers", "A beta of \(AppIdentity.name) is offered the next beta. Everyone else only gets full releases."),

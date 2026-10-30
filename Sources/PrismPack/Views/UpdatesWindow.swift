@@ -135,6 +135,9 @@ struct MainView: View {
         .sheet(item: $controller.review) { request in
             MajorUpgradeReview(request: request).environmentObject(controller)
         }
+        .sheet(isPresented: $controller.showingAdoptionReview) {
+            AdoptionReviewSheet().environmentObject(controller)
+        }
         .sheet(item: $controller.passwordRequest) { request in
             PasswordSheet(request: request).environmentObject(controller)
                 .interactiveDismissDisabled()

@@ -17,6 +17,7 @@ struct SourceStyle {
         case "components": SourceStyle(symbol: "cpu.fill",             color: .purple)
         case "sparkle":    SourceStyle(symbol: "sparkles",             color: .yellow)
         case "custom":     SourceStyle(symbol: "slider.horizontal.3",  color: .green)
+        case "github":     SourceStyle(symbol: "chevron.left.forwardslash.chevron.right", color: .cyan)
         case "pip":        SourceStyle(symbol: "terminal.fill",        color: .orange)
         case "npm":        SourceStyle(symbol: "square.stack.3d.up.fill", color: Theme.npmRed)
         case "tools":      SourceStyle(symbol: "wrench.and.screwdriver.fill", color: .mint)
@@ -300,7 +301,7 @@ struct GlassIconTile: View {
 
 /// The app icon's rainbow as a soft colour mesh: blurred blobs of the card
 /// colours over a lavender base, frosted so it reads as a tint. Used for the
-/// "up to date" prism and the password badge (not for buttons any more).
+/// "up to date" prism (not for buttons or the password badge any more).
 struct PrismSheen: View {
     enum Variant: String, CaseIterable, Identifiable {
         case warmToCool = "B: warm to cool", aurora = "D: scattered aurora"
@@ -391,6 +392,100 @@ struct PrismBlur: View {
 extension View {
     /// Update All, the password sheet's Authorize, and Adopt all safe ones.
     func prismProminent() -> some View { modifier(PrismProminent()) }
+}
+
+// MARK: - The password badge
+
+/// The key on Liquid Glass, with the icon's colours blurred behind it, as on
+/// Update All. `realGlass` false draws a glass look instead, for NSImage
+/// icons (the askpass alert), where the system glass can't render.
+struct GlassKeyBadge: View {
+    var size: CGFloat
+    var realGlass = true
+    /// The key for password prompts; an exclamation mark for confirmations.
+    var symbol = "key.fill"
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let disc = size * 0.8
+        ZStack {
+            Circle()
+                .fill(AngularGradient(colors: PrismBlur.spectrum + [PrismBlur.spectrum[0]], center: .center))
+                .frame(width: disc * 0.9, height: disc * 0.9)
+                .blur(radius: size * 0.08)
+                .opacity(scheme == .dark ? 0.75 : 0.5)
+                .saturation(scheme == .dark ? 1.05 : 1)
+            if realGlass, #available(macOS 26.0, *) {
+                Circle().fill(.clear)
+                    .frame(width: disc, height: disc)
+                    .glassEffect(.regular, in: Circle())
+            } else {
+                drawnGlass.frame(width: disc, height: disc)
+            }
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.32, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+        .frame(width: size, height: size)
+    }
+
+    /// Clear glass by hand: a frosted fill, a bright top edge fading down,
+    /// a soft top highlight and a neutral shadow.
+    private var drawnGlass: some View {
+        let dark = scheme == .dark
+        return Circle()
+            .fill((dark ? PrismSheen.midnight : .white).opacity(dark ? 0.22 : 0.45))
+            .overlay(
+                Ellipse()
+                    .fill(LinearGradient(colors: [.white.opacity(dark ? 0.25 : 0.6), .clear],
+                                         startPoint: .top, endPoint: .bottom))
+                    .scaleEffect(x: 0.8, y: 0.5, anchor: .top)
+                    .padding(size * 0.04)
+            )
+            .overlay(
+                Circle().strokeBorder(
+                    LinearGradient(colors: [.white.opacity(dark ? 0.4 : 0.9), .white.opacity(dark ? 0.06 : 0.15)],
+                                   startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(dark ? 0.4 : 0.15), radius: size * 0.04, y: size * 0.02)
+    }
+}
+
+/// The password prompts' icon (Nick, 30 Oct 2026): the app icon with the
+/// glass key over its lower right corner, the way macOS badges an app that
+/// asks for a password. In dark mode it uses the icon's midnight version.
+struct AppIconKeyBadge: View {
+    var size: CGFloat
+    /// False for the askpass alert, which can only show a flat image.
+    var realGlass = true
+    /// "exclamationmark" on confirmation pop-ups (Nick, 30 Oct 2026).
+    var symbol = "key.fill"
+    @Environment(\.colorScheme) private var scheme
+
+    /// The flat icon apps are handed is the light one only, so the dark
+    /// version is bundled (an export of AppIcon.icon's dark appearance).
+    static let darkIcon: NSImage? = Bundle.main.image(forResource: "AppIconDark")
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if scheme == .dark, let dark = Self.darkIcon {
+                // The export has no transparent margin: draw it at the system
+                // icon's artwork size (about 82%) so both look the same size.
+                Image(nsImage: dark)
+                    .resizable().interpolation(.high)
+                    .frame(width: size * 0.82, height: size * 0.82)
+                    .frame(width: size, height: size)
+            } else {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable().interpolation(.high)
+                    .frame(width: size, height: size)
+            }
+            GlassKeyBadge(size: size * 0.5, realGlass: realGlass, symbol: symbol)
+                .offset(x: size * 0.06, y: size * 0.06)
+        }
+        .frame(width: size, height: size)
+    }
 }
 
 extension Color {

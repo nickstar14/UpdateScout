@@ -51,7 +51,7 @@ struct CaskOracleSource: UpdateSource {
                                         installedVersion: installed,
                                         latestVersion: cask.version,
                                         url: cask.homepage ?? "https://formulae.brew.sh/cask/\(cask.token)",
-                                        caveat: "Installs via Homebrew — this app will become Homebrew-managed (cask \"\(cask.token)\").",
+                                        caveat: "Installs via Homebrew: your copy goes to the Trash and this app becomes Homebrew-managed (cask \"\(cask.token)\"). Its settings and data stay.",
                                         installToken: cask.token,
                                         appPath: appURL.path))
             }
@@ -63,14 +63,13 @@ struct CaskOracleSource: UpdateSource {
         guard let brew = HomebrewSource.brewPath else {
             throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
         }
-        let args = ["install", "--cask", item.installToken, "--force"]
-        let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
-        guard result.status == 0 else {
-            if let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: item.installToken) {
-                throw PrismPackError.staleCaskUpgrade(token: item.installToken, folder: folder)
-            }
-            throw PrismPackError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
+        // Replace, not `--force` (which deleted the old app outright): the
+        // old copy waits in the Trash until Homebrew's is checked (Nick, 30 Oct 2026).
+        guard let appPath = item.appPath else {
+            throw PrismPackError.parseFailure("app path for \(item.name)")
         }
+        _ = brew
+        try await Adopter.replace(cask: item.installToken, appPath: appPath, name: item.name, progress: progress)
     }
 
     // MARK: - App scan

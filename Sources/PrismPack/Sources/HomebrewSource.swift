@@ -16,6 +16,8 @@ struct HomebrewSource: UpdateSource {
             return item.installToken.hasPrefix("cask:") ? String(item.installToken.dropFirst(5)) : nil
         case "caskOracle", "components":
             return item.installToken
+        case "adopt":
+            return Adopter.Job(token: item.installToken)?.cask
         default:
             return nil
         }

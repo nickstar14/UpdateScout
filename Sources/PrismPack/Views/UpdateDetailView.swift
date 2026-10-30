@@ -18,7 +18,7 @@ struct UpdateDetailView: View {
             header
             Divider()
             versions
-            if item.isMajorUpgrade || item.caveat != nil { notices }
+            if item.isMajorUpgrade || item.caveat != nil || selfUpdatingCask != nil || behindVendor != nil { notices }
             notesSection
             Divider()
             ignoreGroup
@@ -69,6 +69,18 @@ struct UpdateDetailView: View {
         }
     }
 
+    /// The vendor's own newer release, for a cask PrismPack adopted.
+    private var behindVendor: String? {
+        HomebrewSource.caskToken(of: item).flatMap { controller.state.adoptedBehind[$0] }
+    }
+
+    /// A Homebrew cask that Homebrew marks as updating itself.
+    private var selfUpdatingCask: String? {
+        guard item.sourceID == "homebrew", let cask = HomebrewSource.caskToken(of: item),
+              controller.selfUpdatingCasks.contains(cask) else { return nil }
+        return cask
+    }
+
     @ViewBuilder
     private var notices: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -80,6 +92,14 @@ struct UpdateDetailView: View {
             if let caveat = item.caveat {
                 Label(caveat, systemImage: "info.circle.fill")
                     .foregroundStyle(.secondary)
+            }
+            if selfUpdatingCask != nil {
+                Label("This app also updates itself. Either it or Homebrew can update it.", systemImage: "info.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            if let vendor = behindVendor {
+                Label("Homebrew is behind the vendor's release (\(vendor)).", systemImage: "exclamationmark.circle.fill")
+                    .foregroundStyle(Color.orange.readable)
             }
         }
         .font(.callout)

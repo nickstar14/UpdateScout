@@ -87,9 +87,10 @@ final class StatusItemController: NSObject {
         guard let button = item?.button else { return }
         let controller = UpdateController.shared
         let count = controller.badgeCount
-        button.image = controller.isSpinning ? MenuBarIcon.pulse(frame: controller.spinFrame) : MenuBarIcon.still
+        button.image = controller.isPulsing ? MenuBarIcon.pulse(frame: controller.spinFrame) : MenuBarIcon.still
         button.title = count > 0 ? "\(count)" : ""
-        button.setAccessibilityLabel(controller.isSpinning ? "Checking for updates"
+        button.setAccessibilityLabel(controller.needsAttention ? "Waiting for your password"
+                                     : controller.isSpinning ? "Checking for updates"
                                      : count > 0 ? "\(count) updates available" : "Up to date")
     }
 

@@ -155,6 +155,9 @@ enum AppcastParser {
         /// `sparkle:channel`, e.g. "beta". Absent means the default channel.
         var channel: String?
         var minimumSystemVersion: String?
+        /// The item lists binary-delta updates (adoption shows this as a cost
+        /// of moving to Homebrew, which always downloads the whole app).
+        var hasDeltas = false
 
         var displayVersion: String { shortVersion ?? version }
 
@@ -220,7 +223,7 @@ enum AppcastParser {
             currentElement = name
             buffer = ""
             if name == "item" { current = Latest(version: "") }
-            if name == "sparkle:deltas" { insideDeltas = true }
+            if name == "sparkle:deltas" { insideDeltas = true; current?.hasDeltas = true }
             if name == "enclosure", !insideDeltas, attributes["sparkle:deltaFrom"] == nil, var item = current {
                 if let v = attributes["sparkle:version"], item.version.isEmpty { item.version = v }
                 if let sv = attributes["sparkle:shortVersionString"], item.shortVersion == nil { item.shortVersion = sv }

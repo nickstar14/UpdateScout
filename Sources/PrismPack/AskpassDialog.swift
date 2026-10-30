@@ -77,21 +77,16 @@ enum AskpassDialog {
         exit(1) // sudo treats a non-zero askpass exit as "cancelled"
     }
 
-    /// The password prompt's badge: the app's prism sheen in a disc, with a
-    /// faint halo and the white key glyph.
-    @MainActor static func circularKeyIcon() -> NSImage {
-        let disc = SwiftUI.ZStack {
-            SwiftUI.Circle().fill(PrismSheen.lavender.opacity(0.3))
-            PrismSheen(frosted: false)
-                .clipShape(SwiftUI.Circle())
-                .padding(9)
-            SwiftUI.Image(systemName: "key.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
-        }
-        .frame(width: 64, height: 64)
-        let renderer = ImageRenderer(content: disc)
+    /// The password prompt's icon: the app icon with the glass key badge
+    /// (AppIconKeyBadge), drawn for the current light or dark look.
+    @MainActor static func circularKeyIcon() -> NSImage { badgeIcon(symbol: "key.fill") }
+
+    /// The same icon with another symbol in the bubble: "exclamationmark"
+    /// for confirmation pop-ups.
+    @MainActor static func badgeIcon(symbol: String) -> NSImage {
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let renderer = ImageRenderer(content: AppIconKeyBadge(size: 64, realGlass: false, symbol: symbol)
+            .environment(\.colorScheme, dark ? .dark : .light))
         renderer.scale = 2
         let image = renderer.nsImage ?? NSImage(size: NSSize(width: 64, height: 64))
         image.size = NSSize(width: 64, height: 64)
