@@ -21,7 +21,7 @@ struct SparkleSource: UpdateSource {
 
     func detect() async throws -> [UpdateItem] {
         let fm = FileManager.default
-        var candidates: [(name: String, path: String, version: String, build: String?, feed: URL)] = []
+        var candidates: [(name: String, path: String, version: String, build: String?, feed: URL, channel: Channel?)] = []
 
         var apps = AppFolders.appPaths().map { URL(fileURLWithPath: $0) }
         // PrismPack always lists itself, wherever it runs from (Nick, Phase 5);
@@ -39,7 +39,8 @@ struct SparkleSource: UpdateSource {
                   let installed = (plist["CFBundleShortVersionString"] ?? plist["CFBundleVersion"]) as? String
             else { continue }
             let name = (appURL.lastPathComponent as NSString).deletingPathExtension
-            candidates.append((name, appURL.path, installed, plist["CFBundleVersion"] as? String, feed))
+            candidates.append((name, appURL.path, installed, plist["CFBundleVersion"] as? String, feed,
+                               Channels.choice(for: plist["CFBundleIdentifier"] as? String)))
         }
 
         // Fetch appcasts concurrently; ignore individual feed failures.
@@ -47,7 +48,7 @@ struct SparkleSource: UpdateSource {
             for c in candidates {
                 group.addTask {
                     await checkAppcast(name: c.name, appPath: c.path, installed: c.version,
-                                       build: c.build, feed: c.feed)
+                                       build: c.build, feed: c.feed, channel: c.channel)
                 }
             }
             var items: [UpdateItem] = []
@@ -57,10 +58,11 @@ struct SparkleSource: UpdateSource {
     }
 
     private func checkAppcast(name: String, appPath: String, installed: String, build: String?,
-                              feed: URL) async -> UpdateItem? {
+                              feed: URL, channel: Channel?) async -> UpdateItem? {
         guard let (data, response) = try? await Net.fetch(feed),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let latest = AppcastParser.latestVersion(from: data, installed: installed, installedBuild: build)
+              let latest = AppcastParser.latestVersion(from: data, installed: installed, installedBuild: build,
+                                                       channel: channel)
         else { return nil }
 
         let latestVersion = latest.displayVersion
@@ -123,9 +125,15 @@ struct SparkleSource: UpdateSource {
         let (feedData, response) = try await Net.fetch(feed)
         guard (response as? HTTPURLResponse)?.statusCode == 200,
               let latest = AppcastParser.latestVersion(from: feedData, installed: installed,
-                                                       installedBuild: plist["CFBundleVersion"] as? String),
+                                                       installedBuild: plist["CFBundleVersion"] as? String,
+                                                       channel: Channels.choice(for: plist["CFBundleIdentifier"] as? String)),
               let plan = SparkleInstaller.plan(appPath: appPath, latest: latest)
         else { throw PrismPackError.parseFailure("appcast for \(item.name)") }
+        // Install what the row showed, or something newer; never an older
+        // version the row didn't promise (a channel switched since the check).
+        guard latest.displayVersion == item.latestVersion || isNewerVersion(latest.displayVersion, than: installed) else {
+            throw PrismPackError.unsupported("\(item.name)'s feed now offers \(latest.displayVersion), not \(item.latestVersion). Check again.")
+        }
 
         try await SparkleInstaller.install(plan, progress: progress)
     }
@@ -174,36 +182,66 @@ enum AppcastParser {
         }
     }
 
-    /// The newest item on the installed app's release track that this Mac
-    /// can run. The track is read from the installed version: a stable
-    /// install sees stable releases only, a beta sees betas and releases, an
-    /// alpha sees everything. So someone on 3.0.0-beta.4 is offered beta.5
-    /// and 3.0.0, never an alpha.
-    static func latestVersion(from data: Data, installed: String, installedBuild: String?) -> Latest? {
+    static func items(from data: Data) -> [Latest] {
         let parser = XMLParser(data: data)
         let delegate = Delegate()
         parser.delegate = delegate
         parser.parse()
-        let items = delegate.items
+        return delegate.items
+    }
 
-        var installedTrack = VersionParts(installed).track
-        // The installed build may itself be a tagged feed item.
+    /// The installed app's own track: from its version, or from the feed when
+    /// the installed build is itself a tagged item.
+    static func installedTrack(_ items: [Latest], installed: String, installedBuild: String?) -> Int {
+        var track = VersionParts(installed).track
         if let match = items.first(where: {
             ($0.shortVersion != nil && $0.shortVersion == installed)
                 || (installedBuild != nil && $0.version == installedBuild)
         }) {
-            installedTrack = max(installedTrack, match.track)
+            track = max(track, match.track)
         }
+        return track
+    }
 
+    /// The item can run on this Mac.
+    static func runsHere(_ item: Latest) -> Bool {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         let os = "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+        if let min = item.minimumSystemVersion, isNewerVersion(min, than: os) { return false }
+        return meetsHardwareRequirements(item.hardwareRequirements)
+    }
+
+    /// The newest item on the app's release track that this Mac can run. With
+    /// no channel chosen, the track is read from the installed version: a
+    /// stable install sees stable releases only, a beta sees betas and
+    /// releases, an alpha sees everything. So someone on 3.0.0-beta.4 is
+    /// offered beta.5 and 3.0.0, never an alpha. A chosen channel overrides it.
+    static func latestVersion(from data: Data, installed: String, installedBuild: String?,
+                              channel: Channel? = nil) -> Latest? {
+        let items = items(from: data)
+        let track = Channels.track(installed: installedTrack(items, installed: installed, installedBuild: installedBuild),
+                                   choice: channel)
         var best: Latest?
-        for item in items where item.track <= installedTrack {
-            if let min = item.minimumSystemVersion, isNewerVersion(min, than: os) { continue }
-            if !meetsHardwareRequirements(item.hardwareRequirements) { continue }
+        for item in items where item.track <= track && runsHere(item) {
             if best == nil || isNewerVersion(item.displayVersion, than: best!.displayVersion) { best = item }
         }
         return best
+    }
+
+    /// The feed offers betas this Mac can run.
+    static func offersBetas(_ data: Data) -> Bool {
+        items(from: data).contains { $0.track > 0 && runsHere($0) }
+    }
+
+    /// The newest stable release, when a beta is installed and that release is
+    /// older than it: the target of "Go back to stable".
+    static func stableBelow(from data: Data, installed: String, installedBuild: String?) -> Latest? {
+        let items = items(from: data)
+        guard installedTrack(items, installed: installed, installedBuild: installedBuild) > 0 else { return nil }
+        let stable = items.filter { $0.track == 0 && runsHere($0) }
+            .max { isNewerVersion($1.displayVersion, than: $0.displayVersion) }
+        guard let stable, isNewerVersion(installed, than: stable.displayVersion) else { return nil }
+        return stable
     }
 
     /// Sparkle defines one requirement today, `arm64` (Apple silicon only).

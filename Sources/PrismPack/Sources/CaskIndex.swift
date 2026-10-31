@@ -142,6 +142,27 @@ extension CaskIndex {
     /// conflict. Never match against these.
     static func isPrerelease(_ token: String) -> Bool { token.contains("@") }
 
+    /// Separate beta casks by the stable cask they go with ("firefox" →
+    /// ["firefox@beta", "firefox@nightly"]). They're separate apps, so they're
+    /// only mentioned, never switched to. Reads tokens from the raw index
+    /// without decoding all 19 MB of it.
+    static func separateBetas() async -> [String: [String]] {
+        guard let data = try? await rawData() else { return [:] }
+        return await Task.detached(priority: .utility) { separateBetas(in: data) }.value
+    }
+
+    static func separateBetas(in data: Data) -> [String: [String]] {
+        let text = String(decoding: data, as: UTF8.self)
+        let pattern = try! NSRegularExpression(pattern: #""token"\s*:\s*"([^"@]+)@([^"]+)""#)
+        var found: [String: [String]] = [:]
+        for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let base = Range(match.range(at: 1), in: text),
+                  let suffix = Range(match.range(at: 2), in: text) else { continue }
+            found[String(text[base]), default: []].append("\(text[base])@\(text[suffix])")
+        }
+        return found.mapValues { $0.sorted() }
+    }
+
     /// App name (lowercased) → stable cask.
     static func byAppName(_ casks: [CaskInfo]) -> [String: CaskInfo] {
         var map: [String: CaskInfo] = [:]

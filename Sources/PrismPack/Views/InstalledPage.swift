@@ -165,6 +165,14 @@ private struct InstalledDetail: View {
                 }
             }
             LabeledContent("Installed", value: pkg.version)
+            if let path = pkg.appPath, ["sparkle", "github"].contains(pkg.sourceID) {
+                ChannelSection(appPath: path)
+            }
+            if let cask, let betas = controller.separateBetas[cask] {
+                Label("Separate beta available: \(betas.joined(separator: ", "))", systemImage: "testtube.2")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if pkg.sourceID == "unmanaged" {
                 Text("Nothing here updates this app. It may update itself.")
                     .font(.callout).foregroundStyle(.secondary)

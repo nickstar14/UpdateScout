@@ -40,7 +40,9 @@ struct GitHubReleasesSource: UpdateSource {
 
     /// A pkg asset runs an installer, which needs the password.
     func needsAdmin(_ item: UpdateItem) -> Bool {
-        GitHubAPI.cachedRelease(item.installToken).flatMap(GitHubAPI.pickAsset)?.kind == .pkg
+        let releases = [item.installToken, item.installToken + "#beta"].compactMap(GitHubAPI.cachedRelease)
+        let release = releases.first { $0.version == item.latestVersion } ?? releases.first
+        return release.flatMap(GitHubAPI.pickAsset)?.kind == .pkg
     }
 
     func detect() async throws -> [UpdateItem] {
@@ -50,8 +52,9 @@ struct GitHubReleasesSource: UpdateSource {
         var failures: [String] = []
         for app in apps {
             guard let facts = Adoption.facts(at: app.appPath) else { continue }
+            let channel = Channels.effective(Channels.choice(for: app.bundleID), installedVersion: facts.version)
             do {
-                guard let release = try await GitHubAPI.latestRelease(app.repo),
+                guard let release = try await GitHubAPI.release(app.repo, channel: channel),
                       isNewerVersion(release.version, than: facts.version),
                       GitHubAPI.pickAsset(release) != nil else { continue }
                 items.append(UpdateItem(sourceID: id, name: app.name, installedVersion: facts.version,
@@ -74,8 +77,15 @@ struct GitHubReleasesSource: UpdateSource {
         guard let app = GitHubApps.load().first(where: { $0.repo == item.installToken && $0.appPath == item.appPath }) else {
             throw PrismPackError.parseFailure("GitHub link for \(item.name)")
         }
-        guard let release = try await GitHubAPI.latestRelease(app.repo), let asset = GitHubAPI.pickAsset(release) else {
+        let installed = Adoption.facts(at: app.appPath)?.version ?? item.installedVersion
+        let channel = Channels.effective(Channels.choice(for: app.bundleID), installedVersion: installed)
+        guard let release = try await GitHubAPI.release(app.repo, channel: channel), let asset = GitHubAPI.pickAsset(release) else {
             throw PrismPackError.commandFailed("GitHub", output: "No macOS download in the latest release of \(app.repo).")
+        }
+        // Install what the row showed, or something newer; never an older
+        // version the row didn't promise.
+        guard release.version == item.latestVersion || isNewerVersion(release.version, than: installed) else {
+            throw PrismPackError.unsupported("\(app.repo) now offers \(release.version), not \(item.latestVersion). Check again.")
         }
         try await GitHubInstaller.install(app, asset: asset, progress: progress)
     }
@@ -89,6 +99,8 @@ enum GitHubAPI {
         let notes: String?
         let htmlURL: String
         let assets: [Asset]
+        /// Marked as a pre-release on GitHub (nil in caches from before channels).
+        var prerelease: Bool? = nil
         /// The tag without a leading "v" ("v1.0.2" → "1.0.2").
         var version: String { tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag }
     }
@@ -169,38 +181,67 @@ enum GitHubAPI {
     /// The latest full release (GitHub's /releases/latest skips drafts and
     /// prereleases). nil when the project publishes no releases.
     static func latestRelease(_ repo: String) async throws -> Release? {
+        try await cachedFetch(repo, path: "releases/latest", key: repo) { json in
+            (json as? [String: Any]).flatMap { release(from: $0, repo: repo) }
+        }
+    }
+
+    /// The newest release with a macOS download, pre-releases included (the
+    /// Beta channel). Drafts never count.
+    static func newestRelease(_ repo: String) async throws -> Release? {
+        try await cachedFetch(repo, path: "releases?per_page=20", key: repo + "#beta") { json in
+            (json as? [[String: Any]] ?? [])
+                .filter { $0["draft"] as? Bool != true }
+                .compactMap { release(from: $0, repo: repo) }
+                .filter { pickAsset($0) != nil }
+                .max { isNewerVersion($1.version, than: $0.version) }
+        }
+    }
+
+    /// The release a channel offers: Beta reads pre-releases too.
+    static func release(_ repo: String, channel: Channel) async throws -> Release? {
+        channel == .beta ? try await newestRelease(repo) : try await latestRelease(repo)
+    }
+
+    private static func release(from json: [String: Any], repo: String) -> Release? {
+        guard let tag = json["tag_name"] as? String else { return nil }
+        let assets = (json["assets"] as? [[String: Any]] ?? []).compactMap { a -> Asset? in
+            guard let name = a["name"] as? String, let url = a["browser_download_url"] as? String else { return nil }
+            return Asset(name: name, url: url, size: a["size"] as? Int ?? 0)
+        }
+        return Release(tag: tag, notes: json["body"] as? String,
+                       htmlURL: json["html_url"] as? String ?? "https://github.com/\(repo)/releases",
+                       assets: assets, prerelease: json["prerelease"] as? Bool ?? false)
+    }
+
+    /// One GitHub API call with the ETag cache and rate-limit handling.
+    private static func cachedFetch(_ repo: String, path: String, key: String,
+                                    parse: (Any) -> Release?) async throws -> Release? {
         guard repo.wholeMatch(of: #/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/#) != nil,
-              let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
+              let url = URL(string: "https://api.github.com/repos/\(repo)/\(path)") else {
             throw PrismPackError.parseFailure("repository \(repo)")
         }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let cached = cache()[repo]
+        let cached = cache()[key]
         if let etag = cached?.etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         let (data, response) = try await Net.fetch(request)
         guard let http = response as? HTTPURLResponse else { throw Failure.http(0) }
         switch http.statusCode {
         case 304:
-            store(repo, CacheEntry(etag: cached?.etag, release: cached?.release, fetched: Date()))
+            store(key, CacheEntry(etag: cached?.etag, release: cached?.release, fetched: Date()))
             return cached?.release
         case 404:
-            store(repo, CacheEntry(etag: nil, release: nil, fetched: Date()))
+            store(key, CacheEntry(etag: nil, release: nil, fetched: Date()))
             return nil
         case 403, 429:
             let reset = (http.value(forHTTPHeaderField: "X-RateLimit-Reset")).flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
             if let release = cached?.release { return release }
             throw Failure.rateLimited(reset)
         case 200:
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let tag = json["tag_name"] as? String else { throw PrismPackError.parseFailure("GitHub release") }
-            let assets = (json["assets"] as? [[String: Any]] ?? []).compactMap { a -> Asset? in
-                guard let name = a["name"] as? String, let url = a["browser_download_url"] as? String else { return nil }
-                return Asset(name: name, url: url, size: a["size"] as? Int ?? 0)
-            }
-            let release = Release(tag: tag, notes: json["body"] as? String,
-                                  htmlURL: json["html_url"] as? String ?? "https://github.com/\(repo)/releases",
-                                  assets: assets)
-            store(repo, CacheEntry(etag: http.value(forHTTPHeaderField: "ETag"), release: release, fetched: Date()))
+            guard let json = try? JSONSerialization.jsonObject(with: data) else { throw PrismPackError.parseFailure("GitHub release") }
+            let release = parse(json)
+            store(key, CacheEntry(etag: http.value(forHTTPHeaderField: "ETag"), release: release, fetched: Date()))
             return release
         default:
             throw Failure.http(http.statusCode)

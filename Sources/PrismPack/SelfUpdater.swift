@@ -14,10 +14,16 @@ final class SelfUpdaterDelegate: NSObject, SPUUpdaterDelegate {
         return base + "?t=\(Int(Date().timeIntervalSince1970))"
     }
 
-    /// A running beta (any prerelease marker) also sees items tagged
-    /// `sparkle:channel` beta; a release sees only untagged items.
+    /// Items tagged `sparkle:channel` beta are seen when Beta is chosen on
+    /// PrismPack's own card, or, with no choice, when the running version is
+    /// a beta (any prerelease marker). Otherwise only untagged items.
     func allowedChannels(for updater: SPUUpdater) -> Set<String> {
-        Self.channels(forVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        switch Channels.choice(for: Bundle.main.bundleIdentifier) {
+        case .beta: return ["beta"]
+        case .stable: return []
+        case nil: return Self.channels(forVersion: version)
+        }
     }
 
     /// Sparkle is about to restart us after "Install and Relaunch": reopen the

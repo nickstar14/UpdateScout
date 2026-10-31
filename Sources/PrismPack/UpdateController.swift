@@ -31,6 +31,8 @@ final class UpdateController: ObservableObject {
     @Published var duplicates: [DuplicateGroup] = []
     /// Installed casks Homebrew marks as updating themselves (both can update them).
     @Published var selfUpdatingCasks: Set<String> = []
+    /// Separate beta casks by stable cask, for "Separate beta available".
+    @Published var separateBetas: [String: [String]] = [:]
     @Published var showingAdoptionReview = false
     /// A chip Installed should select when it next shows ("duplicates").
     @Published var installedChipRequest: String?
@@ -43,6 +45,9 @@ final class UpdateController: ObservableObject {
         Task {
             installed = await Inventory.load()
             loadingInstalled = false
+            if separateBetas.isEmpty, installed.contains(where: { $0.detail?.hasPrefix("cask ") == true }) {
+                separateBetas = await CaskIndex.separateBetas()
+            }
         }
     }
 

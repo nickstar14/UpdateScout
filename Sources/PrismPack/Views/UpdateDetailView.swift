@@ -19,6 +19,13 @@ struct UpdateDetailView: View {
             Divider()
             versions
             if item.isMajorUpgrade || item.caveat != nil || selfUpdatingCask != nil || behindVendor != nil { notices }
+            if let path = item.appPath, ["sparkle", "github"].contains(item.sourceID) {
+                ChannelSection(appPath: path)
+            }
+            if item.installToken.hasPrefix("cask:"), let betas = controller.separateBetas[String(item.installToken.dropFirst(5))] {
+                Label("Separate beta available: \(betas.joined(separator: ", "))", systemImage: "testtube.2")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             notesSection
             Divider()
             ignoreGroup
