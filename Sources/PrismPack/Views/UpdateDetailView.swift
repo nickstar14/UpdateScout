@@ -29,6 +29,7 @@ struct UpdateDetailView: View {
             notesSection
             Divider()
             ignoreGroup
+            AutoUpdateControls(item: item)
             Divider()
             footer
         }
@@ -244,5 +245,56 @@ struct UpdateDetailView: View {
             return md
         }
         return AttributedString(notes)
+    }
+}
+
+/// Pin and "Update automatically" on an update's card (Phase 8).
+struct AutoUpdateControls: View {
+    @EnvironmentObject var controller: UpdateController
+    let item: UpdateItem
+
+    private var rule: Binding<String> {
+        Binding(get: { controller.autoRule(item)?.rawValue ?? "setting" },
+                set: { controller.setAutoRule(AutoUpdate.Rule(rawValue: $0), for: item) })
+    }
+
+    var body: some View {
+        let _ = controller.autoRulesVersion
+        let pinned = controller.isPinned(item)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                if pinned {
+                    Label("Pinned at \(item.installedVersion)", systemImage: "pin.fill").font(.callout)
+                    Spacer()
+                    if !item.isPinned {   // uv's own pins are changed in uv
+                        Button("Unpin") { controller.setPinned(item, false) }.glass().controlSize(.small)
+                    }
+                } else {
+                    // Segmented, not a menu: a pop-up menu inside the card's
+                    // popover dropped the choice (tested 30 Oct 2026).
+                    Text("Update automatically").font(.callout).fixedSize()
+                    Spacer()
+                    Picker("Update automatically", selection: rule) {
+                        Text("Use setting").tag("setting")
+                        Text("Always").tag(AutoUpdate.Rule.always.rawValue)
+                        Text("Never").tag(AutoUpdate.Rule.never.rawValue)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+            }
+            if !pinned {
+                HStack {
+                    Text("Pin it to keep \(item.installedVersion): never automatic, not in Update All.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Keep this version") { controller.setPinned(item, true) }
+                        .glass().controlSize(.small).fixedSize()
+                }
+            }
+            if !pinned, let reason = controller.autoBlocker(item) {
+                Text("Won't install automatically: \(reason.prefix(1).lowercased() + reason.dropFirst()).")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }

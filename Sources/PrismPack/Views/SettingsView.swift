@@ -13,6 +13,9 @@ struct SettingsView: View {
     @State private var appearance = Prefs.appearance
     @State private var updateConcurrency = Prefs.updateConcurrency
     @State private var passwordOnce = Prefs.askPasswordOncePerBatch
+    @State private var autoEnabled = AutoUpdate.enabled
+    @State private var autoSchedule = AutoUpdate.schedule
+    @State private var autoUnmetered = AutoUpdate.unmeteredOnly
     @AppStorage(Prefs.glassTintKey) private var glassTint: Double = 0.35
     @State private var showDockIcon = Prefs.showDockIcon
     @State private var adoptionEnabled = Prefs.adoptionEnabled
@@ -93,6 +96,18 @@ struct SettingsView: View {
                     .onChange(of: passwordOnce) { _, value in Prefs.askPasswordOncePerBatch = value }
                 Text("Kept in memory for that batch only, then wiped. Never saved. When off, each installer asks for itself.")
                     .font(.caption).foregroundStyle(.secondary)
+                Toggle("Install updates automatically", isOn: $autoEnabled)
+                    .onChange(of: autoEnabled) { _, value in AutoUpdate.enabled = value }
+                if autoEnabled {
+                    Picker("How often", selection: $autoSchedule) {
+                        ForEach(AutoUpdate.Schedule.allCases) { Text($0.title).tag($0) }
+                    }
+                    .onChange(of: autoSchedule) { _, value in AutoUpdate.schedule = value }
+                    Toggle("Only on Wi-Fi or Ethernet", isOn: $autoUnmetered)
+                        .onChange(of: autoUnmetered) { _, value in AutoUpdate.unmeteredOnly = value }
+                }
+                Text("Never automatic: anything that needs your password, apps that are open, macOS, custom sources, betas, major upgrades, and anything hidden or pinned. \"Only on Wi-Fi or Ethernet\" skips a phone hotspot and Low Data Mode. Each app's card can override this.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Homebrew adoption") {
@@ -152,7 +167,9 @@ struct SettingsView: View {
                 if let agentError {
                     Text(agentError).font(.caption).foregroundStyle(Color.red.readable)
                 }
-                Text("Background checks only detect and notify — updates are always installed by you, per item.")
+                Text(autoEnabled
+                     ? "Background checks also install automatic updates while \(AppIdentity.name) isn't open; when it is, it installs them itself."
+                     : "Background checks only detect and notify. Updates are installed by you, unless an app's card says Always.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

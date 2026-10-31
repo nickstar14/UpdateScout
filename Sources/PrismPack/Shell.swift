@@ -30,6 +30,9 @@ enum Shell {
     /// Process tag for install work. The install queue sets a per-item value
     /// around each install, so cancelling one item kills only its processes.
     @TaskLocal static var installTag = "install"
+    /// Set for automatic installs: any sudo they reach fails at once instead
+    /// of showing the password dialog (nobody asked for this install).
+    @TaskLocal static var noPasswordPrompt = false
 
     /// Run an executable directly (no shell interpretation of arguments).
     /// `environment` adds or overrides variables for this one process.
@@ -54,7 +57,7 @@ enum Shell {
         // GUI apps have no terminal for sudo to prompt on; pkg-based casks and
         // some mas updates need elevation. SUDO_ASKPASS makes sudo show a
         // graphical prompt instead — the password goes directly to sudo.
-        env["SUDO_ASKPASS"] = Askpass.path
+        env["SUDO_ASKPASS"] = noPasswordPrompt ? "/usr/bin/false" : Askpass.path
         env.merge(environment) { _, new in new }
         process.environment = env
 

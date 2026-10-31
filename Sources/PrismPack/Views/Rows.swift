@@ -109,8 +109,9 @@ struct UpdateRow: View {
 
     private var subtitle: String {
         var parts = ["\(item.installedVersion) to \(item.latestVersion)"]
-        if item.isPinned { parts.append("pinned") }
-        if let caveat = item.caveat, !item.isPinned { parts.append(caveat) }
+        let pinned = controller.isPinned(item)
+        if pinned { parts.append("pinned") }
+        if let caveat = item.caveat, !pinned { parts.append(caveat) }
         return parts.joined(separator: " · ")
     }
 

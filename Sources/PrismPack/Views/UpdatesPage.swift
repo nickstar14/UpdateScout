@@ -159,7 +159,7 @@ struct UpdatesPage: View {
 
     @ViewBuilder
     private func headerButton(id: String, title: String, items: [UpdateItem]) -> some View {
-        let installable = items.filter { $0.scriptedInstall && !$0.isPinned }
+        let installable = items.filter { $0.scriptedInstall && !controller.isPinned($0) }
         if !installable.isEmpty {
             Button(installable.count > 1 ? "Update all \(title)" : "Update \(title)") {
                 controller.updateAll(sectionID: id)

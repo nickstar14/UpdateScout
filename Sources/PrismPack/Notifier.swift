@@ -10,6 +10,7 @@ enum Notifier {
     /// Notification Center instead of piling up.
     static let updatesID = "updates"
     static let adoptionID = "adoption"
+    static let autoID = "auto"
 
     /// One notification for updates. A check that finds new ones replaces the
     /// last; once nothing is waiting, it's taken down. Hidden items never
@@ -26,10 +27,23 @@ enum Notifier {
         let center = UNUserNotificationCenter.current()
         center.getDeliveredNotifications { delivered in
             center.removeDeliveredNotifications(withIdentifiers:
-                delivered.map(\.request.identifier).filter { $0 != adoptionID })
+                delivered.map(\.request.identifier).filter { $0 != adoptionID && $0 != autoID })
             guard !newItems.isEmpty else { return }
             center.add(UNNotificationRequest(identifier: updatesID, content: content, trigger: nil))
         }
+    }
+
+    /// One summary per automatic run, replacing the last.
+    static func notifyAutoRun(updated: [String], failed: [String]) {
+        guard !updated.isEmpty || !failed.isEmpty else { return }
+        let content = UNMutableNotificationContent()
+        content.title = updated.isEmpty ? "Automatic updates didn't finish"
+            : updated.count == 1 ? "1 app updated automatically" : "\(updated.count) apps updated automatically"
+        var lines: [String] = []
+        if !updated.isEmpty { lines.append(updated.prefix(4).joined(separator: ", ") + (updated.count > 4 ? ", …" : "")) }
+        if !failed.isEmpty { lines.append(failed.count == 1 ? "1 couldn't update" : "\(failed.count) couldn't update") }
+        content.body = lines.joined(separator: " · ")
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: autoID, content: content, trigger: nil))
     }
 
     /// At most one a week, never one per app (Adoption.merge decides when).

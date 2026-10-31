@@ -211,6 +211,7 @@ final class UpdateController: ObservableObject {
             fresh = Self.merge(items: items, errors: errors, leftovers: leftovers, into: &s)
         }
         Notifier.notifyNewUpdates(fresh, waiting: state.items.filter { !state.isHidden($0) })
+        maybeAutoUpdate()
     }
 
     nonisolated static func sourceName(_ id: String) -> String {
@@ -657,8 +658,11 @@ final class UpdateController: ObservableObject {
             MoveProgressWindow.shared.show(jobID: item.id)
         }
         let started = Date()
+        let automatic = autoPending.contains(item.id)
+        let how = automatic ? "Automatically · " : ""
         let install = Task {
             try await Shell.$installTag.withValue(Self.processTag(item)) {
+              try await Shell.$noPasswordPrompt.withValue(automatic) {
                 try await source.install(item) { line in
                     Task { @MainActor in
                         self.moveProgress[item.id]?.take(line)
@@ -671,6 +675,7 @@ final class UpdateController: ObservableObject {
                         self.installStates[item.id] = InstallState(progressLine: line)
                     }
                 }
+              }
             }
         }
         runningInstalls[item.id] = install
@@ -697,10 +702,11 @@ final class UpdateController: ObservableObject {
                     state = Store.mutate {
                         $0.items.removeAll { $0.id == item.id }
                         $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
-                                             detail: Self.sourceName(item.sourceID), itemID: item.id,
+                                             detail: how + Self.sourceName(item.sourceID), itemID: item.id,
                                              sourceID: item.sourceID, seconds: seconds))
                     }
                 }
+                autoFinished(item, ok: true)
             } catch {
                 // A user-cancelled install isn't an error worth showing.
                 installStates[item.id] = install.isCancelled ? nil : .failed(error.localizedDescription)
@@ -710,12 +716,13 @@ final class UpdateController: ObservableObject {
                     ? ActivityEntry(kind: .cancelled, title: item.logTitle,
                                     detail: Self.sourceName(item.sourceID), itemID: item.id, sourceID: item.sourceID)
                     : ActivityEntry(kind: .failed, title: item.logTitle,
-                                    detail: "\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
+                                    detail: "\(how)\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
                                     itemID: item.id, sourceID: item.sourceID,
                                     log: (outputTails[item.id] ?? []).joined(separator: "\n")))
                 if case PrismPackError.staleCaskUpgrade(let token, let folder) = error {
                     repairable[item.id] = (token, folder)
                 }
+                autoFinished(item, ok: false)
             }
             runningInstalls[item.id] = nil
             outputTails[item.id] = nil
@@ -738,13 +745,13 @@ final class UpdateController: ObservableObject {
 
     /// Queue every visible scripted update; lanes decide what runs together.
     func updateAll() {
-        queueAll(visibleItems.filter { $0.scriptedInstall && !$0.isPinned && !isBusy($0) })
+        queueAll(visibleItems.filter { $0.scriptedInstall && !isPinned($0) && !isBusy($0) })
     }
 
     /// Queue every installable update in one window section.
     func updateAll(sectionID: String) {
         queueAll(visibleItems.filter {
-            $0.sectionID == sectionID && $0.scriptedInstall && !$0.isPinned && !isBusy($0)
+            $0.sectionID == sectionID && $0.scriptedInstall && !isPinned($0) && !isBusy($0)
         })
     }
 
@@ -805,8 +812,74 @@ final class UpdateController: ObservableObject {
     /// as new as what's in memory and reloading is safe at any time.
     func reloadFromDisk() {
         let fresh = Store.load()
-        if fresh != state { state = fresh }
+        if fresh != state { state = fresh; maybeAutoUpdate() }
         updateSpinner()
+    }
+
+    // MARK: - Automatic updates
+
+    /// Bumped when a pin or per-app rule changes, so views redraw.
+    @Published private(set) var autoRulesVersion = 0
+    /// Items queued by an automatic run, and how that run is going.
+    private var autoPending: Set<String> = []
+    private var autoUpdated: [String] = []
+    private var autoFailed: [String] = []
+    private var autoStarting = false
+
+    func isPinned(_ item: UpdateItem) -> Bool { AutoUpdate.isPinned(item) }
+
+    func setPinned(_ item: UpdateItem, _ pinned: Bool) {
+        var all = AutoUpdate.pinned
+        if pinned { all.insert(item.appKey) } else { all.remove(item.appKey) }
+        AutoUpdate.pinned = all
+        autoRulesVersion += 1
+    }
+
+    func autoRule(_ item: UpdateItem) -> AutoUpdate.Rule? { AutoUpdate.rule(for: item.appKey) }
+
+    func setAutoRule(_ rule: AutoUpdate.Rule?, for item: UpdateItem) {
+        AutoUpdate.setRule(rule, for: item.appKey)
+        autoRulesVersion += 1
+    }
+
+    /// Why this update won't install on its own (for its card), or nil.
+    func autoBlocker(_ item: UpdateItem) -> String? {
+        AutoUpdate.blocker(item, hidden: isIgnored(item), pinned: isPinned(item),
+                           needsAdmin: Self.source(for: item.sourceID)?.needsAdmin(item) ?? true,
+                           appOpen: false, rule: autoRule(item))
+    }
+
+    /// After a check lands: queue what automatic updates allow, through the
+    /// normal queue. The background agent leaves this to the app while it runs.
+    func maybeAutoUpdate() {
+        guard autoPending.isEmpty, !autoStarting, AutoUpdate.isActive, AutoUpdate.isDue() else { return }
+        autoStarting = true
+        Task {
+            defer { autoStarting = false }
+            if AutoUpdate.unmeteredOnly, await AutoUpdate.onMeteredNetwork() { return }
+            // The agent may be mid-run from before the app opened.
+            guard let lock = AutoUpdate.acquireLock() else { return }
+            AutoUpdate.releaseLock(lock)
+            await HomebrewSource.lookUpInstallerCasks(state.items.compactMap(HomebrewSource.caskToken(of:)))
+            let items = state.items.filter { item in
+                !isBusy(item) && AutoUpdate.blocker(
+                    item, hidden: isIgnored(item), pinned: isPinned(item),
+                    needsAdmin: Self.source(for: item.sourceID)?.needsAdmin(item) ?? true,
+                    appOpen: AutoUpdate.isOpen(item), rule: autoRule(item)) == nil
+            }
+            AutoUpdate.lastRun = Date()
+            guard !items.isEmpty else { return }
+            autoPending = Set(items.map(\.id))
+            autoUpdated = []; autoFailed = []
+            items.forEach(update)
+        }
+    }
+
+    /// An automatic install finished; the last one posts the summary.
+    private func autoFinished(_ item: UpdateItem, ok: Bool) {
+        guard autoPending.remove(item.id) != nil else { return }
+        if ok { autoUpdated.append(item.name) } else { autoFailed.append(item.name) }
+        if autoPending.isEmpty { Notifier.notifyAutoRun(updated: autoUpdated, failed: autoFailed) }
     }
 
     // MARK: - Menu bar spinner

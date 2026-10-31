@@ -13,8 +13,8 @@ struct Main {
         }
     }
 
-    /// Headless mode, run by the launchd agent: detect, persist, notify, exit.
-    /// Installs never happen here — detection only.
+    /// Headless mode, run by the launchd agent: detect, persist, install
+    /// what automatic updates allow (only while the app isn't running), notify, exit.
     static func backgroundCheck() {
         let semaphore = DispatchSemaphore(value: 0)
         // Tell the menu bar app a check is under way (merge clears it).
@@ -28,14 +28,17 @@ struct Main {
             let (items, errors) = await detection
             let kexts = await leftovers
             let scan = await adoption
-            var fresh: [UpdateItem] = [], waiting: [UpdateItem] = []
+            var fresh: [UpdateItem] = []
             var digest: [AdoptionCandidate] = []
             Store.mutate { s in
                 fresh = UpdateController.merge(items: items, errors: errors, leftovers: kexts, into: &s)
-                waiting = s.items.filter { !s.isHidden($0) }
                 if let scan { digest = Adoption.merge(scan, into: &s) }
             }
-            Notifier.notifyNewUpdates(fresh, waiting: waiting)
+            // Before notifying, so what updated automatically isn't announced.
+            let auto = await AutoUpdate.runHeadless()
+            Notifier.notifyAutoRun(updated: auto.updated, failed: auto.failed)
+            let after = Store.load()
+            Notifier.notifyNewUpdates(fresh, waiting: after.items.filter { !after.isHidden($0) })
             Notifier.notifyAdoptionDigest(digest)
             // Give the notification a moment to post before exiting.
             try? await Task.sleep(for: .seconds(2))
