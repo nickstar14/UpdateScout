@@ -86,6 +86,12 @@ struct Store {
                 || (adoptionSnoozed[candidate.hideKey].map { $0 > now } ?? false)
         }
 
+        /// Hidden by any of the three Hide options.
+        func isHidden(_ item: UpdateItem) -> Bool {
+            dismissed.contains(item.id) || ignoredApps.contains(item.appKey)
+                || (item.isMajorUpgrade && ignoredMajors.contains(item.appKey))
+        }
+
         mutating func log(_ entry: ActivityEntry) {
             activity.insert(entry, at: 0)
             if activity.count > Self.activityLimit { activity.removeLast(activity.count - Self.activityLimit) }
@@ -156,6 +162,13 @@ enum Prefs {
     static var disabledSources: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: "disabledSources") ?? []) }
         set { UserDefaults.standard.set(Array(newValue), forKey: "disabledSources") }
+    }
+
+    /// Custom-source entry names allowed to run in the background check.
+    /// Nil until `CustomSource.backgroundNames` first sets it.
+    static var customBackgroundNames: Set<String>? {
+        get { UserDefaults.standard.stringArray(forKey: "customBackgroundNames").map(Set.init) }
+        set { UserDefaults.standard.set(newValue.map(Array.init), forKey: "customBackgroundNames") }
     }
 
     /// Ask for the admin password once per batch instead of once per sudo call.

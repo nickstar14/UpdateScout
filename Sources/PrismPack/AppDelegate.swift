@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Relaunching from the renamed bundle: the new copy does the rest.
         if Migration.runAtLaunch() { return }
         StatusItemController.shared.install()
+        SelfUpdater.start()
         // The rename pop-up lives in the main window, so open it once; and
         // after an update relaunch, come back to the window.
         let defaults = UserDefaults.standard
@@ -27,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        // Clicked means seen: take it out of Notification Center.
+        center.removeDeliveredNotifications(withIdentifiers: [response.notification.request.identifier])
         DispatchQueue.main.async {
             UpdatesWindow.shared.show()
         }

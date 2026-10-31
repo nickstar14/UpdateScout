@@ -63,10 +63,7 @@ final class UpdateController: ObservableObject {
     }
 
     /// Hidden by any of the three ignore options.
-    func isIgnored(_ item: UpdateItem) -> Bool {
-        state.dismissed.contains(item.id) || state.ignoredApps.contains(item.appKey)
-            || (item.isMajorUpgrade && state.ignoredMajors.contains(item.appKey))
-    }
+    func isIgnored(_ item: UpdateItem) -> Bool { state.isHidden(item) }
 
     /// Why a hidden item is hidden, for the Hidden section.
     func ignoreReason(_ item: UpdateItem) -> String {
@@ -208,7 +205,7 @@ final class UpdateController: ObservableObject {
         state = Store.mutate { s in
             fresh = Self.merge(items: items, errors: errors, leftovers: leftovers, into: &s)
         }
-        Notifier.notifyNewUpdates(fresh)
+        Notifier.notifyNewUpdates(fresh, waiting: state.items.filter { !state.isHidden($0) })
     }
 
     nonisolated static func sourceName(_ id: String) -> String {

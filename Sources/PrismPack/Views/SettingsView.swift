@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var intervalMinutes = Prefs.checkIntervalMinutes
     @State private var disabled = Prefs.disabledSources
     @State private var agentInstalled = LaunchAgent.isInstalled
+    @State private var agentStalled = LaunchAgent.isStalled
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
@@ -16,6 +17,8 @@ struct SettingsView: View {
     @State private var showDockIcon = Prefs.showDockIcon
     @State private var adoptionEnabled = Prefs.adoptionEnabled
     @State private var adoptionSelfUpdating = Prefs.adoptionIncludeSelfUpdating
+    @State private var customNames: [String] = []
+    @State private var customBackground: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -126,6 +129,7 @@ struct SettingsView: View {
                                 agentError = error.localizedDescription
                                 agentInstalled = LaunchAgent.isInstalled
                             }
+                            agentStalled = LaunchAgent.isStalled
                         }
                     }
                 Picker("Check every", selection: $intervalMinutes) {
@@ -140,6 +144,10 @@ struct SettingsView: View {
                         do { agentError = nil; try await LaunchAgent.install(intervalMinutes: minutes) }
                         catch { agentError = error.localizedDescription }
                     }
+                }
+                if !agentInstalled && agentStalled {
+                    Text("The background check is set up but isn't running. Turn it on again to restart it.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if let agentError {
                     Text(agentError).font(.caption).foregroundStyle(Color.red.readable)
@@ -210,6 +218,22 @@ struct SettingsView: View {
                         NSWorkspace.shared.activateFileViewerSelecting([CustomSource.configURL])
                     }
                 }
+                ForEach(customNames, id: \.self) { name in
+                    Toggle("Check \(name) in the background", isOn: Binding(
+                        get: { customBackground.contains(name) },
+                        set: { on in
+                            if on { customBackground.insert(name) } else { customBackground.remove(name) }
+                            Prefs.customBackgroundNames = customBackground
+                        }))
+                }
+                if !customNames.isEmpty {
+                    Text("Custom sources run your own commands. Those switched off are only checked while \(AppIdentity.name) is open.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .onAppear {
+                customNames = (CustomSource.entries() ?? []).map(\.name)
+                customBackground = CustomSource.backgroundNames
             }
 
             Section {
@@ -236,7 +260,32 @@ enum LaunchAgent {
             .appendingPathComponent("Library/LaunchAgents/\(label).plist")
     }
 
-    static var isInstalled: Bool { FileManager.default.fileExists(atPath: plistURL.path) }
+    static var hasPlist: Bool { FileManager.default.fileExists(atPath: plistURL.path) }
+
+    /// On only when launchd actually has the job loaded, not just when the
+    /// plist exists (a booted-out or failed agent used to show as on).
+    static var isInstalled: Bool { hasPlist && isLoaded }
+
+    /// Set up but not running: the plist exists, launchd doesn't have it.
+    static var isStalled: Bool { hasPlist && !isLoaded }
+
+    /// `launchctl print` exits 0 only for a loaded job. It answers at once,
+    /// so a synchronous call is fine for Settings. Waits on a semaphore, not
+    /// `waitUntilExit`, which runs the run loop and crashed SwiftUI when
+    /// called while it was building the Settings page.
+    static var isLoaded: Bool {
+        let process = Process()
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["print", "gui/\(getuid())/\(label)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return false }
+        exited.wait()
+        return process.terminationStatus == 0
+    }
 
     static func install(intervalMinutes: Int) async throws {
         guard let exe = Bundle.main.executablePath else { return }

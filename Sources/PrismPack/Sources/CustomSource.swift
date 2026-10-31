@@ -56,15 +56,42 @@ struct CustomSource: UpdateSource {
         if let data = try? encoder.encode(seed) { try? data.write(to: url) }
     }
 
+    /// Entries as written in custom_sources.json; nil if the file is missing
+    /// or can't be read.
+    static func entries() -> [Entry]? {
+        guard let data = FileManager.default.contents(atPath: configURL.path) else { return nil }
+        return try? JSONDecoder().decode([Entry].self, from: data)
+    }
+
+    /// Entries allowed to run their commands in the headless background check.
+    /// The first time 2.0 looks, every entry already in the file is allowed
+    /// (1.8.0 ran them all); entries added after that start off.
+    static var backgroundNames: Set<String> {
+        if let names = Prefs.customBackgroundNames { return names }
+        let names = Set((entries() ?? []).map(\.name))
+        Prefs.customBackgroundNames = names
+        return names
+    }
+
     func detect() async throws -> [UpdateItem] {
+        let allowed = Self.backgroundNames   // before the seed, so a fresh seed starts off
         Self.seedIfMissing()
         guard let data = FileManager.default.contents(atPath: Self.configURL.path) else { return [] }
         let entries: [Entry]
         do { entries = try JSONDecoder().decode([Entry].self, from: data) }
         catch { throw PrismPackError.parseFailure("custom_sources.json (\(error.localizedDescription))") }
 
+        // Headless, an entry that isn't allowed keeps its last result instead
+        // of running: dropping its row would also drop its hidden version.
+        let headless = CommandLine.arguments.contains("--background-check")
+        let previous = headless ? Store.load().items.filter { $0.sourceID == id } : []
         var items: [UpdateItem] = []
         for entry in entries where entry.enabled ?? true {
+            if headless && !allowed.contains(entry.name) {
+                let token = Self.token(for: entry)
+                items += previous.filter { $0.installToken == token }
+                continue
+            }
             guard let installed = await installedVersion(of: entry) else { continue }
             guard let latest = await remoteVersion(of: entry) else { continue }
             if isNewerVersion(latest, than: installed) {

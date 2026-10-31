@@ -24,17 +24,10 @@ struct SystemUpdateSource: UpdateSource {
             if line.hasPrefix("* Label:") {
                 currentLabel = line.replacingOccurrences(of: "* Label:", with: "").trimmingCharacters(in: .whitespaces)
             } else if let label = currentLabel, line.hasPrefix("Title:") {
-                var title = label, version = "", restart = false
-                for field in line.split(separator: ",") {
-                    let kv = field.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-                    guard kv.count == 2 else { continue }
-                    switch kv[0] {
-                    case "Title": title = kv[1]
-                    case "Version": version = kv[1]
-                    case "Action": restart = kv[1].lowercased().contains("restart")
-                    default: break
-                    }
-                }
+                let fields = Self.fields(of: line)
+                let title = fields["Title"].flatMap { $0.isEmpty ? nil : $0 } ?? label
+                let version = fields["Version"] ?? ""
+                let restart = fields["Action"]?.lowercased().contains("restart") ?? false
                 // macOS installs are handed to System Settings rather than run
                 // with `softwareupdate -i`: Settings handles the download,
                 // restart scheduling and progress, and is the supported path.
@@ -51,6 +44,28 @@ struct SystemUpdateSource: UpdateSource {
             }
         }
         return items
+    }
+
+    /// Splits a `Title: …, Version: …, Size: …` line. Fields are cut only at
+    /// a comma followed by a known key, so a title that itself contains a
+    /// comma ("Safari 18.1, for macOS") stays whole.
+    static func fields(of line: String) -> [String: String] {
+        let keys = ["Title", "Version", "Size", "Recommended", "Action"]
+        let pattern = "(?:^|,)\\s*(" + keys.joined(separator: "|") + "):"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [:] }
+        let ns = line as NSString
+        let matches = regex.matches(in: line, range: NSRange(location: 0, length: ns.length))
+        var result: [String: String] = [:]
+        for (i, match) in matches.enumerated() {
+            let key = ns.substring(with: match.range(at: 1))
+            let start = match.range.location + match.range.length
+            let end = i + 1 < matches.count ? matches[i + 1].range.location : ns.length
+            var value = ns.substring(with: NSRange(location: start, length: end - start))
+                .trimmingCharacters(in: .whitespaces)
+            if value.hasSuffix(",") { value = String(value.dropLast()).trimmingCharacters(in: .whitespaces) }
+            result[key] = value
+        }
+        return result
     }
 
     /// System Settings → General → Software Update.

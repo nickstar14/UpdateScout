@@ -146,7 +146,12 @@ enum SparkleInstaller {
     private static func swap(newApp: URL, into target: URL, workDir: URL,
                              progress: @escaping @Sendable (String) -> Void) async throws {
         let fm = FileManager.default
-        let backup = workDir.appendingPathComponent("previous.app")
+        // Keep the app's own name, so the copy in the Trash reads "Thaw.app",
+        // not "previous.app".
+        let backupDir = workDir.appendingPathComponent("previous")
+        try fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
+        let backup = backupDir.appendingPathComponent(target.lastPathComponent)
+        defer { trashPrevious(backup, replacedBy: target) }
         do {
             try fm.moveItem(at: target, to: backup)
             do {
@@ -182,6 +187,18 @@ enum SparkleInstaller {
                         : result.combined)
             }
         }
+    }
+
+    /// After a successful swap the old version goes to the Trash instead of
+    /// being deleted with the temp folder, so it can be put back if the new
+    /// one won't launch. Not there (the swap rolled back): nothing to do. A
+    /// root-owned copy the Trash refuses is left to the temp folder, as before.
+    private static func trashPrevious(_ backup: URL, replacedBy target: URL) {
+        let fm = FileManager.default
+        // Never trash the only copy: the installed app must be in place.
+        guard fm.fileExists(atPath: backup.path), fm.fileExists(atPath: target.path) else { return }
+        do { try fm.trashItem(at: backup, resultingItemURL: nil) }
+        catch { NSLog("Update: couldn't move the previous %@ to the Trash: %@", backup.lastPathComponent, error.localizedDescription) }
     }
 
     // MARK: - Helpers
@@ -222,12 +239,20 @@ enum SparkleInstaller {
             guard attach.status == 0 else {
                 throw PrismPackError.commandFailed("hdiutil attach", output: attach.combined)
             }
-            defer { Task { _ = try? await Shell.run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-quiet"]) } }
-            // Copy off the read-only image before detaching.
-            let source = try findApp(in: mountPoint)
-            let dest = dir.appendingPathComponent(source.lastPathComponent)
-            try FileManager.default.copyItem(at: source, to: dest)
-            return dest
+            // Copy off the read-only image, then wait for the detach to finish
+            // before returning, so the temp folder isn't removed while the
+            // image is still mounted inside it.
+            let copied: Result<URL, Error> = Result {
+                let source = try findApp(in: mountPoint)
+                let dest = dir.appendingPathComponent(source.lastPathComponent)
+                try FileManager.default.copyItem(at: source, to: dest)
+                return dest
+            }
+            let detach = try? await Shell.run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-quiet"])
+            if detach?.status != 0 {
+                _ = try? await Shell.run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-quiet", "-force"])
+            }
+            return try copied.get()
         default:
             throw PrismPackError.commandFailed(
                 "unpack", output: "Unsupported archive type: .\(archive.pathExtension)")

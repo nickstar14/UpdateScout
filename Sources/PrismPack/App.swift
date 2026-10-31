@@ -28,13 +28,14 @@ struct Main {
             let (items, errors) = await detection
             let kexts = await leftovers
             let scan = await adoption
-            var fresh: [UpdateItem] = []
+            var fresh: [UpdateItem] = [], waiting: [UpdateItem] = []
             var digest: [AdoptionCandidate] = []
             Store.mutate { s in
                 fresh = UpdateController.merge(items: items, errors: errors, leftovers: kexts, into: &s)
+                waiting = s.items.filter { !s.isHidden($0) }
                 if let scan { digest = Adoption.merge(scan, into: &s) }
             }
-            Notifier.notifyNewUpdates(fresh)
+            Notifier.notifyNewUpdates(fresh, waiting: waiting)
             Notifier.notifyAdoptionDigest(digest)
             // Give the notification a moment to post before exiting.
             try? await Task.sleep(for: .seconds(2))
@@ -50,6 +51,7 @@ struct PrismPackApp: App {
 
     init() {
         Notifier.requestPermission()
+        _ = CustomSource.backgroundNames   // before the seed, so a fresh seed starts off
         CustomSource.seedIfMissing()
         DispatchQueue.main.async {
             Prefs.migrateGlassTint()

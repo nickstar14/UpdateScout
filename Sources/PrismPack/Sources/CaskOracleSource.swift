@@ -74,15 +74,10 @@ struct CaskOracleSource: UpdateSource {
 
     // MARK: - App scan
 
+    /// Top-level apps only: Homebrew would install the cask's copy at the
+    /// top level, leaving an app one folder down where it was.
     private func installedApps() -> [URL] {
-        let fm = FileManager.default
-        var urls: [URL] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            guard let entries = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir),
-                                                           includingPropertiesForKeys: nil) else { continue }
-            urls += entries.filter { $0.pathExtension == "app" }
-        }
-        return urls
+        AppFolders.appPaths().filter { !AppFolders.isNested($0) }.map { URL(fileURLWithPath: $0) }
     }
 
 }

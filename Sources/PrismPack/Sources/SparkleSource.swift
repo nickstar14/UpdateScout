@@ -23,12 +23,7 @@ struct SparkleSource: UpdateSource {
         let fm = FileManager.default
         var candidates: [(name: String, path: String, version: String, build: String?, feed: URL)] = []
 
-        var apps: [URL] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            guard let entries = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir),
-                                                           includingPropertiesForKeys: nil) else { continue }
-            apps += entries.filter { $0.pathExtension == "app" }
-        }
+        var apps = AppFolders.appPaths().map { URL(fileURLWithPath: $0) }
         // PrismPack always lists itself, wherever it runs from (Nick, Phase 5);
         // its Update opens the built-in Sparkle updater.
         let me = Bundle.main.bundleURL
@@ -155,6 +150,8 @@ enum AppcastParser {
         /// `sparkle:channel`, e.g. "beta". Absent means the default channel.
         var channel: String?
         var minimumSystemVersion: String?
+        /// `sparkle:hardwareRequirements`, e.g. ["arm64"].
+        var hardwareRequirements: [String] = []
         /// The item lists binary-delta updates (adoption shows this as a cost
         /// of moving to Homebrew, which always downloads the whole app).
         var hasDeltas = false
@@ -203,9 +200,20 @@ enum AppcastParser {
         var best: Latest?
         for item in items where item.track <= installedTrack {
             if let min = item.minimumSystemVersion, isNewerVersion(min, than: os) { continue }
+            if !meetsHardwareRequirements(item.hardwareRequirements) { continue }
             if best == nil || isNewerVersion(item.displayVersion, than: best!.displayVersion) { best = item }
         }
         return best
+    }
+
+    /// Sparkle defines one requirement today, `arm64` (Apple silicon only).
+    /// Unknown tokens are ignored, as Sparkle does.
+    static func meetsHardwareRequirements(_ requirements: [String]) -> Bool {
+        #if arch(arm64)
+        return true
+        #else
+        return !requirements.contains { $0.lowercased() == "arm64" }
+        #endif
     }
 
     private final class Delegate: NSObject, XMLParserDelegate {
@@ -250,6 +258,8 @@ enum AppcastParser {
             case "sparkle:shortVersionString": item.shortVersion = text
             case "sparkle:channel": if !text.isEmpty { item.channel = text }
             case "sparkle:minimumSystemVersion": if !text.isEmpty { item.minimumSystemVersion = text }
+            case "sparkle:hardwareRequirements":
+                item.hardwareRequirements = text.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
             case "link": if item.link == nil { item.link = text }
             case "description": if !text.isEmpty { item.notes = text }
             case "sparkle:releaseNotesLink": if !text.isEmpty { item.notesLink = text }

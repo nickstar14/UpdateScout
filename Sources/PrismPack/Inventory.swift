@@ -142,19 +142,16 @@ enum Inventory {
         let github = Set(GitHubApps.load().map { $0.appPath.lowercased() })
         let fm = FileManager.default
         var found: [InstalledPackage] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            for entry in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                let path = "\(dir)/\(entry)"
-                guard !claimed.contains(path.lowercased()),
-                      let data = fm.contents(atPath: "\(path)/Contents/Info.plist"),
-                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-                else { continue }
-                let name = (entry as NSString).deletingPathExtension
-                let version = plist["CFBundleShortVersionString"] as? String ?? plist["CFBundleVersion"] as? String ?? "?"
-                let sparkle = plist["SUFeedURL"] != nil
-                let source = github.contains(path.lowercased()) ? "github" : sparkle ? "sparkle" : "unmanaged"
-                found.append(InstalledPackage(name: name, version: version, sourceID: source, appPath: path))
-            }
+        for path in AppFolders.appPaths() {
+            guard !claimed.contains(path.lowercased()),
+                  let data = fm.contents(atPath: "\(path)/Contents/Info.plist"),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+            else { continue }
+            let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            let version = plist["CFBundleShortVersionString"] as? String ?? plist["CFBundleVersion"] as? String ?? "?"
+            let sparkle = plist["SUFeedURL"] != nil
+            let source = github.contains(path.lowercased()) ? "github" : sparkle ? "sparkle" : "unmanaged"
+            found.append(InstalledPackage(name: name, version: version, sourceID: source, appPath: path))
         }
         return found
     }

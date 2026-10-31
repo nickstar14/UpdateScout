@@ -60,25 +60,22 @@ struct MASSource: UpdateSource {
     private static func iosAppsOutdated(excluding known: Set<String>) async -> [UpdateItem] {
         struct Wrapped { let id: String; let name: String; let version: String; let path: String }
         var apps: [Wrapped] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            for entry in (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                let path = "\(dir)/\(entry)"
-                guard let data = FileManager.default.contents(atPath: path + "/Wrapper/iTunesMetadata.plist"),
-                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                      let version = plist["bundleShortVersionString"] as? String else { continue }
-                let id = (plist["itemId"] as? NSNumber)?.stringValue ?? (plist["itemId"] as? String) ?? ""
-                guard !id.isEmpty, !known.contains(id) else { continue }
-                // Use the store's name so it matches what the App Store shows
-                // ("Vocal Remover", not the bundle's "Musiclab"), minus the
-                // marketing tagline ("Shop: All your favorite brands" → "Shop").
-                let bundleName = (entry as NSString).deletingPathExtension
-                let storeName = (plist["itemName"] as? String)?
-                    .components(separatedBy: ":").first?
-                    .components(separatedBy: " - ").first?
-                    .trimmingCharacters(in: .whitespaces)
-                let name = (storeName?.isEmpty == false ? storeName! : bundleName)
-                apps.append(Wrapped(id: id, name: name, version: version, path: path))
-            }
+        for path in AppFolders.appPaths() {
+            guard let data = FileManager.default.contents(atPath: path + "/Wrapper/iTunesMetadata.plist"),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                  let version = plist["bundleShortVersionString"] as? String else { continue }
+            let id = (plist["itemId"] as? NSNumber)?.stringValue ?? (plist["itemId"] as? String) ?? ""
+            guard !id.isEmpty, !known.contains(id) else { continue }
+            // Use the store's name so it matches what the App Store shows
+            // ("Vocal Remover", not the bundle's "Musiclab"), minus the
+            // marketing tagline ("Shop: All your favorite brands" → "Shop").
+            let bundleName = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            let storeName = (plist["itemName"] as? String)?
+                .components(separatedBy: ":").first?
+                .components(separatedBy: " - ").first?
+                .trimmingCharacters(in: .whitespaces)
+            let name = (storeName?.isEmpty == false ? storeName! : bundleName)
+            apps.append(Wrapped(id: id, name: name, version: version, path: path))
         }
         guard !apps.isEmpty else { return [] }
 
@@ -108,15 +105,12 @@ struct MASSource: UpdateSource {
 
     /// The wrapper bundle for an iOS app, by store id.
     private static func wrapperApp(id: String) -> String? {
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            for entry in (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                let path = "\(dir)/\(entry)"
-                guard let data = FileManager.default.contents(atPath: path + "/Wrapper/iTunesMetadata.plist"),
-                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-                else { continue }
-                let found = (plist["itemId"] as? NSNumber)?.stringValue ?? (plist["itemId"] as? String)
-                if found == id { return path }
-            }
+        for path in AppFolders.appPaths() {
+            guard let data = FileManager.default.contents(atPath: path + "/Wrapper/iTunesMetadata.plist"),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+            else { continue }
+            let found = (plist["itemId"] as? NSNumber)?.stringValue ?? (plist["itemId"] as? String)
+            if found == id { return path }
         }
         return nil
     }

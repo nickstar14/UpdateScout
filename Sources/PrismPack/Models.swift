@@ -78,6 +78,37 @@ struct UpdateItem: Identifiable, Codable, Hashable {
     }
 }
 
+/// The .app bundles in /Applications and ~/Applications, and one folder
+/// deeper (Utilities, vendor folders), never further. Top-level apps come
+/// first, so apps found before keep their paths. Never looks inside a bundle,
+/// and doesn't follow a symlinked folder.
+enum AppFolders {
+    static var roots: [String] { ["/Applications", NSHomeDirectory() + "/Applications"] }
+
+    static func appPaths(in roots: [String] = roots) -> [String] {
+        let fm = FileManager.default
+        var top: [String] = [], nested: [String] = []
+        for root in roots {
+            for entry in ((try? fm.contentsOfDirectory(atPath: root)) ?? []).sorted() where !entry.hasPrefix(".") {
+                let path = "\(root)/\(entry)"
+                if entry.hasSuffix(".app") { top.append(path); continue }
+                guard (try? fm.attributesOfItem(atPath: path)[.type] as? FileAttributeType) == .typeDirectory
+                else { continue }
+                for child in ((try? fm.contentsOfDirectory(atPath: path)) ?? []).sorted()
+                where child.hasSuffix(".app") && !child.hasPrefix(".") {
+                    nested.append("\(path)/\(child)")
+                }
+            }
+        }
+        return top + nested
+    }
+
+    /// True for an app found one folder down, such as /Applications/Utilities/X.app.
+    static func isNested(_ path: String, roots: [String] = roots) -> Bool {
+        !roots.contains((path as NSString).deletingLastPathComponent)
+    }
+}
+
 /// Finds an installed .app by its display name, in the usual places.
 enum AppLocator {
     static func find(named name: String) -> String? {
@@ -100,14 +131,8 @@ enum AppLocator {
         }
         let key = norm(token)
         guard key.count >= 4 else { return nil }
-        let fm = FileManager.default
-        var hits: [String] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            for entry in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                if norm((entry as NSString).deletingPathExtension).hasPrefix(key) {
-                    hits.append(dir + "/" + entry)
-                }
-            }
+        let hits = AppFolders.appPaths().filter {
+            norm((($0 as NSString).lastPathComponent as NSString).deletingPathExtension).hasPrefix(key)
         }
         return hits.count == 1 ? hits[0] : nil
     }

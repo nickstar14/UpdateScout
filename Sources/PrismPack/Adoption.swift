@@ -239,8 +239,11 @@ enum Adoption {
         }
 
         // Read the vendor's feed only for apps that would otherwise be shown
-        // and update themselves through Sparkle.
-        let pairs = apps.compactMap { app in byFile[app.fileName.lowercased()].map { (app, $0) } }
+        // and update themselves through Sparkle. An app one folder down still
+        // counts as a copy above, but isn't offered: its cask would install
+        // it at the top level instead.
+        let pairs = apps.filter { !AppFolders.isNested($0.path) }
+            .compactMap { app in byFile[app.fileName.lowercased()].map { (app, $0) } }
         let candidates = await withTaskGroup(of: AdoptionCandidate?.self) { group in
             for (app, cask) in pairs {
                 group.addTask {
@@ -263,7 +266,7 @@ enum Adoption {
             for name in cask.appNames { byName[name.lowercased().replacingOccurrences(of: ".app", with: "")] = cask.token }
         }
         var switches: [String: String] = [:]
-        for app in apps where app.hasMASReceipt {
+        for app in apps where app.hasMASReceipt && !AppFolders.isNested(app.path) {
             if let token = byName[app.name.lowercased()] { switches[app.path] = token }
         }
         return Scan(candidates: candidates, behind: behind, managed: managed, storeSwitches: switches)
@@ -278,16 +281,9 @@ enum Adoption {
         return (latest.displayVersion, latest.hasDeltas)
     }
 
-    /// Apps directly in /Applications and ~/Applications.
+    /// Apps in /Applications and ~/Applications, and one folder deeper.
     static func installedApps() -> [AppFacts] {
-        let fm = FileManager.default
-        var found: [AppFacts] = []
-        for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
-            for entry in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where entry.hasSuffix(".app") {
-                if let facts = facts(at: "\(dir)/\(entry)") { found.append(facts) }
-            }
-        }
-        return found
+        AppFolders.appPaths().compactMap { facts(at: $0) }
     }
 
     static func facts(at path: String) -> AppFacts? {

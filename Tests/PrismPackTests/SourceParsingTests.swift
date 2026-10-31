@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PrismPack
 
@@ -69,5 +70,43 @@ struct SourceParsingTests {
         #expect(EditorExtensionsSource.engineAllows(">=1.80", editor: "1.80.0"))
         #expect(EditorExtensionsSource.engineAllows("*", editor: "1.0"))
         #expect(EditorExtensionsSource.engineAllows("^1.90.0", editor: nil))
+    }
+
+    @Test func softwareUpdateTitleWithComma() {
+        let f = SystemUpdateSource.fields(of: "Title: Safari 18.1, for macOS Tahoe, Version: 18.1, Size: 140210KiB, Recommended: YES, Action: restart,")
+        #expect(f["Title"] == "Safari 18.1, for macOS Tahoe")
+        #expect(f["Version"] == "18.1")
+        #expect(f["Action"] == "restart")
+        let plain = SystemUpdateSource.fields(of: "Title: macOS Tahoe 27.1, Version: 27.1, Size: 1KiB, Recommended: YES,")
+        #expect(plain["Title"] == "macOS Tahoe 27.1" && plain["Action"] == nil)
+    }
+
+    @Test func appcastHardwareRequirementsParsedAndMetHere() {
+        let feed = """
+        <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>
+        <item><sparkle:version>2</sparkle:version><sparkle:shortVersionString>2.0</sparkle:shortVersionString>
+        <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements></item>
+        <item><sparkle:version>1</sparkle:version><sparkle:shortVersionString>1.0</sparkle:shortVersionString></item>
+        </channel></rss>
+        """
+        let latest = AppcastParser.latestVersion(from: Data(feed.utf8), installed: "1.0", installedBuild: "1")
+        #expect(latest?.hardwareRequirements == ["arm64"])
+        #expect(latest?.displayVersion == "2.0")   // this build is arm64-only
+        #expect(AppcastParser.meetsHardwareRequirements(["arm64"]))
+    }
+
+    @Test func appScanGoesOneFolderDeep() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("appscan-\(UUID().uuidString)").path
+        defer { try? fm.removeItem(atPath: root) }
+        for dir in ["Top.app/Contents/Inner.app", "Utilities/Tool.app", "Vendor/Deep/Hidden.app", "Vendor/Suite.app"] {
+            try fm.createDirectory(atPath: "\(root)/\(dir)", withIntermediateDirectories: true)
+        }
+        try fm.createSymbolicLink(atPath: "\(root)/Linked", withDestinationPath: "\(root)/Utilities")
+        let found = AppFolders.appPaths(in: [root]).map { String($0.dropFirst(root.count + 1)) }
+        // Top level first; one folder down; never inside a bundle, deeper, or through a symlink.
+        #expect(found == ["Top.app", "Utilities/Tool.app", "Vendor/Suite.app"])
+        #expect(!AppFolders.isNested("\(root)/Top.app", roots: [root]))
+        #expect(AppFolders.isNested("\(root)/Utilities/Tool.app", roots: [root]))
     }
 }

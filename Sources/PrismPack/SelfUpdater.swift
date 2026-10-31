@@ -47,6 +47,13 @@ enum SelfUpdater {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
     }
 
+    /// Start Sparkle's scheduled checks at launch. Without this the lazy
+    /// `controller` was only created by a manual Check for Updates, so no
+    /// automatic check ever ran. Never called from the headless background check.
+    static func start() {
+        _ = controller
+    }
+
     static func checkForUpdates() {
         controller.checkForUpdates(nil)
     }

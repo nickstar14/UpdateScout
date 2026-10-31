@@ -6,21 +6,30 @@ enum Notifier {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
     }
 
-    /// Post one notification summarizing newly found updates.
-    static func notifyNewUpdates(_ newItems: [UpdateItem]) {
-        guard !newItems.isEmpty else { return }
+    /// Fixed identifiers, so a new notification replaces the last one in
+    /// Notification Center instead of piling up.
+    static let updatesID = "updates"
+    static let adoptionID = "adoption"
+
+    /// One notification for updates. A check that finds new ones replaces the
+    /// last; once nothing is waiting, it's taken down. Hidden items never
+    /// notify. Older builds posted under random ids, so those go too.
+    static func notifyNewUpdates(_ fresh: [UpdateItem], waiting: [UpdateItem]) {
+        let waitingIDs = Set(waiting.map(\.id))
+        let newItems = fresh.filter { waitingIDs.contains($0.id) }
+        guard waiting.isEmpty || !newItems.isEmpty else { return }
+        // Counts only (Nick, 30 Oct 2026): "2 new updates", "12 waiting to be updated".
         let content = UNMutableNotificationContent()
-        if newItems.count == 1, let item = newItems.first {
-            content.title = "Update available: \(item.name)"
-            content.body = "\(item.installedVersion) → \(item.latestVersion)"
-        } else {
-            content.title = "\(newItems.count) new updates available"
-            content.body = newItems.prefix(5).map(\.name).joined(separator: ", ")
-                + (newItems.count > 5 ? ", …" : "")
-        }
+        content.title = newItems.count == 1 ? "1 new update" : "\(newItems.count) new updates"
+        content.body = "\(waiting.count) waiting to be updated"
         content.sound = .default
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { delivered in
+            center.removeDeliveredNotifications(withIdentifiers:
+                delivered.map(\.request.identifier).filter { $0 != adoptionID })
+            guard !newItems.isEmpty else { return }
+            center.add(UNNotificationRequest(identifier: updatesID, content: content, trigger: nil))
+        }
     }
 
     /// At most one a week, never one per app (Adoption.merge decides when).
@@ -31,7 +40,7 @@ enum Notifier {
             ? "\(candidates[0].name) could be updated by Homebrew"
             : "\(candidates.count) apps could be updated by Homebrew"
         content.body = "Nothing updates them today. Nothing changes unless you say so."
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: adoptionID, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 }

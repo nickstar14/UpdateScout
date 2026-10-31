@@ -36,13 +36,16 @@ enum Duplicates {
         var groups: [DuplicateGroup] = []
 
         for (_, copies) in Dictionary(grouping: apps, by: \.bundleID) where copies.count > 1 {
+            // On a version tie: /Applications itself, then a folder in it, then ~/Applications.
+            func place(_ path: String) -> Int {
+                path.hasPrefix("/Applications/") ? (AppFolders.isNested(path) ? 1 : 2) : 0
+            }
             let keep = copies.max { a, b in
                 // The newer version wins; on a tie, the one in /Applications.
                 switch compareVersions(a.version, b.version) {
                 case .orderedAscending: return true
                 case .orderedDescending: return false
-                case .orderedSame: return a.path.hasPrefix("/Applications/") && !b.path.hasPrefix("/Applications/") ? false
-                    : !a.path.hasPrefix("/Applications/") && b.path.hasPrefix("/Applications/")
+                case .orderedSame: return place(a.path) < place(b.path)
                 }
             }!
             groups.append(DuplicateGroup(kind: .twoCopies, name: keep.name, keep: keep.path,
