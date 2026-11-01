@@ -162,7 +162,7 @@ struct DiscoverInstaller: UpdateSource {
     static func lane(of token: String) -> String {
         let kind = token.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
         switch kind {
-        case "cask", "formula": return "brew"
+        case "cask", "formula", "zap": return "brew"
         case "pipx", "uv": return "pip"
         case "npm", "cargo", "gem", "app": return kind
         default: return kind.hasPrefix("ext-") ? "editors" : "discover"

@@ -24,6 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    /// Opening the app again (Finder, Spotlight, `open`) while it's running
+    /// shows the window, as other Mac apps do.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        UpdatesWindow.shared.show()
+        return false
+    }
+
     /// User clicked (or actioned) a notification.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,

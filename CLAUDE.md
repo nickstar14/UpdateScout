@@ -9,6 +9,8 @@ sources, and installs them.
 entry point, with the status at handoff, Nick's answers (section 3.4), the
 build order and links to every other 2.0 doc.
 [docs/1.8.0-plan.md](docs/1.8.0-plan.md) records what 1.8.0 changed.
+Phase 9 (leftover cleanup) has its own record in
+[docs/phase9-leftovers-plan.md](docs/phase9-leftovers-plan.md).
 
 ## Rules for working here
 
@@ -37,6 +39,11 @@ build order and links to every other 2.0 doc.
 - **Rename, Part 1 (2.0):** only the display and bundle name changed. The bundle
   ID `com.nickszun.updatescout`, executable `UpdateScout`, launchd label, data
   folder `Application Support/UpdateScout/` and preference keys stay until Part 2.
+- **Signing:** `build-app.sh` signs with the self-signed "PrismPack Signing"
+  certificate in Nick's login keychain (made once with
+  `scripts/make-signing-cert.sh`), so Full Disk Access survives updates. If it
+  prints "signing ad hoc", the certificate is missing: Full Disk Access will
+  stop working in that build. Never read or touch the keychain yourself.
 - **Compile check:** `swift build`.
 - **Running a test build:**
   - Quit the installed copy first. Both copies share the bundle ID and
@@ -44,6 +51,14 @@ build order and links to every other 2.0 doc.
   - Don't toggle "Check for updates in the background" in a test build. It
     points the real launchd agent (`com.nickszun.updatescout.check`) at that
     build.
+  - Open the running test build's window with `open build/PrismPack.app`.
+    Opening the running app again shows its window. Add
+    `--args --open-settings` on a fresh launch to start in Settings.
+  - System Settings' "Quit & Reopen", after a privacy change, reopens the
+    *installed* copy, because it finds the app by bundle ID. Quit that copy and
+    reopen the test build.
+  - Adding or removing an app in Full Disk Access is Nick's click, never
+    Claude's.
 - **Trigger a background check by hand:**
   `/Applications/PrismPack.app/Contents/MacOS/UpdateScout --background-check`
 - **Release:**
@@ -77,6 +92,16 @@ build order and links to every other 2.0 doc.
   `~/Library/Application Support/UpdateScout/`. Ask Nick before running one.
 - **Item IDs include the install token.** Changing the ID format resets
   users' ignored and notified lists.
+- **Page headers:** never put `fixedSize(horizontal: false, vertical: true)`
+  on text in a page header (`pinnedHeader`). Measured at zero width, it made
+  the page thousands of points tall, which stretched the window and pushed
+  the sidebar off screen. Use a line limit. It's fine in fixed-width panels.
+  Pages don't size the main window (`sizingOptions = []`).
+- **Moving other apps' data:** macOS can report a Trash move as done while
+  the folder stays put (a group container, 31 Oct 2026). `Leftovers.moveToTrash`
+  checks afterwards; keep that. App-group folders are never moved, and
+  nothing with `com.apple.` anywhere in its name is touched: a stuck Apple
+  container can make the Trash impossible to empty.
 - **Liquid Glass:** `build-app.sh` patches the linked-SDK version so AppKit
   uses the new UI. Use the `.glass()` and `.glassProminent(_:)` helpers and
   `GlassBackground` from `Views/Style.swift`.

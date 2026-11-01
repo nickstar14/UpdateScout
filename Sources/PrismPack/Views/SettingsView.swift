@@ -77,11 +77,13 @@ struct SettingsView: View {
                     if let error = deps.installError {
                         Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
                     }
+                    FullDiskAccessRow()
                 }
             } else {
                 Section("Setup") {
                     Label("All dependencies installed (Homebrew, mas-cli)", systemImage: "checkmark.circle")
                         .foregroundStyle(Color.green.readable).font(.callout)
+                    FullDiskAccessRow()
                 }
             }
 
@@ -334,5 +336,36 @@ enum LaunchAgent {
 
     private static func bootout() async {
         _ = try? await Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
+    }
+}
+
+/// Optional Full Disk Access (Phase 9): without it, other apps' data folders
+/// can't be moved, only shown in Finder. Rechecked whenever the app comes back
+/// to the front, for example from System Settings.
+private struct FullDiskAccessRow: View {
+    @State private var granted = FullDiskAccess.isGranted
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                if granted {
+                    Label("Full Disk Access is on", systemImage: "checkmark.circle")
+                        .foregroundStyle(Color.green.readable)
+                } else {
+                    Label("Full Disk Access (optional)", systemImage: "lock.shield")
+                }
+                Text(granted
+                     ? "\(AppIdentity.name) can move apps' data folders to the Trash when you remove an app or clean up orphaned files. It stays on through updates."
+                     : "Apps keep their data in folders macOS guards, so other apps can't change them. Only apps you give Full Disk Access may move them; an administrator password doesn't unlock them. With it, \(AppIdentity.name) can move an app's data folders to the Trash when you remove the app or clean up orphaned files. Without it, those folders are listed with Show in Finder so you can move them yourself. Once on, it stays on through updates.")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(6)
+            }
+            Spacer()
+            if !granted {
+                Button("Allow…") { FullDiskAccess.openSettings() }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            granted = FullDiskAccess.isGranted
+        }
     }
 }

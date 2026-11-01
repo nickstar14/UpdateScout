@@ -166,6 +166,12 @@ enum Prefs {
 
     /// Custom-source entry names allowed to run in the background check.
     /// Nil until `CustomSource.backgroundNames` first sets it.
+    /// Orphaned App Files the user chose to keep, by lowercased ID (Phase 9).
+    static var keptOrphans: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "keptOrphans") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "keptOrphans") }
+    }
+
     static var customBackgroundNames: Set<String>? {
         get { UserDefaults.standard.stringArray(forKey: "customBackgroundNames").map(Set.init) }
         set { UserDefaults.standard.set(newValue.map(Array.init), forKey: "customBackgroundNames") }

@@ -8,12 +8,27 @@ import AppKit
 struct Removal: Hashable, Sendable {
     let token: String
     let name: String
+    /// The app on disk, for a Homebrew app: shown and checked for running
+    /// in the uninstall window. Apps (`app:`) carry it in the token.
+    var appPath: String? = nil
+
+    /// Apps and Homebrew apps open the uninstall window (Phase 9).
+    var opensWindow: Bool { kind == "app" || kind == "cask" }
+
+    /// The app on disk, if this removes one.
+    var appOnDisk: String? { kind == "app" ? target : appPath }
+
+    /// The same cask with Homebrew's cleanup list (`--zap`).
+    var zap: Removal? {
+        kind == "cask" ? Removal(token: "zap:" + target, name: name, appPath: appPath) : nil
+    }
 
     /// What the confirmation says happens.
     var explanation: String {
         switch kind {
         case "app": "\(name) moves to the Trash. You can put it back from there."
         case "cask": "Homebrew removes the app. Its settings and data stay."
+        case "zap": "Homebrew removes the app, then cleans up the files on its list for it."
         case "formula" where Tools.packageLane(ofFormula: target) != nil:
             "Homebrew removes it, and any libraries nothing else needs. Packages you installed with \(target) stop working until it's back."
         case "formula": "Homebrew removes it, and any libraries nothing else needs."
@@ -45,7 +60,7 @@ struct Removal: Hashable, Sendable {
         switch pkg.sourceID {
         case "homebrew", "tools":
             if let detail = pkg.detail, detail.hasPrefix("cask ") {
-                self.init(token: "cask:" + detail.dropFirst(5), name: pkg.name)
+                self.init(token: "cask:" + detail.dropFirst(5), name: pkg.name, appPath: pkg.appPath)
             } else {
                 self.init(token: "formula:\(pkg.name)", name: pkg.name)
             }
@@ -82,9 +97,10 @@ struct Removal: Hashable, Sendable {
         self.init(token: "\(kind):\(entry.name)", name: entry.title)
     }
 
-    init(token: String, name: String) {
+    init(token: String, name: String, appPath: String? = nil) {
         self.token = token
         self.name = name
+        self.appPath = appPath
     }
 
     private static func isSelf(_ path: String) -> Bool {
@@ -99,21 +115,31 @@ struct Remover: UpdateSource {
 
     func detect() async throws -> [UpdateItem] { [] }
 
-    /// pkg-based casks need the admin password to remove, as to install.
+    /// pkg-based casks need the admin password to remove, as to install,
+    /// and so does a zap list that reaches outside the user's own folder.
     func needsAdmin(_ item: UpdateItem) -> Bool {
         let removal = Removal(token: item.installToken, name: item.name)
-        return removal.kind == "cask" && HomebrewSource.isInstallerCask(removal.target)
+        switch removal.kind {
+        case "cask": return HomebrewSource.isInstallerCask(removal.target)
+        case "zap": return HomebrewSource.isInstallerCask(removal.target) || Zap.cached(removal.target)?.needsPassword != false
+        default: return false
+        }
     }
 
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         let removal = Removal(token: item.installToken, name: item.name)
         let name = removal.target
         switch removal.kind {
-        case "cask", "formula":
+        case "cask", "formula", "zap":
             guard let brew = HomebrewSource.brewPath else {
                 throw PrismPackError.toolMissing("Homebrew", hint: "It was removed after the last check.")
             }
-            try await run(brew, removal.kind == "cask" ? ["uninstall", "--cask", name] : ["uninstall", name], progress)
+            let args = switch removal.kind {
+            case "cask": ["uninstall", "--cask", name]
+            case "zap": ["uninstall", "--cask", "--zap", name]
+            default: ["uninstall", name]
+            }
+            try await run(brew, args, progress)
         case "npm":
             try await run(tool("npm"), ["uninstall", "-g", name], progress)
         case "pipx":
@@ -164,5 +190,70 @@ struct Remover: UpdateSource {
             throw PrismPackError.commandFailed(([(tool as NSString).lastPathComponent] + args).joined(separator: " "),
                                                  output: result.combined)
         }
+    }
+}
+
+/// Homebrew's own cleanup list for a cask (`zap`), shown before
+/// `brew uninstall --zap` runs (Phase 9).
+struct Zap: Sendable {
+    /// Moved to the Trash by Homebrew.
+    var trash: [String] = []
+    /// Deleted outright by Homebrew (`delete`, and `rmdir` when empty).
+    var delete: [String] = []
+    /// Background jobs stopped, installer records removed, apps quit.
+    var other: [String] = []
+    /// The app's pkg installer or a path outside `~` needs the password.
+    var needsPassword = false
+
+    var isEmpty: Bool { trash.isEmpty && delete.isEmpty && other.isEmpty }
+
+    /// The list as shown in the uninstall alert.
+    var summary: String {
+        var parts: [String] = []
+        if !trash.isEmpty { parts.append("To the Trash:\n" + trash.map { "  " + $0 }.joined(separator: "\n")) }
+        if !delete.isEmpty { parts.append("Deleted by Homebrew (not to the Trash):\n" + delete.map { "  " + $0 }.joined(separator: "\n")) }
+        if !other.isEmpty { parts.append("Also:\n" + other.map { "  " + $0 }.joined(separator: "\n")) }
+        return parts.joined(separator: "\n\n")
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var plans: [String: Zap] = [:]
+
+    static func cached(_ token: String) -> Zap? { lock.withLock { plans[token] } }
+
+    /// One `brew info` call. nil when Homebrew can't say.
+    static func load(_ token: String) async -> Zap? {
+        guard let brew = HomebrewSource.brewPath,
+              let result = try? await Shell.run(brew, ["info", "--json=v2", "--cask", token]), result.status == 0,
+              let zap = parse(Data(result.stdout.utf8)) else { return nil }
+        lock.withLock { plans[token] = zap }
+        return zap
+    }
+
+    /// From `brew info --json=v2 --cask` output.
+    static func parse(_ data: Data) -> Zap? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let cask = (json["casks"] as? [[String: Any]])?.first,
+              let artifacts = cask["artifacts"] as? [[String: Any]] else { return nil }
+        var zap = Zap()
+        func strings(_ value: Any?) -> [String] {
+            if let s = value as? String { return [s] }
+            return (value as? [Any])?.compactMap { $0 as? String } ?? []
+        }
+        for artifact in artifacts {
+            if artifact["pkg"] != nil { zap.needsPassword = true }
+            for stanza in (artifact["zap"] as? [Any]) ?? [] {
+                guard let stanza = stanza as? [String: Any] else { continue }
+                zap.trash += strings(stanza["trash"])
+                zap.delete += strings(stanza["delete"]) + strings(stanza["rmdir"])
+                zap.other += strings(stanza["launchctl"]).map { "Stop background job \($0)" }
+                    + strings(stanza["pkgutil"]).map { "Forget installer record \($0)" }
+                    + strings(stanza["quit"]).map { "Quit \($0)" }
+                if stanza["pkgutil"] != nil || stanza["script"] != nil || stanza["launchctl"] != nil { zap.needsPassword = true }
+                if stanza["script"] != nil { zap.other.append("Run the cask's own cleanup script") }
+            }
+        }
+        if (zap.trash + zap.delete).contains(where: { !$0.hasPrefix("~") }) { zap.needsPassword = true }
+        return zap
     }
 }

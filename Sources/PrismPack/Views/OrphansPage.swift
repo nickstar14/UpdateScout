@@ -1,0 +1,209 @@
+import SwiftUI
+import AppKit
+
+/// Orphaned App Files (Phase 9): files in the user's Library named for an
+/// app ID that nothing on this Mac owns any more. Nothing is ticked: an ID
+/// with no app can still belong to a command-line tool or a background
+/// service, so the user ticks what they recognise. Scans only when opened or
+/// on Rescan, never in the background check.
+struct OrphansPage: View {
+    @EnvironmentObject var controller: UpdateController
+    @State private var orphans: [Leftovers.Orphan]?
+    @State private var scanning = false
+    @State private var ticked: Set<String> = []
+    @State private var expanded: Set<String> = []
+    @State private var moving = false
+    @State private var outcome: Leftovers.Outcome?
+    @State private var filter = ""
+    @State private var sort = "size"
+
+    private static let sorts = [("size", "Size"), ("name", "Name"), ("changed", "Last changed")]
+
+    /// Filtered by the search box, in the chosen order.
+    private var shown: [Leftovers.Orphan] {
+        let list = (orphans ?? []).filter { filter.isEmpty || $0.id.localizedCaseInsensitiveContains(filter) }
+        switch sort {
+        case "name": return list.sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+        case "changed": return list.sorted { ($0.lastChanged ?? .distantPast) > ($1.lastChanged ?? .distantPast) }
+        default: return list.sorted { $0.size > $1.size }
+        }
+    }
+
+    private var tickedItems: [Leftovers.Found] {
+        (orphans ?? []).filter { ticked.contains($0.id) }.flatMap(\.items).filter(\.movable)
+    }
+
+    var body: some View {
+        Group {
+            if let orphans, !scanning {
+                if orphans.isEmpty {
+                    ContentUnavailableView("No orphaned app files", systemImage: "archivebox",
+                                           description: Text("Everything in your Library that's named for an app belongs to one that's installed."))
+                } else {
+                    List(shown) { orphan in row(orphan) }
+                        .listStyle(.inset)
+                        .scrollContentBackground(.hidden)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                ProgressView("Looking through your Library…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .pinnedHeader { header }
+        .navigationSubtitle(orphans.map { "\($0.count) app\($0.count == 1 ? "" : "s")" } ?? "")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { Task { await scan() } } label: { Label("Rescan", systemImage: "arrow.clockwise") }
+                    .disabled(scanning || moving)
+            }
+        }
+        .task { if orphans == nil { await scan() } }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Files named for apps that are no longer on this Mac. Nothing is ticked: some may belong to a command-line tool or a background service, so tick only what you recognise. Everything goes to the Trash.")
+                .font(.caption).foregroundStyle(.secondary)
+                // A line limit, not fixedSize: measured at zero width, fixedSize
+                // text made the page thousands of points tall, which pushed the
+                // window and its sidebar off screen (31 Oct 2026).
+                .lineLimit(3)
+            if let outcome { result(outcome) }
+            GlassSearchField(prompt: "Filter by app ID", text: $filter)
+            HStack(spacing: 6) {
+                ForEach(Self.sorts, id: \.0) { key, title in
+                    ChipButton(title: title, selected: sort == key, size: .small) { sort = key }
+                }
+            }
+            HStack {
+                let items = tickedItems
+                Text(items.isEmpty ? "Nothing ticked"
+                     : "\(ticked.count) app\(ticked.count == 1 ? "" : "s"), \(UninstallPanelText.bytes(items.reduce(0) { $0 + $1.size })) ticked")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(role: .destructive) { confirmMove() } label: { Label("Move to Trash…", systemImage: "trash") }
+                    .glassProminent(.red)
+                    .disabled(items.isEmpty || moving)
+            }
+        }
+        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
+    }
+
+    private func row(_ orphan: Leftovers.Orphan) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                if orphan.isGroup {
+                    // Shared folders are never moved (see Found.movable).
+                    Button { orphan.items.forEach(Leftovers.showInFinder) } label: { Image(systemName: "folder").accessibilityLabel("Show in Finder") }
+                        .buttonStyle(.borderless)
+                        .help("Show in Finder")
+                } else {
+                    Toggle("", isOn: Binding(get: { ticked.contains(orphan.id) },
+                                             set: { if $0 { ticked.insert(orphan.id) } else { ticked.remove(orphan.id) } }))
+                        .toggleStyle(.checkbox).labelsHidden()
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(orphan.id).font(.body.weight(.semibold)).lineLimit(1).truncationMode(.middle)
+                    Text(subtitle(orphan)).font(.caption).foregroundStyle(.secondary)
+                    if orphan.isGroup {
+                        Text("Shared folder: may be used by other apps from this developer. Not moved by \(AppIdentity.name); check it in Finder")
+                            .font(.caption).foregroundStyle(Color.orange.readable)
+                    } else if orphan.sameDeveloper {
+                        Text("Another app from this developer is installed: these may be its shared files")
+                            .font(.caption).foregroundStyle(Color.orange.readable)
+                    }
+                    if let date = orphan.lastChanged, date > Date.now.addingTimeInterval(-30 * 86_400) {
+                        Text("Changed in the last month: something on this Mac may still use these")
+                            .font(.caption).foregroundStyle(Color.orange.readable)
+                    }
+                }
+                Spacer()
+                Button(expanded.contains(orphan.id) ? "Hide files" : "Show files") {
+                    if expanded.contains(orphan.id) { expanded.remove(orphan.id) } else { expanded.insert(orphan.id) }
+                }
+                .buttonStyle(.link).font(.caption)
+                Button("Keep") { keep(orphan) }.glass()
+                    .help("Stop listing these. They stay where they are.")
+            }
+            if expanded.contains(orphan.id) {
+                ForEach(orphan.items) { item in
+                    HStack {
+                        Text(UninstallPanelText.shortPath(item.path)).font(.caption).lineLimit(1).truncationMode(.middle)
+                            .help(item.path)
+                        Spacer()
+                        Text(UninstallPanelText.size(item.size)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 30)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func subtitle(_ orphan: Leftovers.Orphan) -> String {
+        var parts = ["\(orphan.items.count) item\(orphan.items.count == 1 ? "" : "s")", UninstallPanelText.size(orphan.size)]
+        if let date = orphan.lastChanged {
+            parts.append("last changed \(date.formatted(.dateTime.month(.wide).year()))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder private func result(_ outcome: Leftovers.Outcome) -> some View {
+        if !outcome.moved.isEmpty {
+            Label("Moved \(outcome.moved.count) item\(outcome.moved.count == 1 ? "" : "s") to the Trash.", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+        }
+        ForEach(outcome.failed, id: \.item.path) { failure in
+            Text("\(UninstallPanelText.shortPath(failure.item.path)): \(failure.reason)").font(.caption).foregroundStyle(.red)
+                .lineLimit(2)
+        }
+        let blocked = outcome.failed.filter(\.needsFullDiskAccess).map(\.item)
+        if !blocked.isEmpty {
+            BlockedLeftovers(items: blocked) { await move(blocked) }
+        }
+    }
+
+    // MARK: Work
+
+    private func scan() async {
+        scanning = true
+        let kept = Prefs.keptOrphans
+        let found = await Task.detached { Leftovers.orphans(kept: kept) }.value
+        orphans = found
+        ticked = ticked.intersection(found.map(\.id))
+        scanning = false
+    }
+
+    private func keep(_ orphan: Leftovers.Orphan) {
+        Prefs.keptOrphans.insert(orphan.id.lowercased())
+        ticked.remove(orphan.id)
+        orphans?.removeAll { $0.id == orphan.id }
+    }
+
+    private func confirmMove() {
+        let items = tickedItems
+        let alert = NSAlert()
+        alert.icon = AskpassDialog.badgeIcon(symbol: "exclamationmark")
+        alert.messageText = "Move \(items.count) item\(items.count == 1 ? "" : "s") to the Trash?"
+        alert.informativeText = (orphans ?? []).filter { ticked.contains($0.id) }.map(\.id).joined(separator: "\n")
+            + "\n\nYou can put them back from the Trash."
+        alert.alertStyle = .warning
+        let go = alert.addButton(withTitle: "Move to Trash")
+        go.hasDestructiveAction = true
+        go.keyEquivalent = ""
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { await move(items) }
+    }
+
+    private func move(_ items: [Leftovers.Found]) async {
+        moving = true
+        let result = await Leftovers.moveToTrash(items)
+        controller.logLeftovers(of: "apps no longer installed", result)
+        outcome = Leftovers.Outcome(moved: result.moved,
+                                    failed: result.failed.filter { $0.reason != "It's already gone." })
+        ticked = []
+        moving = false
+        await scan()
+    }
+}

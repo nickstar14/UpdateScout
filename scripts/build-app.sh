@@ -51,10 +51,21 @@ SPARKLE=$(find .build/artifacts/sparkle -name Sparkle.framework -path "*macos*" 
 [[ -z "$SPARKLE" ]] && SPARKLE=$(find .build/artifacts -name Sparkle.framework | head -1)
 cp -R "$SPARKLE" "$APP/Contents/Frameworks/"
 
-# Ad-hoc sign (inside out) so notifications and launchd behave; replace with a
-# real Developer ID identity if this ever gets distributed.
-codesign --force --sign - "$APP/Contents/Frameworks/Sparkle.framework"
-codesign --force --sign - "$APP"
+# Sign (inside out) with the self-signed "PrismPack Signing" certificate in
+# Nick's login keychain. Its designated requirement stays the same from build
+# to build, so Full Disk Access survives updates; an ad-hoc signature changes
+# every build and macOS drops the grant (31 Oct 2026 test). Without the
+# certificate (another Mac, CI) it falls back to ad hoc, with a warning.
+# PRISMPACK_SIGN_IDENTITY overrides the name, for example with a Developer ID.
+IDENTITY="${PRISMPACK_SIGN_IDENTITY:-PrismPack Signing}"
+sign() { codesign --force --sign "$IDENTITY" "$1" 2>/dev/null; }
+if sign "$APP/Contents/Frameworks/Sparkle.framework" && sign "$APP"; then
+    echo "Signed with \"$IDENTITY\""
+else
+    echo "warning: \"$IDENTITY\" isn't available; signing ad hoc. Full Disk Access won't survive this build." >&2
+    codesign --force --sign - "$APP/Contents/Frameworks/Sparkle.framework"
+    codesign --force --sign - "$APP"
+fi
 
 echo "Built $APP"
 

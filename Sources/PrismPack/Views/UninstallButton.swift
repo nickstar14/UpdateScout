@@ -1,17 +1,20 @@
 import SwiftUI
 import AppKit
 
-/// "Uninstall…" for the app pop-ups (Discover, Installed, Updates). It asks
-/// first, then shows the removal's progress, failure or result in place.
-/// The question is an NSAlert: SwiftUI's confirmationDialog, opened from
-/// inside a popover, hung without taking clicks on macOS 27.
+/// "Uninstall…" for the app pop-ups (Discover, Installed, Updates). Apps
+/// and Homebrew apps open the uninstall window, which lists the app and what
+/// it leaves behind before anything moves (Phase 9). Everything else asks
+/// with an NSAlert: SwiftUI's confirmationDialog, opened from inside a
+/// popover, hung without taking clicks on macOS 27.
 struct UninstallButton: View {
     @EnvironmentObject var controller: UpdateController
     let removal: Removal
     /// The update row this pop-up belongs to, which goes once removed.
     var updateID: String? = nil
 
-    private var state: InstallState? { controller.installStates[removal.item.id] }
+    private var state: InstallState? {
+        controller.installStates[removal.item.id] ?? removal.zap.flatMap { controller.installStates[$0.item.id] }
+    }
 
     var body: some View {
         if let state, state.isActive {
@@ -29,7 +32,7 @@ struct UninstallButton: View {
                                color: error == "Needs admin" ? .orange : .red).help(error)
                 }
                 Button(role: .destructive) { confirm() } label: {
-                    Label(removal.actionTitle, systemImage: "trash")
+                    Label(removal.opensWindow ? removal.actionTitle + "…" : removal.actionTitle, systemImage: "trash")
                 }
                 .glassProminent(.red)
             }
@@ -37,6 +40,10 @@ struct UninstallButton: View {
     }
 
     private func confirm() {
+        if removal.opensWindow {
+            UninstallWindow.shared.show(removal, updateID: updateID)
+            return
+        }
         let alert = NSAlert()
         alert.icon = AskpassDialog.badgeIcon(symbol: "exclamationmark")
         alert.messageText = "\(removal.actionTitle) \(removal.name)?"

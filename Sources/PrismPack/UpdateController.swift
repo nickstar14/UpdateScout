@@ -323,12 +323,34 @@ final class UpdateController: ObservableObject {
         }
     }
 
+    /// Leftovers ticked in the uninstall window, by removal job id. They
+    /// move only once the app itself is in the Trash.
+    private var pendingLeftovers: [String: [Leftovers.Found]] = [:]
+    /// What happened to them, for the uninstall window's result.
+    @Published var leftoverOutcomes: [String: Leftovers.Outcome] = [:]
+
     /// Queue a removal. `updateID` is the update row it came from, if any,
-    /// which goes once the removal succeeds.
-    func uninstall(_ removal: Removal, updateID: String? = nil) {
+    /// which goes once the removal succeeds. `leftovers` move after it.
+    func uninstall(_ removal: Removal, updateID: String? = nil, leftovers: [Leftovers.Found] = []) {
         let job = removal.item
         removalUpdates[job.id] = updateID
+        pendingLeftovers[job.id] = leftovers.isEmpty ? nil : leftovers
+        leftoverOutcomes[job.id] = nil
         update(job)
+    }
+
+    /// "Try Again" and Orphaned App Files: their own Activity line.
+    func logLeftovers(of name: String, _ outcome: Leftovers.Outcome) {
+        guard !outcome.moved.isEmpty else { return }
+        state = Store.mutate {
+            $0.log(ActivityEntry(kind: .removed, title: "Leftovers of \(name)",
+                                 detail: Self.leftoverSummary(outcome.moved) + ", moved to the Trash"))
+        }
+    }
+
+    nonisolated static func leftoverSummary(_ moved: [Leftovers.Found]) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: moved.reduce(0) { $0 + $1.size }, countStyle: .file)
+        return "\(moved.count) leftover\(moved.count == 1 ? "" : "s") (\(size))"
     }
 
     /// Update rows a running removal clears when it succeeds.
@@ -337,15 +359,25 @@ final class UpdateController: ObservableObject {
     private func finishRemoval(_ job: UpdateItem, seconds: Int) {
         let updateID = removalUpdates.removeValue(forKey: job.id)
         let removal = Removal(token: job.installToken, name: job.name)
+        let leftovers = pendingLeftovers.removeValue(forKey: job.id) ?? []
         state = Store.mutate {
             if let updateID { $0.items.removeAll { $0.id == updateID } }
             if removal.kind == "app" { $0.items.removeAll { $0.appPath == removal.target } }
-            $0.log(ActivityEntry(kind: .removed, title: job.name, detail: DiscoverInstaller.sourceTitle(of: job.installToken),
-                                 itemID: job.id, sourceID: job.sourceID, seconds: seconds))
         }
         // Finished Discover installs would still say Installed.
         for (id, state) in installStates where id.hasPrefix("discover|") && state == .done { installStates[id] = nil }
         loadInstalled()
+        Task {
+            // The app is in the Trash: now its leftovers, then one Activity line.
+            let outcome = leftovers.isEmpty ? Leftovers.Outcome() : await Leftovers.moveToTrash(leftovers)
+            if !leftovers.isEmpty { leftoverOutcomes[job.id] = outcome }
+            let detail = DiscoverInstaller.sourceTitle(of: job.installToken)
+                + (outcome.moved.isEmpty ? "" : ", with " + Self.leftoverSummary(outcome.moved))
+            state = Store.mutate {
+                $0.log(ActivityEntry(kind: .removed, title: job.name, detail: detail,
+                                     itemID: job.id, sourceID: job.sourceID, seconds: seconds))
+            }
+        }
     }
 
     // MARK: - Adoption and duplicates (Phase 7)
@@ -528,7 +560,7 @@ final class UpdateController: ObservableObject {
     /// Sparkle swaps, any cask).
     nonisolated static func mayPrompt(_ item: UpdateItem, needsAdmin: Bool) -> Bool {
         needsAdmin || ["mas", "custom", "sparkle", "caskOracle", "components"].contains(item.sourceID)
-            || item.installToken.hasPrefix("cask:")
+            || item.installToken.hasPrefix("cask:") || item.installToken.hasPrefix("zap:")
     }
 
     private func forget(_ item: UpdateItem) {

@@ -14,7 +14,7 @@ extension NSWindow {
 
 /// The pages in the sidebar.
 enum Page: String, CaseIterable, Identifiable {
-    case updates, discover, installed, activity, settings, buttonLab
+    case updates, discover, installed, orphans, activity, settings, buttonLab
     var id: String { rawValue }
 
     var title: String {
@@ -22,6 +22,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .updates: "Updates"
         case .discover: "Discover"
         case .installed: "Installed"
+        case .orphans: "Orphaned App Files"
         case .activity: "Activity"
         case .settings: "Settings"
         case .buttonLab: "Button lab"
@@ -33,6 +34,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .updates: "arrow.down.circle"
         case .discover: "magnifyingglass"
         case .installed: "checkmark.circle"
+        case .orphans: "archivebox"
         case .activity: "clock.arrow.circlepath"
         case .settings: "gearshape"
         case .buttonLab: "flask"
@@ -41,7 +43,7 @@ enum Page: String, CaseIterable, Identifiable {
 
     /// In the sidebar, in order. The Button lab only while it's compiled in.
     static var sidebar: [Page] {
-        [.updates, .discover, .installed, .activity, .settings] + (ButtonLab.enabled ? [.buttonLab] : [])
+        [.updates, .discover, .installed, .orphans, .activity, .settings] + (ButtonLab.enabled ? [.buttonLab] : [])
     }
 }
 
@@ -67,12 +69,18 @@ final class UpdatesWindow {
             // SwiftUI's .toolbar and .navigationTitle drive the window's own
             // unified toolbar and title.
             hosting.sceneBridgingOptions = [.toolbars, .title]
+            // Pages never size the window; a long page scrolls. Even
+            // `.minSize` let Orphaned App Files stretch it to 2,367 pt
+            // (31 Oct 2026): wrapping text measured at its narrowest made the
+            // minimum height huge. The window's own minSize below is enough.
+            hosting.sizingOptions = []
             let w = NSWindow(contentViewController: hosting)
             w.title = UpdateController.shared.page.title
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.toolbarStyle = .unified
             w.isReleasedWhenClosed = false
-            w.setContentSize(NSSize(width: 860, height: 680))
+            // Nick's chosen opening size (31 Oct 2026); the saved frame wins after.
+            w.setContentSize(NSSize(width: 914, height: 706))
             w.minSize = NSSize(width: 640, height: 420)
             w.setFrameAutosaveName("MainWindow")
             window = w
@@ -82,6 +90,11 @@ final class UpdatesWindow {
         // The first time, centre it; after that the autosaved frame wins.
         if !wasVisible, UserDefaults.standard.string(forKey: "NSWindow Frame MainWindow") == nil {
             window?.centerExactly()
+        }
+        // A frame saved while a page stretched the window can be taller than
+        // the screen; bring it back within it.
+        if let w = window, let visible = w.screen?.visibleFrame, w.frame.height > visible.height {
+            w.setFrame(w.frame.intersection(visible), display: true)
         }
     }
 }
@@ -105,6 +118,7 @@ struct MainView: View {
                     case .updates: UpdatesPage()
                     case .discover: DiscoverPage()
                     case .installed: InstalledPage()
+                    case .orphans: OrphansPage()
                     case .activity: ActivityPage()
                     case .settings: SettingsView()
                     case .buttonLab: ButtonLabPage()

@@ -82,11 +82,11 @@ struct PrismPackApp: App {
             }
         }
         Migration.prepareNotice()
-        // First launch with missing dependencies → open Settings so the
-        // Setup section can offer one-click installs.
+        // First launch with missing dependencies or no Full Disk Access →
+        // open Settings so the Setup section can offer them.
         if !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {
             UserDefaults.standard.set(true, forKey: "didFirstRunSetup")
-            if Shell.which("brew") == nil || Shell.which("mas") == nil {
+            if Shell.which("brew") == nil || Shell.which("mas") == nil || !FullDiskAccess.isGranted {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     SettingsWindow.shared.show()
                 }
