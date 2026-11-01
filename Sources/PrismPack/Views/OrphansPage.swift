@@ -81,7 +81,7 @@ struct OrphansPage: View {
                      : "\(ticked.count) app\(ticked.count == 1 ? "" : "s"), \(UninstallPanelText.bytes(items.reduce(0) { $0 + $1.size })) ticked")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button(role: .destructive) { confirmMove() } label: { Label("Move to Trash…", systemImage: "trash") }
+                Button(role: .destructive) { confirmMove() } label: { Label("Move to Trash", systemImage: "trash") }
                     .glassProminent(.red)
                     .disabled(items.isEmpty || moving)
             }

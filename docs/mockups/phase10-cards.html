@@ -136,7 +136,7 @@ document.getElementById("installed").innerHTML = [
   ["Claude", "1.4.2", "Homebrew", "ok"], ["Xcode", "27.0", "App Store", "ok"], ["Zen", "1.16", "Homebrew", "1.17"],
   ["black", "25.9", "Python", "ok"], ["cowsay", "1.6.0", "npm", "ok"]
 ].map(([n, v, s, st]) => `<div class="card">${head(n, c[s], "Version " + v, "var(--sub)", pill(s, c[s]) + (st === "ok" ? pill("Up to date", "#28a745") : pill("Update to " + st, "#e8870e")))}
-  <div class="actions">${st === "ok" ? `<button class="btn open">Open</button>` : `<button class="btn" style="background:${c[s]}">Update</button>`}<button class="btn trash" title="Move to Trash…">🗑</button></div></div>`).join("");
+  <div class="actions">${st === "ok" ? `<button class="btn open">Open</button>` : `<button class="btn" style="background:${c[s]}">Update</button>`}<button class="btn trash" title="Move to Trash">🗑</button></div></div>`).join("");
 
 document.getElementById("discover").innerHTML = [
   ["Claude", "AI", "Anthropic's desktop app for Claude.", "Homebrew", true], ["Claude Code", "Developer Tools", "Anthropic's coding agent for the terminal.", "npm", false],

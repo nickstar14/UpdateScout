@@ -76,8 +76,11 @@ final class DiscoverModel: ObservableObject {
     @Published var onlyNew = false
     /// Apps in each category, for the sidebar's counts.
     @Published private(set) var categoryCounts: [DiscoverCategories.Category: Int] = [:]
+    /// Each app's category, worked out once per catalogue (the guess runs a
+    /// few regexes per cask). Freed with the catalogue.
+    private var categoryOf: [String: DiscoverCategories.Category] = [:]
 
-    @Published private(set) var snapshot: DiscoverCatalog.Snapshot? { didSet { countCategories() } }
+    @Published private(set) var snapshot: DiscoverCatalog.Snapshot? { didSet { indexCategories() } }
     @Published private(set) var loadingCatalog = false
     @Published private(set) var catalogError: String?
 
@@ -116,11 +119,13 @@ final class DiscoverModel: ObservableObject {
         }
     }
 
-    private func countCategories() {
+    private func indexCategories() {
+        var index: [String: DiscoverCategories.Category] = [:]
         var counts: [DiscoverCategories.Category: Int] = [:]
         for e in snapshot?.entries ?? [] where e.kind == .cask && !e.isFont {
-            if let c = DiscoverCategories.category(ofCask: e.name) { counts[c, default: 0] += 1 }
+            if let c = DiscoverCategories.category(of: e) { index[e.name] = c; counts[c, default: 0] += 1 }
         }
+        categoryOf = index
         categoryCounts = counts
     }
 
@@ -176,7 +181,7 @@ final class DiscoverModel: ObservableObject {
         case .apps:
             return entries.filter { e in
                 e.kind == .cask && !e.isFont
-                    && (category == nil || DiscoverCategories.category(ofCask: e.name) == category)
+                    && (category == nil || categoryOf[e.name] == category)
             }
         case .cli: return entries.filter { $0.kind == .formula && !$0.isRuntime }
         case .runtimes: return entries.filter(\.isRuntime)

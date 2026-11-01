@@ -34,6 +34,17 @@ Mockups (approved designs, open in a browser):
   updates stop until PrismPack is opened again. Quit from the menu bar menu
   doesn't ask.
 - **Memory and size:** approved rules under "Lightness" below.
+- **Colours** (Nick, 1 Nov 2026): Install and Update buttons take the
+  source's colour (Homebrew brown, npm red, and so on), as today. Selection
+  highlights are grey or a faint rainbow, never purple.
+- **Wording:** "Move to Trash" never has "…" after it.
+- **Installed's "Update to x"** (Nick, 1 Nov 2026): today it's only a pill
+  and does nothing. It becomes an **Update** button that updates right there,
+  through the same queue and one-password batch as everywhere else
+  (consistent with cards' Update buttons; Claude's call, Nick agreed either
+  was fine). The orange reminder strip still leads to the Updates page.
+- **Animations:** every change of what's on screen (pages, Discover's parts)
+  uses the same quick fade.
 - **Discover's card everywhere** (1 Nov 2026, mockup
   [mockups/phase10-cards.html](mockups/phase10-cards.html)): Updates and
   Installed use Discover's left-aligned card, with a Cards / List switch on
@@ -63,6 +74,27 @@ Mockups (approved designs, open in a browser):
   Activity and Settings pinned at the bottom in glass. Runtimes kept its own
   entry. Button lab removed. Discover tiles keep two description lines
   (Nick). Checked in light and dark (the app's Theme setting).
+  Committed `5d7d199`.
+- **Step 3 done (1 Nov 2026), not committed:** 12 categories with colours
+  (`Discover/DiscoverCategories.swift`): hand-made list first, then a regex
+  guess on the cask's description; tried on all 7,824 casks, about 80% of the
+  5,207 non-font casks land in a category (the rest show in Featured, New and
+  search). The model works out each cask's category once per catalogue
+  (`categoryOf`). Three tests in `DiscoverTests` (list beats guess, guesses,
+  known misfits). Sidebar names fit (smaller indent and counts).
+- **Also this round (Nick, not committed):**
+  - Moving between Discover's parts fades like moving between pages
+    (`MainView.shown` in `Views/UpdatesWindow.swift`).
+  - Duplicate pop-up had two identical Move to Trash buttons: on the extra
+    copy the duplicate note no longer adds one (the pop-up's own button
+    removes it); on the copy to keep it says "Move the Copy in <folder> to
+    Trash". `UninstallButton` gained `title:`. **Not seen live:** a fresh
+    launch hadn't found Flux's duplicates yet; check after a Check Now.
+  - No "…" after Move to Trash anywhere (buttons; progress text keeps it).
+  - The updates reminder is a light orange strip, as in the mockup.
+
+**Next:** commit the above when Nick says, then step 4 (Discover page: drop
+both chip rows, under-row with search, Sort and Cards/List, the new cards).
 
 ## Build order
 
@@ -86,7 +118,7 @@ the next. No rebuild while Nick is mid-step.
    rows as mocked; source tags by the mixed-list rule.
 5. **Details pop-up** (new `Views/DetailsPopup.swift`): one pop-up for
    Discover, Installed and Updates. Helpers bottom left, Close then the main
-   action bottom right, Move to Trash… in red set apart; beta offer;
+   action bottom right, Move to Trash in red set apart; beta offer;
    web description and screenshot (step 7).
 6. **Fonts:** sample line drawn from Google Fonts while the Fonts page is on
    screen; name only when a font isn't on Google Fonts.
@@ -97,7 +129,7 @@ the next. No rebuild while Nick is mid-step.
    `Views/UpdatesPage.swift`, shared card in `Views/Rows.swift`): Cards / List
    switch on both; Discover's card; Updates kept in source sections with
    warnings top right; Installed gets All / Updates / Hidden,
-   a Source menu (show one installation type, e.g. Homebrew), Sort by Name,
+   an Update button in place of the "Update to x" pill, a Source menu (show one installation type, e.g. Homebrew), Sort by Name,
    Size, Date installed or Installation type with a button that reverses it
    (A → Z / Z → A, largest / smallest first, newest / oldest first), both
    remembered; and the coloured source pill. Size and date installed are read
@@ -121,6 +153,20 @@ the next. No rebuild while Nick is mid-step.
     menu; then go through every tab (Updates, Installed, Discover, Orphaned
     App Files, Activity, Settings) checking cards, rows, pills, buttons and
     pop-ups match, in light and dark, and list anything left for Nick.
+
+13. **Final review** (Nick, 1 Nov 2026), before Phase 10 is called done:
+    - **Arbitrary and leftover code:** anything unused, half-finished,
+      experimental or debug-only (old variants, test switches, dead
+      branches, stray TODOs) is removed or listed for Nick.
+    - **Visual consistency:** every tab, card, row, pill, pop-up, sheet and
+      button in light and dark against the decisions above.
+    - **Operations consistency:** every install, update and removal goes
+      through the same queue, password batch, progress, cancel and Activity
+      line, wherever it starts (card, row, pop-up, menu bar).
+    - **Wording:** the same words for the same thing everywhere.
+    - **Lightness:** the before/after measurements below.
+    - A written list of what was checked, what was fixed, and anything left
+      for Nick.
 
 ## Lightness
 

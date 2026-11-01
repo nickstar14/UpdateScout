@@ -111,8 +111,12 @@ struct UpdatesReminder: View {
                 Text("·").foregroundStyle(.secondary)
                 Button("Review") { controller.page = .updates }
                     .buttonStyle(.link)
+                Spacer(minLength: 0)
             }
             .font(.callout)
+            // A light orange strip, as in the mockup (Nick).
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
     }
 }

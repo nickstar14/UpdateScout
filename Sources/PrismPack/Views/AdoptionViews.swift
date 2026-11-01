@@ -279,16 +279,23 @@ struct DuplicateActions: View {
     let path: String?
 
     var body: some View {
+        // On an extra copy the pop-up's own Move to Trash removes it, so no
+        // second button here (two identical buttons confused Nick).
+        let isExtra = path.map(group.extras.contains) ?? false
         VStack(alignment: .leading, spacing: 8) {
-            Label(group.advice, systemImage: "square.on.square")
+            Label(isExtra ? "This is a second copy of \(group.name). Keep the one in \(Self.folder(of: group.keep)); Move to Trash below removes this copy."
+                          : group.advice,
+                  systemImage: "square.on.square")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             switch group.kind {
             case .twoCopies:
-                // On the copy to keep, offer the others; on an extra, itself.
-                let targets = path.map { group.extras.contains($0) ? [$0] : group.extras } ?? group.extras
-                ForEach(targets, id: \.self) { extra in
-                    UninstallButton(removal: Removal(token: "app:\(extra)", name: "\(group.name) in \(Self.folder(of: extra))"))
+                // On the copy to keep, offer the others, each named by folder.
+                if !isExtra {
+                    ForEach(group.extras, id: \.self) { extra in
+                        UninstallButton(removal: Removal(token: "app:\(extra)", name: "\(group.name) in \(Self.folder(of: extra))"),
+                                        title: "Move the Copy in \(Self.folder(of: extra)) to Trash")
+                    }
                 }
             case .twoStores(let cask):
                 HStack {

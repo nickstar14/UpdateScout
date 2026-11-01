@@ -8,6 +8,29 @@ struct DiscoverTests {
         DiscoverEntry(kind: kind, name: name, title: name, summary: summary, version: "1", popularity: pop)
     }
 
+    @Test func handMadeCategoryBeatsTheGuess() {
+        // Its description says "browser" nowhere; the list puts it in Browsers.
+        #expect(DiscoverCategories.category(of: entry(.cask, "zen", "Gecko based web browser")) == .browsers)
+        #expect(DiscoverCategories.category(of: entry(.cask, "codex", "OpenAI's coding agent that runs in your terminal")) == .developer)
+    }
+
+    @Test func guessesFromTheDescription() {
+        #expect(DiscoverCategories.guess("Game Boy Advance emulator") == .games)
+        #expect(DiscoverCategories.guess("Desktop client that supports multiple LLM providers") == .ai)
+        #expect(DiscoverCategories.guess("Dynamic Island for the MacBook notch") == .menuBar)
+        #expect(DiscoverCategories.guess("Calendar software focusing on flexibility and reliability") == .productivity)
+        #expect(DiscoverCategories.guess("Open-source BitTorrent client") == .cloud)
+        #expect(DiscoverCategories.guess("Virtual Audio Driver") == .audio)
+    }
+
+    @Test func guessAvoidsKnownMisfits() {
+        // Found while checking the rules against every cask.
+        #expect(DiscoverCategories.guess("Bluetooth Low Energy browser") != .browsers)
+        #expect(DiscoverCategories.guess("Apply and analyze cryptographic algorithms") != .design)
+        #expect(DiscoverCategories.guess("Graphically shows disk usage within a file system") != .design)
+        #expect(DiscoverCategories.guess("") == nil)
+    }
+
     @Test func searchRanksExactThenPrefixThenContains() {
         let entries = [entry(.formula, "ripmime", pop: 900), entry(.formula, "ripgrep", pop: 50),
                        entry(.formula, "grip", pop: 10), entry(.cask, "searcher", "rip through files"),

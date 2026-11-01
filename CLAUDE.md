@@ -29,6 +29,20 @@ Phase 9 (leftover cleanup) has its own record in
   leave a half-finished release.
 - **Filesystem.** Nick's global rules apply: ask before reading or writing
   outside this folder.
+- **Commit only when Nick asks.** Show `git status` first.
+- **Plan the whole step before building.** Research, write the plan, show it,
+  get Nick's OK. No trial-and-error builds, nothing built beyond the plan.
+- **Batch feedback into one build.** Build, gather all of Nick's feedback,
+  then roll it into the next build. No rebuild for a single small item, and
+  never rebuild while Nick is mid-step.
+- **Go easy on usage.** Nick is on a Pro plan: keep tool calls, screenshots
+  and file reads lean. Check the 5-hour and weekly limits now and then and
+  pause at a safe point near the limit.
+- **Testing.** Only on throwaway apps. Never touch the keychain or change
+  System Settings. For dark-mode checks use the app's own Theme setting and
+  set it back to Light. Ask before pausing the 1.8.0 background agent and
+  turn it back on afterwards. Never show a live password dialog as a preview
+  (rendered images only).
 
 ## Build, test, release
 

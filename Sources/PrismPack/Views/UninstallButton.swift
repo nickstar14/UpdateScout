@@ -11,6 +11,8 @@ struct UninstallButton: View {
     let removal: Removal
     /// The update row this pop-up belongs to, which goes once removed.
     var updateID: String? = nil
+    /// Says which copy, when a pop-up offers more than one removal.
+    var title: String? = nil
 
     private var state: InstallState? {
         controller.installStates[removal.item.id] ?? removal.zap.flatMap { controller.installStates[$0.item.id] }
@@ -32,7 +34,7 @@ struct UninstallButton: View {
                                color: error == "Needs admin" ? .orange : .red).help(error)
                 }
                 Button(role: .destructive) { confirm() } label: {
-                    Label(removal.opensWindow ? removal.actionTitle + "…" : removal.actionTitle, systemImage: "trash")
+                    Label(title ?? removal.actionTitle, systemImage: "trash")
                 }
                 .glassProminent(.red)
             }

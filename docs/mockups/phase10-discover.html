@@ -157,7 +157,7 @@ select, .search { font: inherit; color: var(--text); background: var(--card); bo
         <button class="btn quiet">Website</button>
         <button class="btn quiet" id="dFinder">Show in Finder</button>
         <div class="spacer"></div>
-        <button class="link" id="dRemove">Move to Trash…</button>
+        <button class="link" id="dRemove">Move to Trash</button>
         <span style="width:14px"></span>
         <button class="btn quiet" id="dClose">Close</button>
         <button class="btn" id="dMain">Install</button>
@@ -244,8 +244,8 @@ function sidebar() {
 }
 
 function button(a) {
-  if (a[5] === "update") return `<button class="btn update">Update</button><button class="btn trash" title="Move to Trash…">🗑</button>`;
-  if (a[5] === "installed") return `<button class="btn open">Open</button><button class="btn trash" title="Move to Trash…">🗑</button>`;
+  if (a[5] === "update") return `<button class="btn update">Update</button><button class="btn trash" title="Move to Trash">🗑</button>`;
+  if (a[5] === "installed") return `<button class="btn open">Open</button><button class="btn trash" title="Move to Trash">🗑</button>`;
   return `<button class="btn" style="background:${srcColorOf(a)}">Install</button>`;
 }
 

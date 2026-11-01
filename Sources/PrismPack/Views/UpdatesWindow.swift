@@ -97,6 +97,13 @@ struct MainView: View {
     @EnvironmentObject var controller: UpdateController
     @State private var columns = NavigationSplitViewVisibility.all
     @AppStorage(Migration.noticeKey) private var showRenameNotice = false
+    @ObservedObject private var discover = DiscoverModel.shared
+
+    /// What's on screen: the page, and for Discover which of its parts, so
+    /// moving between Discover's parts fades like moving between pages (Nick).
+    private var shown: String {
+        controller.page == .discover ? "discover:\(discover.spot)" : controller.page.rawValue
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
@@ -118,10 +125,10 @@ struct MainView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(controller.page)
+                .id(shown)
                 .transition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.14), value: controller.page)
+            .animation(.easeInOut(duration: 0.14), value: shown)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(GlassBackground())
         }
@@ -272,10 +279,11 @@ private struct Sidebar: View {
                 }
                 Text(title)
                 Spacer(minLength: 4)
-                if count > 0 { Text("\(count)").foregroundStyle(.secondary).monospacedDigit() }
+                if count > 0 { Text("\(count)").font(.caption).foregroundStyle(.secondary).monospacedDigit() }
             }
             .font(.callout)
-            .padding(.leading, 18).padding(.trailing, 8)
+            .lineLimit(1)
+            .padding(.leading, 10).padding(.trailing, 6)
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
             .background(discover.spot == spot
@@ -288,7 +296,7 @@ private struct Sidebar: View {
     private func heading(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            .padding(.leading, 18).padding(.top, 8).padding(.bottom, 2)
+            .padding(.leading, 10).padding(.top, 8).padding(.bottom, 2)
     }
 
     /// Package kinds take their Updates section's colour; Homebrew's lists
