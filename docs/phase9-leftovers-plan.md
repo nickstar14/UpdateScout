@@ -1,7 +1,7 @@
 # Phase 9 plan: leftover cleanup (31 Oct 2026)
 
 Replaces the first Phase 9 design after three test runs. **Approved by Nick
-and built** on `release/2.0.0`; **not committed** (ask Nick).
+and built** on `release/2.0.0`, **committed as `e9d8c56`**.
 
 ## Status at handoff (31 Oct 2026)
 
@@ -40,7 +40,7 @@ and built** on `release/2.0.0`; **not committed** (ask Nick).
    changed from ad hoc.
 6. **"What's new in 2.0"** (`Views/RenameWelcome.swift`): add leftover cleanup,
    Orphaned App Files and Full Disk Access; show Nick.
-7. **Commit**, when Nick asks.
+7. **Commit** the items above, when Nick asks.
 8. **Cleanup on Nick's Mac:** `~/Library/Group Containers/group.com.nickszun.leftovertest2`
    (Nick can try Finder), test leftovers in the Trash.
 
