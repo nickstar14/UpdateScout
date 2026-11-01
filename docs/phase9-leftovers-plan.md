@@ -29,17 +29,32 @@ and built** on `release/2.0.0`, **committed as `e9d8c56`**.
 - **Tests:** `LeftoverTests`, 10 tests, temp folders only, all pass.
 
 **Left to do:**
-1. **Homebrew cleanup-list (zap) test** on a throwaway cask Nick picks: with
-   and without the list, checking the shown list matches what Homebrew does.
-2. **Running-app Quit step** test (a throwaway app left open).
+1. ~~Homebrew cleanup-list (zap) test~~ **Passed 31 Oct 2026** on Itsycal
+   (Nick's pick). The shown list matched `brew info` exactly (3 paths under
+   `~`, no password note). Unticked: app and cask gone, all 3 files stayed.
+   Ticked: all 3 gone. One Activity line each.
+2. ~~Running-app Quit step~~ **Passed 31 Oct 2026** (Itsycal left open): "Quit
+   Itsycal first." showed, Uninstall was disabled, Quit closed it and the
+   warning cleared. Found while testing (for the polish list): after a
+   reinstall the card still said "Removed" with no Uninstall button until the
+   app restarted (Refresh didn't clear it); the window shows
+   `/Applications/itsycal.app` in lowercase; the two Activity lines don't say
+   whether the cleanup list ran.
 3. **The helper's in-app icon drag** into the Full Disk Access list: fixed
    (it now offers the app's file URL) but untested; Finder drag is proven.
 4. **"Off" look of the Settings row**: not seen live (access is on).
 5. **Sparkle and the signing change**: before the first release signed with
    the certificate, confirm Sparkle accepts an update whose code signature
    changed from ad hoc.
-6. **"What's new in 2.0"** (`Views/RenameWelcome.swift`): add leftover cleanup,
-   Orphaned App Files and Full Disk Access; show Nick.
+6. ~~"What's new in 2.0"~~ **Done 31 Oct 2026, Nick approved:** Uninstall
+   rewritten, Orphaned App Files, Full Disk Access, plus Phase 8's Stable or
+   Beta per app and Automatic updates. Sparkle test (5) deferred by Nick to
+   before the first release; plan: throwaway Sparkle app, throwaway EdDSA key
+   file from `openssl`, localhost feed, v1 ad hoc → v2 "PrismPack Signing",
+   plus a v3 with a bad EdDSA signature that must be refused. Sparkle 2.9.4's
+   `SUUpdateValidator` accepts an update when the old key's EdDSA check passes
+   and the new app's code signature is intact (it needn't match); unproven is
+   whether a self-signed certificate's signature counts as intact.
 7. **Commit** the items above, when Nick asks.
 8. **Cleanup on Nick's Mac:** `~/Library/Group Containers/group.com.nickszun.leftovertest2`
    (Nick can try Finder), test leftovers in the Trash.
