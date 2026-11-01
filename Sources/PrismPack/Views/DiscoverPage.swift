@@ -24,12 +24,12 @@ struct DiscoverPage: View {
         }
         // Search and chips stay put; the tiles scroll under them in glass.
         .pinnedHeader {
-            VStack(alignment: .leading, spacing: 10) {
+            PageControls {
                 GlassSearchField(prompt: "Search apps, command line tools and packages", text: $model.query)
                 chipRow
                 if model.chip == .apps { categoryRow }
+                UpdatesReminder()
             }
-            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
         }
         .navigationSubtitle("Apps and tools from Homebrew, pip, npm and more")
         .onAppear {
@@ -46,7 +46,7 @@ struct DiscoverPage: View {
         ChipFlow(spacing: 6) {
             ForEach(model.chips) { chip in
                 ChipButton(title: chip.title, selected: model.chip == chip, size: .small) {
-                    model.chip = chip; model.category = nil
+                    model.chip = chip; model.category = nil; model.onlyNew = false
                 }
             }
         }
@@ -72,7 +72,7 @@ struct DiscoverPage: View {
             if model.snapshot == nil && model.loadingCatalog {
                 loading("Loading Homebrew's lists…")
             } else {
-                group("Popular this month", model.popular)
+                if !model.onlyNew { group("Popular this month", model.popular) }
                 if model.recent.isEmpty {
                     hint("Recently added", "New apps and tools show here once \(AppIdentity.name) has seen Homebrew's list change, usually after a day or two.")
                 } else {
@@ -228,7 +228,9 @@ private struct DiscoverTile: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
                         Text([entry.summary, entry.tag].compactMap { $0 }.joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            // Always two lines tall, so every tile and its
+                            // button line up (Nick).
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
                     }
                     Spacer(minLength: 0)
                 }
@@ -270,7 +272,7 @@ private struct DiscoverAction: View {
                     .help(state.label)
             }
         } else if installed || state == .done {
-            StatusPill(text: "Installed", color: .green)
+            StatusPill.installed
         } else {
             HStack(spacing: 6) {
                 if let error = state?.errorMessage {

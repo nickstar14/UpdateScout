@@ -51,15 +51,15 @@ struct InstalledPage: View {
         }
         // The filter and chips stay put; the list scrolls under them in glass.
         .pinnedHeader {
-            VStack(alignment: .leading, spacing: 10) {
+            PageControls {
                 GlassSearchField(prompt: "Filter installed apps and packages", text: $filter)
                 ChipFlow(spacing: 6) {
                     ForEach(chips, id: \.id) { c in
                         ChipButton(title: c.title, selected: chip == c.id, size: .small) { chip = c.id }
                     }
                 }
+                UpdatesReminder()
             }
-            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
         }
         .navigationSubtitle("\(controller.installed.count) items")
         .toolbar {
@@ -102,7 +102,7 @@ private struct InstalledRow: View {
                     RowIcon(name: pkg.name, appPath: pkg.appPath, sectionID: pkg.sourceID)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pkg.name).font(.body.weight(.semibold)).lineLimit(1)
-                        Text([pkg.version, pkg.detail].compactMap { $0 }.joined(separator: " · "))
+                        Text(versionLine(pkg.version, pkg.detail))
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 0)
@@ -117,7 +117,7 @@ private struct InstalledRow: View {
                     InstalledDetail(pkg: pkg, sectionTitle: sectionTitle).environmentObject(controller)
                 }
             }
-            if pkg.sourceID != "unmanaged" { StatusPill(text: sectionTitle, color: .secondary) }
+            if pkg.sourceID != "unmanaged" { StatusPill.source(pkg.sourceID) }
             status
         }
         .padding(.vertical, 2)
@@ -135,11 +135,11 @@ private struct InstalledRow: View {
         } else if let item, controller.isIgnored(item) {
             Button("Unhide") { controller.unhide(item) }.glass().controlSize(.small)
         } else if let item {
-            StatusPill(text: "Update to \(item.latestVersion)", color: .orange)
+            StatusPill.update(to: item.latestVersion)
         } else if pkg.sourceID == "unmanaged" {
-            StatusPill(text: "Not managed", color: .secondary)
+            StatusPill.notManaged
         } else {
-            StatusPill(text: "Up to date", color: .green)
+            StatusPill.upToDate
         }
     }
 }

@@ -68,6 +68,55 @@ struct StatusPill: View {
     }
 }
 
+/// The same pills on every page (Phase 10): a source pill in that source's
+/// Updates colour, and one colour per status, used for nothing else.
+extension StatusPill {
+    static func source(_ sourceID: String) -> StatusPill {
+        sourceID == "unmanaged" ? notManaged
+            : StatusPill(text: UpdatesPage.title(of: sourceID), color: SourceStyle.forSource(sourceID).color)
+    }
+    static let installed = StatusPill(text: "Installed", color: .green)
+    static let upToDate = StatusPill(text: "Up to date", color: .green)
+    static let notManaged = StatusPill(text: "Not managed", color: .secondary)
+    static func update(to version: String) -> StatusPill { StatusPill(text: "Update to \(version)", color: .orange) }
+}
+
+/// "Version 1.2", in the normal text font, the same on every page.
+func versionLine(_ version: String, _ extras: String?...) -> String {
+    ([version.isEmpty ? nil : "Version \(version)"] + extras).compactMap { $0 }.joined(separator: " · ")
+}
+
+/// A page's own controls, in the row under the window's title bar. Same
+/// padding on every page.
+struct PageControls<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10, content: content)
+            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
+    }
+}
+
+/// "12 updates available · Review" on Installed and Discover (Phase 10).
+/// Shows only when updates are waiting; Review opens the Updates page.
+struct UpdatesReminder: View {
+    @EnvironmentObject var controller: UpdateController
+
+    var body: some View {
+        let count = controller.visibleItems.count
+        if count > 0 {
+            HStack(spacing: 6) {
+                Circle().fill(Color.orange).frame(width: 7, height: 7)
+                Text("\(count) update\(count == 1 ? "" : "s") available")
+                Text("·").foregroundStyle(.secondary)
+                Button("Review") { controller.page = .updates }
+                    .buttonStyle(.link)
+            }
+            .font(.callout)
+        }
+    }
+}
+
 /// Icon, name and the line under it; clicking either opens `detail`.
 private struct RowTitle<Detail: View>: View {
     let icon: RowIcon

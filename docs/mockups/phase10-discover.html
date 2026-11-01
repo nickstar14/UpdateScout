@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discover Mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter&family=JetBrains+Mono&family=Lora&family=Playfair+Display&family=Fira+Code&family=Caveat&display=swap">
+<style>
+:root {
+  --bg: #e9ecf3; --side: rgba(255,255,255,.55); --card: rgba(255,255,255,.72); --line: rgba(0,0,0,.08);
+  --text: #1d1d1f; --sub: #6e6e73; --accent: #6b5bd6; --glass: rgba(255,255,255,.6);
+  --sel: rgba(107,91,214,.14); --red: #c4302b; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141a2e; --side: rgba(30,36,58,.7); --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08);
+  --text: #f2f2f7; --sub: #a1a1aa; --accent: #9d8ff0; --glass: rgba(40,46,70,.75);
+  --sel: rgba(157,143,240,.2); --red: #ff6961; --shadow: 0 1px 2px rgba(0,0,0,.3);
+}}
+:root[data-theme="dark"] {
+  --bg: #141a2e; --side: rgba(30,36,58,.7); --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08);
+  --text: #f2f2f7; --sub: #a1a1aa; --accent: #9d8ff0; --glass: rgba(40,46,70,.75);
+  --sel: rgba(157,143,240,.2); --red: #ff6961; --shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+.note { max-width: 1100px; margin: 16px auto 0; padding: 0 16px; color: var(--sub); font-size: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.note b { color: var(--text); }
+.note button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.win { max-width: 1100px; height: 720px; margin: 12px auto 40px; display: flex; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.18); background: var(--bg); position: relative; }
+/* Sidebar */
+.side { width: 230px; flex: none; background: var(--side); border-right: 1px solid var(--line); padding: 14px 10px; overflow-y: auto; }
+.brand { display: flex; gap: 10px; align-items: center; padding: 6px 8px 14px; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: conic-gradient(from 200deg, #ff453a, #ff9f0a, #ffd60a, #30d158, #0a84ff, #bf5af2, #ff453a); }
+.brand b { font-size: 15px; display: block; } .brand span { color: var(--sub); font-size: 11px; }
+.group { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); margin: 12px 8px 4px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer; color: var(--text); }
+.item:hover { background: var(--line); }
+.item.sel { background: var(--sel); color: var(--accent); font-weight: 600; }
+.item .n { margin-left: auto; color: var(--sub); font-size: 11px; font-weight: 400; }
+.item .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.item.sub { padding-left: 26px; font-size: 12.5px; }
+.ico { width: 16px; text-align: center; opacity: .8; }
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--glass); backdrop-filter: blur(20px); }
+.toggle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--sub); display: grid; place-items: center; font-size: 13px; }
+.bar h1 { font-size: 14px; margin: 0; line-height: 1.2; } .bar .sub2 { color: var(--sub); font-size: 11.5px; }
+.subrow { display: flex; align-items: center; gap: 10px; padding: 6px 18px 10px; border-bottom: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(20px); }
+.subrow .search { flex: 1; width: auto; border-radius: 16px; padding: 6px 12px; }
+.pill { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+.pill.ok { background: rgba(48,209,88,.16); color: #1f9d48; }
+.tags { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; align-self: flex-start; }
+.spacer { flex: 1; }
+select, .search { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; }
+.search { width: 220px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--card); color: var(--sub); padding: 5px 10px; cursor: pointer; font: inherit; }
+.seg button.on { background: var(--sel); color: var(--accent); }
+.content { flex: 1; overflow-y: auto; padding: 16px 18px; }
+.lead { color: var(--sub); margin: 0 0 12px; font-size: 12px; }
+.remind { display: flex; align-items: center; gap: 8px; padding: 6px 18px; font-size: 12px; background: rgba(255,159,10,.12); color: var(--text); border-bottom: 1px solid var(--line); }
+.remind .dot2 { width: 7px; height: 7px; border-radius: 50%; background: #ff9f0a; }
+.remind a { color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: none; }
+/* Cards */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.card, .row { cursor: pointer; } .card:hover, .row:hover { border-color: var(--accent); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); position: relative; }
+.head { display: flex; gap: 10px; align-items: center; }
+.app { width: 36px; height: 36px; border-radius: 9px; flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 16px; }
+.name { font-weight: 600; } .cat { font-size: 11px; font-weight: 500; }
+.desc { color: var(--sub); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 33px; }
+.meta { color: var(--sub); font-size: 11.5px; }
+.info { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--sub); font-size: 11px; cursor: pointer; }
+.actions { display: flex; gap: 6px; margin-top: auto; }
+.btn { flex: 1; border: 0; border-radius: 7px; padding: 6px 10px; font: 600 12px -apple-system, sans-serif; cursor: pointer; background: var(--accent); color: #fff; }
+.btn.open { background: rgba(48,209,88,.18); color: #1f9d48; }
+.btn.update { background: #ff9f0a; color: #fff; }
+.btn.quiet { flex: none; background: var(--line); color: var(--text); font-weight: 500; }
+.btn.trash { flex: none; width: 30px; background: var(--line); color: var(--sub); }
+/* List */
+.list { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .app { width: 28px; height: 28px; font-size: 13px; border-radius: 7px; }
+.row .txt { flex: 1; min-width: 0; } .row .desc { min-height: 0; -webkit-line-clamp: 1; }
+.row .actions { margin: 0; width: 140px; }
+/* Fonts */
+.sample { font-size: 22px; line-height: 1.25; min-height: 56px; color: var(--text); }
+/* Details pop-up */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.25); display: none; align-items: center; justify-content: center; }
+.scrim.on { display: flex; }
+.sheet { width: 520px; max-width: calc(100% - 32px); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.sheet .app { width: 52px; height: 52px; font-size: 22px; border-radius: 12px; }
+.shot { height: 170px; border-radius: 10px; border: 1px solid var(--line); background: linear-gradient(135deg, var(--sel), var(--card)); display: grid; place-items: center; color: var(--sub); font-size: 12px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 12px; } .facts dt { color: var(--sub); } .facts dd { margin: 0; }
+.beta { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--sel); font-size: 12px; }
+.beta .btn { flex: none; }
+.foot { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.link { background: none; border: 0; color: var(--red); font: 500 12px -apple-system, sans-serif; cursor: pointer; padding: 6px 0; }
+.foot .btn { flex: none; min-width: 96px; }
+.callout { position: absolute; background: #ffd60a; color: #1d1d1f; font-size: 11px; padding: 4px 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.2); max-width: 220px; z-index: 5; pointer-events: none; }
+.hide-notes .callout { display: none; }
+@media (max-width: 760px) { .side { display: none; } .search { width: 120px; } .win { height: 640px; } }
+
+/* Selection: faint rainbow, neutral grey accents (Nick, 1 Nov 2026). */
+:root { --accent: #4b5263; --sel: rgba(0,0,0,.06);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.16), rgba(255,159,10,.16), rgba(255,214,10,.16), rgba(48,209,88,.16), rgba(10,132,255,.16), rgba(191,90,242,.16)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); } }
+:root[data-theme="dark"] { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); }
+.item.sel, .seg button.on, .seg span.on, .opt.on, .pick.sel, .note button.on { background: var(--rainbow) !important; color: var(--text) !important; }
+.remind a, .link-accent { color: var(--text) !important; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="note">
+  <span><b>Phase 10 mockup: Discover.</b> Click the sidebar, the sort menu, Cards/List, any card (anywhere but its buttons), and the Fonts entry. Yellow tags are notes for you, not part of the design.</span>
+  <button id="theme">Light / Dark</button>
+  <button id="notes">Hide notes</button>
+</div>
+
+<div class="win" id="win">
+  <aside class="side" id="side"></aside>
+  <section class="main">
+    <div class="bar">
+      <div class="toggle" title="Toggle Sidebar">◧</div>
+      <div><h1 id="title">Discover</h1><div class="sub2" id="count"></div></div>
+    </div>
+    <div class="subrow">
+      <input class="search" placeholder="Search apps, command line tools and packages">
+      <select id="sort" aria-label="Sort">
+        <option>Popular</option><option>Name</option><option>Newest</option><option>Recently updated</option>
+      </select>
+      <div class="seg" role="group" aria-label="View">
+        <button id="vCards" class="on" title="Cards">▦</button><button id="vList" title="List">☰</button>
+      </div>
+    </div>
+    <div class="remind"><span class="dot2"></span>12 updates available<span style="color:var(--sub)">·</span><a title="Opens the Updates page">Review</a></div>
+    <div class="content" id="content"></div>
+  </section>
+
+  <div class="scrim" id="scrim">
+    <div class="sheet" role="dialog" aria-label="App details">
+      <div class="head">
+        <div class="app" id="dIcon"></div>
+        <div><div class="name" style="font-size:16px" id="dName"></div><div class="cat" id="dCat"></div></div>
+      </div>
+      <div id="dLong" style="font-size:12.5px"></div>
+      <div class="shot">Screenshot from the app's website (fetched when this opens, then cached)</div>
+      <dl class="facts">
+        <dt>Version</dt><dd id="dVer"></dd>
+        <dt>From</dt><dd id="dFrom">Homebrew (cask)</dd>
+      </dl>
+      <div class="beta" id="dBeta"><span>A beta is available (<span id="dBetaV"></span>).</span><div class="spacer"></div><button class="btn quiet">Install the beta instead</button></div>
+      <div class="foot">
+        <button class="btn quiet">Website</button>
+        <button class="btn quiet" id="dFinder">Show in Finder</button>
+        <div class="spacer"></div>
+        <button class="link" id="dRemove">Move to Trash…</button>
+        <span style="width:14px"></span>
+        <button class="btn quiet" id="dClose">Close</button>
+        <button class="btn" id="dMain">Install</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const cats = {
+  "AI": "#bf5af2", "Audio & Music": "#ff375f", "Browsers": "#0a84ff", "Cloud & Storage": "#64d2ff",
+  "Communication": "#30d158", "Design": "#ff9f0a", "Developer Tools": "#5e5ce6", "Games": "#ff453a",
+  "Menu Bar": "#8e8e93", "Productivity": "#ffd60a", "Utilities": "#32ade6", "Video": "#ac8e68"
+};
+const apps = [
+  ["Claude", "AI", "Anthropic's desktop app for Claude.", "1.4.2", "224K", "installed"],
+  ["Ollama", "AI", "Get up and running with large language models locally.", "0.40.13", "91K"],
+  ["LM Studio", "AI", "Discover, download, and run local LLMs.", "0.4.28", "58K"],
+  ["Firefox", "Browsers", "Fast, private web browser from Mozilla.", "142.0", "310K", "installed", "143.0b4"],
+  ["Zen", "Browsers", "Calm, Firefox-based browser with vertical tabs.", "1.17", "64K", "update"],
+  ["Arc", "Browsers", "The browser that organises your tabs for you.", "1.98", "120K"],
+  ["Visual Studio Code", "Developer Tools", "Code editor from Microsoft with a huge extension store.", "1.105", "402K", "installed", "1.106 Insiders"],
+  ["Claude Code", "Developer Tools", "Anthropic's coding agent for the terminal.", "2.1.3", "", "", "", "Homebrew"],
+  ["Claude Code", "Developer Tools", "Anthropic's coding agent for the terminal.", "2.1.3", "", "", "", "npm"],
+  ["Ghostty", "Developer Tools", "Fast, native terminal emulator.", "1.2.3", "88K"],
+  ["Obsidian", "Productivity", "Knowledge base that works on top of a local folder of plain text Markdown files.", "1.14.5", "205K", "installed"],
+  ["Raycast", "Productivity", "Control your tools with a few keystrokes.", "1.101", "116K"],
+  ["Spotify", "Audio & Music", "Music and podcasts.", "1.2.70", "190K", "installed"],
+  ["Audacity", "Audio & Music", "Free, open source audio editor and recorder.", "4.0.1", "44K", "installed"],
+  ["Signal", "Communication", "Private messenger.", "7.71", "97K", "installed"],
+  ["Rectangle", "Menu Bar", "Move and resize windows with keyboard shortcuts or snap areas.", "0.89", "140K", "installed"],
+  ["VLC", "Video", "Plays almost any video or audio file.", "3.0.21", "160K", "installed"],
+  ["httpie", "Python", "Friendly command line HTTP client.", "3.2.4", "", "", "", "pip"],
+  ["httpie", "Command line", "Friendly command line HTTP client.", "3.2.4", "", "", "", "Homebrew"],
+  ["black", "Python", "The uncompromising Python code formatter.", "25.9", "", "installed", "", "pip"],
+  ["prettier", "Node", "Opinionated code formatter.", "3.6.2", "", "", "", "npm"],
+  ["ripgrep", "Rust", "Search folders for a pattern, very fast.", "14.1.1", "", "", "", "cargo"],
+  ["ripgrep", "Command line", "Search folders for a pattern, very fast.", "14.1.1", "", "installed", "", "Homebrew"],
+  ["rubocop", "Ruby", "Ruby code style checker and formatter.", "1.81", "", "", "", "gem"],
+  ["Prettier – Code formatter", "Editor extensions", "VS Code, VSCodium and Cursor extension.", "11.0", "", "", "", "Editors"],
+  ["Nextcloud", "Cloud & Storage", "Desktop sync client for Nextcloud.", "4.0.3", "21K", "installed"]
+];
+const fonts = [
+  ["Inter", "Inter", "font-inter"], ["JetBrains Mono", "JetBrains Mono", "font-jetbrains-mono"],
+  ["Lora", "Lora", "font-lora"], ["Playfair Display", "Playfair Display", "font-playfair-display"],
+  ["Fira Code", "Fira Code", "font-fira-code"], ["Caveat", "Caveat", "font-caveat"]
+];
+const state = { page: "Featured", view: "cards", discoverOpen: true };
+
+const srcColor = { "Homebrew": "#a0673a", "npm": "#b8211f", "pip": "#e8870e", "cargo": "#b5582a", "gem": "#ad0f5c", "Editors": "#0a84ff" };
+const pkgPages = { "Python": "pip", "Node": "npm", "Rust": "cargo", "Ruby": "gem", "Editor extensions": "Editors" };
+const pageColor = c => cats[c] || srcColor[pkgPages[c]] || (c === "Command line" ? srcColor.Homebrew : "#8e8e93");
+let mixed = false;
+function srcColorOf(a) { return srcColor[a[7] || "Homebrew"]; }
+function tags(a) {
+  let t = "";
+  if (mixed) t += `<span class="pill" style="background:${srcColorOf(a)}22;color:${srcColorOf(a)}">${a[7] || "Homebrew"}</span>`;
+  if (a[5] === "installed" || a[5] === "update") t += `<span class="pill ok">Installed</span>`;
+  return t ? `<div class="tags">${t}</div>` : "";
+}
+function initials(n) { return n.split(" ").map(w => w[0]).slice(0, 2).join(""); }
+function count(c) { return apps.filter(a => a[1] === c).length * 37 + 12; }
+
+function sidebar() {
+  const s = document.getElementById("side");
+  const sub = (label, extra = "") => `<div class="item sub ${state.page === label ? "sel" : ""}" data-p="${label}">${extra}${label}${label in cats ? `<span class="n">${count(label)}</span>` : ""}</div>`;
+  let h = `<div class="brand"><div class="logo"></div><div><b>PrismPack</b><span>Version 2.0.0</span></div></div>
+    <div class="group">Discover</div>
+    <div class="item ${["Featured","New"].includes(state.page) || state.page in cats || (state.page in pkgPages) || ["Command line","Fonts"].includes(state.page) ? "sel" : ""}" data-p="Featured"><span class="ico">⌕</span>Discover</div>`;
+  h += sub("Featured") + sub("New");
+  h += `<div class="group" style="margin-left:26px">Apps</div>`;
+  for (const c in cats) h += sub(c, `<span class="dot" style="background:${cats[c]}"></span>`);
+  h += `<div class="group" style="margin-left:26px">Tools and packages</div>` + sub("Command line", `<span class="dot" style="background:${srcColor.Homebrew}"></span>`) + sub("Fonts", `<span class="dot" style="background:#8e8e93"></span>`);
+  for (const k in pkgPages) h += sub(k, `<span class="dot" style="background:${srcColor[pkgPages[k]]}"></span>`);
+  h += `<div class="group">Library</div>
+    <div class="item"><span class="ico">↻</span>Updates<span class="n">12</span></div>
+    <div class="item"><span class="ico">✓</span>Installed<span class="n">278</span></div>
+    <div class="item"><span class="ico">▢</span>Orphaned App Files</div>
+    <div class="group">&nbsp;</div>
+    <div class="item"><span class="ico">◷</span>Activity</div>
+    <div class="item"><span class="ico">⚙</span>Settings</div>`;
+  s.innerHTML = h;
+  s.querySelectorAll("[data-p]").forEach(el => el.onclick = () => { state.page = el.dataset.p; render(); });
+}
+
+function button(a) {
+  if (a[5] === "update") return `<button class="btn update">Update</button><button class="btn trash" title="Move to Trash…">🗑</button>`;
+  if (a[5] === "installed") return `<button class="btn open">Open</button><button class="btn trash" title="Move to Trash…">🗑</button>`;
+  return `<button class="btn" style="background:${srcColorOf(a)}">Install</button>`;
+}
+
+function cardHTML(a, i) {
+  const col = pageColor(a[1]);
+  return `<div class="card" data-i="${i}" title="Click for details">
+    <div class="head"><div class="app" style="background:${col}">${initials(a[0])}</div>
+      <div><div class="name">${a[0]}</div><div class="cat" style="color:${col}">${a[1]}</div></div>${tags(a)}</div>
+    <div class="desc">${a[2]}</div>
+    <div class="meta">Version ${a[3]}</div>
+    <div class="actions">${button(a)}</div></div>`;
+}
+function rowHTML(a, i) {
+  const col = pageColor(a[1]);
+  return `<div class="row" data-i="${i}" title="Click for details"><div class="app" style="background:${col}">${initials(a[0])}</div>
+    <div class="txt"><span class="name">${a[0]}</span> <span class="cat" style="color:${col}">${a[1]}</span><div class="desc">${a[2]}</div></div>
+    ${tags(a).replace('class="tags"', 'class="tags" style="margin:0;align-self:center"')}
+    <span class="meta">Version ${a[3]}</span>
+    <div class="actions">${button(a)}</div></div>`;
+}
+
+function fontsPage() {
+  const items = fonts.map(f => `<div class="card">
+    <div class="head"><div class="app" style="background:#8e8e93">Aa</div><div><div class="name">${f[0]}</div><div class="cat" style="color:var(--sub)">${f[2]}</div></div></div>
+    <div class="sample" style="font-family:'${f[1]}'">The quick brown fox jumps over the lazy dog</div>
+    <div class="actions"><button class="btn">Install</button></div></div>`).join("");
+  return `<p class="lead">Each font is drawn in itself, previewed from Google Fonts without installing. Fonts that aren't on Google Fonts show their name only.</p><div class="grid">${items}</div>`;
+}
+
+function render() {
+  sidebar();
+  const page = state.page;
+  document.getElementById("title").textContent = page === "Featured" ? "Discover" : "Discover · " + page;
+  const c = document.getElementById("content");
+  if (page === "Fonts") { document.getElementById("count").textContent = "1,140 fonts"; c.innerHTML = fontsPage(); notes(); return; }
+  let list = apps.map((a, i) => [a, i]);
+  if (page in cats || page in pkgPages || page === "Command line") list = list.filter(([a]) => a[1] === page);
+  if (page === "Featured") list = list.filter(([a]) => a[1] in cats);
+  mixed = new Set(list.map(([a]) => a[7] || "Homebrew")).size > 1;
+  const sort = document.getElementById("sort").value;
+  if (sort === "Name") list.sort((x, y) => x[0][0].localeCompare(y[0][0]));
+  document.getElementById("count").textContent = page in cats ? `${count(page)} apps` : page === "Featured" ? "Popular this month" : page === "New" ? "Added in the last 30 days" : "";
+  let lead = "";
+  if (page in pkgPages) lead = `<p class="lead">Searches ${page === "Editor extensions" ? "the VS Code and Open VSX stores" : page === "Python" ? "PyPI (installs with pipx)" : page === "Node" ? "npm (installs globally)" : page === "Rust" ? "crates.io (installs with cargo)" : "RubyGems (installs with Homebrew's Ruby)"}. Type to search; popular ones show first.</p>`;
+  if (page === "Command line") lead = `<p class="lead">Homebrew formulae: command line tools, sorted by installs.</p>`;
+  c.innerHTML = lead + (state.view === "cards"
+    ? `<div class="grid">${list.map(([a, i]) => cardHTML(a, i)).join("")}</div>`
+    : `<div class="list">${list.map(([a, i]) => rowHTML(a, i)).join("")}</div>`);
+  c.querySelectorAll("[data-i]").forEach(el => el.onclick = e => { if (!e.target.closest("button")) details(apps[el.dataset.i]); });
+  notes();
+}
+
+function details(a) {
+  const col = pageColor(a[1]);
+  const ic = document.getElementById("dIcon"); ic.style.background = col; ic.textContent = initials(a[0]);
+  document.getElementById("dName").textContent = a[0];
+  const dc = document.getElementById("dCat"); dc.textContent = a[1]; dc.style.color = col;
+  document.getElementById("dLong").textContent = a[2] + " The longer description comes from the app's website when it has one.";
+  document.getElementById("dVer").textContent = a[3];
+  document.getElementById("dFrom").textContent = ({ npm: "npm (installed globally)", pip: "PyPI (installed with pipx)", cargo: "crates.io (installed with cargo)", gem: "RubyGems", Editors: "Editor extension store" })[a[7]] || "Homebrew";
+  const installed = a[5] === "installed" || a[5] === "update";
+  document.getElementById("dRemove").style.display = installed ? "" : "none";
+  document.getElementById("dFinder").style.display = installed ? "" : "none";
+  const m = document.getElementById("dMain");
+  m.textContent = a[5] === "update" ? "Update" : installed ? "Open" : "Install";
+  m.className = "btn" + (a[5] === "update" ? " update" : "");
+  m.style.background = installed ? "" : srcColorOf(a);
+  document.getElementById("dBeta").style.display = a[6] ? "" : "none";
+  document.getElementById("dBetaV").textContent = a[6] || "";
+  document.getElementById("scrim").classList.add("on");
+  notes(true);
+}
+
+function notes(sheet) {
+  document.querySelectorAll(".callout").forEach(n => n.remove());
+  const w = document.getElementById("win");
+  const add = (text, css) => { const d = document.createElement("div"); d.className = "callout"; d.textContent = text; Object.assign(d.style, css); w.appendChild(d); };
+  if (sheet) {
+    add("Main action always bottom right. Close beside it.", { right: "40px", bottom: "6px" });
+    add("Remove is red text, set apart from the main button.", { left: "45%", bottom: "6px" });
+    add("Helpers (Website, Show in Finder) bottom left.", { left: "120px", bottom: "6px" });
+    add("Betas live here, not in the sidebar.", { left: "120px", top: "40%" });
+    return;
+  }
+  add("Discover's parts open under it in the sidebar, replacing the two chip rows.", { left: "12px", bottom: "12px" });
+  add("Same top bar as every page. Discover's own controls sit in the row under it.", { right: "20px", top: "8px" });
+  add("When a list mixes sources, every card gets its source tag. One source only (e.g. Browsers): no tags.", { right: "30px", top: "120px" });
+  add("Installed tag kept. No download counts.", { right: "30px", bottom: "24px" });
+  add("Shows only when updates are waiting. Review opens the Updates page; cards still update in place.", { left: "300px", bottom: "24px" });
+}
+
+document.getElementById("scrim").onclick = e => { if (e.target.id === "scrim" || e.target.id === "dClose") { e.currentTarget.classList.remove("on"); notes(); } };
+document.getElementById("dClose").onclick = () => { document.getElementById("scrim").classList.remove("on"); notes(); };
+document.getElementById("vCards").onclick = () => { state.view = "cards"; vCards.classList.add("on"); vList.classList.remove("on"); render(); };
+document.getElementById("vList").onclick = () => { state.view = "list"; vList.classList.add("on"); vCards.classList.remove("on"); render(); };
+document.getElementById("sort").onchange = render;
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+document.getElementById("notes").onclick = e => { document.body.classList.toggle("hide-notes"); e.target.textContent = document.body.classList.contains("hide-notes") ? "Show notes" : "Hide notes"; };
+render();
+</script>
+</body>
+</html>

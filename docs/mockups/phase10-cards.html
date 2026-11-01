@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Cards Mockup</title>
+<style>
+:root {
+  --bg: #e9ecf3; --card: rgba(255,255,255,.72); --line: rgba(0,0,0,.08); --text: #1d1d1f; --sub: #6e6e73;
+  --accent: #6b5bd6; --sel: rgba(107,91,214,.14); --red: #c4302b; --field: #fff;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141a2e; --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08); --text: #f2f2f7; --sub: #a1a1aa;
+  --accent: #9d8ff0; --sel: rgba(157,143,240,.2); --red: #ff6961; --field: rgba(255,255,255,.06);
+}}
+:root[data-theme="dark"] {
+  --bg: #141a2e; --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08); --text: #f2f2f7; --sub: #a1a1aa;
+  --accent: #9d8ff0; --sel: rgba(157,143,240,.2); --red: #ff6961; --field: rgba(255,255,255,.06);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 16px; }
+.top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--sub); font-size: 12px; }
+.top b { color: var(--text); }
+.top button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+h2 { font-size: 13px; margin: 22px 0 4px; } .lead { color: var(--sub); font-size: 12px; margin: 0 0 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.head { display: flex; gap: 10px; align-items: center; }
+.icon { position: relative; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 16px; flex: none; }
+.warns { margin-left: auto; display: flex; gap: 4px; align-self: flex-start; position: relative; }
+.warn { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 11px -apple-system, sans-serif; color: #fff; border: 0; cursor: pointer; padding: 0; }
+.wcard { position: absolute; right: 0; top: 26px; width: 260px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.25); padding: 10px 12px; text-align: left; font-size: 12px; z-index: 3; display: none; }
+.wcard.on { display: block; } .wcard b { display: block; margin-bottom: 4px; }
+.name { font-weight: 600; } .cat { font-size: 11px; font-weight: 500; }
+.line { font-size: 11.5px; color: var(--sub); }
+.desc { font-size: 12px; color: var(--sub); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 33px; }
+.tags { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; align-self: flex-start; }
+.pill { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+.actions { display: flex; gap: 6px; margin-top: auto; }
+.btn { flex: 1; border: 0; border-radius: 7px; padding: 6px 10px; font: 600 12px -apple-system, sans-serif; cursor: pointer; color: #fff; }
+.btn.quiet { background: var(--line); color: var(--text); font-weight: 500; }
+.btn.trash { flex: none; width: 30px; background: var(--line); color: var(--sub); }
+.btn.open { background: rgba(48,209,88,.18); color: #1f9d48; }
+.arrow { color: var(--sub); font-size: 10px; margin: 0 3px; }
+.section { display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; font-weight: 600; }
+.section .sq { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 11px; }
+.section .n { color: var(--sub); font-weight: 400; font-size: 12px; }
+.section .all { margin-left: auto; border: 0; border-radius: 7px; padding: 4px 10px; font: 600 11.5px -apple-system, sans-serif; color: #fff; cursor: pointer; }
+/* Orphans */
+.list { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1; min-width: 200px; } .row .path { font-size: 11px; color: var(--sub); }
+.mini { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 7px; padding: 4px 10px; font: 12px -apple-system, sans-serif; cursor: pointer; }
+.picker { margin-top: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.2); padding: 14px; max-width: 420px; display: none; flex-direction: column; gap: 8px; }
+.picker.on { display: flex; }
+.picker input { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 14px; padding: 5px 11px; }
+.pick { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+.pick:hover, .pick.sel { background: var(--sel); }
+.pick .icon { width: 24px; height: 24px; border-radius: 6px; font-size: 11px; }
+.hint { font-size: 11px; color: var(--sub); }
+.foot { display: flex; gap: 8px; justify-content: flex-end; }
+.foot .btn { flex: none; min-width: 90px; }
+
+/* Selection: faint rainbow, neutral grey accents (Nick, 1 Nov 2026). */
+:root { --accent: #4b5263; --sel: rgba(0,0,0,.06);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.16), rgba(255,159,10,.16), rgba(255,214,10,.16), rgba(48,209,88,.16), rgba(10,132,255,.16), rgba(191,90,242,.16)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); } }
+:root[data-theme="dark"] { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); }
+.item.sel, .seg button.on, .seg span.on, .opt.on, .pick.sel, .note button.on { background: var(--rainbow) !important; color: var(--text) !important; }
+.remind a, .link-accent { color: var(--text) !important; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><b>Phase 10: Discover's card on every page.</b> Click a card anywhere to open its details. <span style="flex:1"></span><button id="theme">Light / Dark</button></div>
+
+  <h2>Updates</h2>
+  <p class="lead">Still grouped by source, each section in its colour with its "Update all" button. Inside a section every card is Discover's card: installed → new version (the new one in the source's colour), warnings as 2.0's round symbols in the card's top-right corner (click one for its explanation), no source tag. "Ignore this version" moves into the details pop-up.</p>
+  <div id="updates"></div>
+
+  <h2>Installed</h2>
+  <p class="lead">Discover's card, one flat list (filter by source with the Source menu). Source pill with the status under it. Open + trash when it's up to date, Update when it isn't.</p>
+  <div class="grid" id="installed"></div>
+
+  <h2>Discover</h2>
+  <p class="lead">As approved: the two-line description, source tag only in mixed lists, Installed stacked under it.</p>
+  <div class="grid" id="discover"></div>
+
+  <h2>Orphaned App Files: "Belongs to…"</h2>
+  <p class="lead">For files PrismPack thinks are orphaned but that really belong to an app you still have.</p>
+  <div class="list">
+    <div class="row"><div class="grow"><b>com.example.helper</b><div class="path">~/Library/Application Support/com.example.helper · 48 MB · changed 3 days ago</div></div>
+      <button class="mini">Show Files</button><button class="mini" id="belongs">Belongs to…</button><button class="mini">Keep</button></div>
+    <div class="row"><div class="grow"><b>OldTool</b><div class="path">~/Library/Caches/com.oldtool.app · 12 MB · changed 2 years ago</div></div>
+      <button class="mini">Show Files</button><button class="mini">Belongs to…</button><button class="mini">Keep</button></div>
+  </div>
+  <div class="picker" id="picker" role="dialog" aria-label="Pick the app these files belong to">
+    <b>Which app do these files belong to?</b>
+    <input placeholder="Search your apps">
+    <div id="picks"></div>
+    <div class="hint">PrismPack remembers this: the files leave this list, and they're offered along with that app's own files if you ever move it to the Trash. Undo it from "Assigned files" at the bottom of this page.</div>
+    <div class="foot"><button class="btn quiet" id="pCancel">Cancel</button><button class="btn" style="background:var(--accent)">Assign</button></div>
+  </div>
+</div>
+
+<script>
+const c = { Homebrew: "#a0673a", "App Store": "#0a84ff", Sparkle: "#30b0c7", npm: "#b8211f", Python: "#e8870e" };
+const pill = (t, col) => `<span class="pill" style="background:${col}22;color:${col}">${t}</span>`;
+const W = {
+  major: ["!", "#ff9f0a", "Major version change", "For paid apps a new major version is often a separate purchase rather than a free update. Check the vendor's terms before updating."],
+  restart: ["↻", "#e6b800", "Requires restart", "The installer asks you to restart your Mac afterwards."],
+  ios: ["▯", "#0a84ff", "iPhone / iPad app", "mas and Homebrew can't update these. The button opens the App Store's Updates page."]
+};
+const badge = (...kinds) => `<div class="warns">${kinds.map(k => { const [sym, col, t, m] = W[k];
+  return `<button class="warn" style="background:${col}" aria-label="${t}">${sym}</button><div class="wcard"><b style="color:${col}">${t}</b>${m}</div>`; }).join("")}</div>`;
+const icon = (n, col, b = "") => `<div class="icon" style="background:${col}">${n.slice(0, 1)}${b}</div>`;
+
+const head = (n, col, sub, subCol, tags = "", warns = "") => `<div class="head">${icon(n, col)}<div><div class="name">${n}</div><div class="cat" style="color:${subCol}">${sub}</div></div>${tags ? `<div class="tags">${tags}</div>` : ""}${warns}</div>`;
+const groups = [
+  ["Homebrew", "🍺", [["Zen", "1.16", "1.17"], ["rubocop", "1.80", "1.81"], ["DisplayLink Manager", "1.12", "1.13", badge("restart")]]],
+  ["App Store", "A", [["Pages", "14.4", "15.0"], ["Fresco", "3.1", "3.2", badge("ios")]]],
+  ["Sparkle", "S", [["Transmit", "5.11", "6.0", badge("major")]]]
+];
+document.getElementById("updates").innerHTML = groups.map(([s, sym, items]) => `
+  <div class="section"><span class="sq" style="background:${c[s]}">${sym}</span>${s}<span class="n">${items.length}</span>
+    <button class="all" style="background:${c[s]}">Update all ${s}</button></div>
+  <div class="grid">${items.map(([n, a, b, w = ""]) => `<div class="card">${head(n, c[s], `${a}<span class="arrow">→</span><b style="color:${c[s]}">${b}</b>`, "var(--sub)", "", w)}
+    <div class="actions"><button class="btn" style="background:${c[s]}">Update</button></div></div>`).join("")}</div>`).join("");
+
+document.getElementById("installed").innerHTML = [
+  ["Claude", "1.4.2", "Homebrew", "ok"], ["Xcode", "27.0", "App Store", "ok"], ["Zen", "1.16", "Homebrew", "1.17"],
+  ["black", "25.9", "Python", "ok"], ["cowsay", "1.6.0", "npm", "ok"]
+].map(([n, v, s, st]) => `<div class="card">${head(n, c[s], "Version " + v, "var(--sub)", pill(s, c[s]) + (st === "ok" ? pill("Up to date", "#28a745") : pill("Update to " + st, "#e8870e")))}
+  <div class="actions">${st === "ok" ? `<button class="btn open">Open</button>` : `<button class="btn" style="background:${c[s]}">Update</button>`}<button class="btn trash" title="Move to Trash…">🗑</button></div></div>`).join("");
+
+document.getElementById("discover").innerHTML = [
+  ["Claude", "AI", "Anthropic's desktop app for Claude.", "Homebrew", true], ["Claude Code", "Developer Tools", "Anthropic's coding agent for the terminal.", "npm", false],
+  ["Ollama", "AI", "Get up and running with large language models locally.", "Homebrew", false], ["LM Studio", "AI", "Discover, download, and run local LLMs.", "Homebrew", false]
+].map(([n, cat, d, s, inst]) => `<div class="card">${head(n, "#bf5af2", cat, cat === "AI" ? "#bf5af2" : "#5e5ce6", pill(s, c[s]) + (inst ? pill("Installed", "#28a745") : ""))}
+  <div class="desc">${d}</div><div class="line">Version 1.0</div>
+  <div class="actions">${inst ? `<button class="btn open">Open</button><button class="btn trash">🗑</button>` : `<button class="btn" style="background:${c[s]}">Install</button>`}</div></div>`).join("");
+
+document.querySelectorAll(".warn").forEach(b => b.onclick = e => { e.stopPropagation(); const card = b.nextElementSibling; const was = card.classList.contains("on"); document.querySelectorAll(".wcard").forEach(x => x.classList.remove("on")); if (!was) card.classList.add("on"); });
+document.addEventListener("click", () => document.querySelectorAll(".wcard").forEach(x => x.classList.remove("on")));
+document.getElementById("picks").innerHTML = [["Example Pro", "#5e5ce6", "Same developer (com.example)"], ["Firefox", "#ff9f0a", ""], ["Obsidian", "#7c3aed", ""]]
+  .map(([n, col, h], i) => `<div class="pick ${i ? "" : "sel"}">${icon(n, col)}<span>${n}</span><span class="hint" style="margin-left:auto">${h}</span></div>`).join("");
+document.getElementById("belongs").onclick = () => document.getElementById("picker").classList.add("on");
+document.getElementById("pCancel").onclick = () => document.getElementById("picker").classList.remove("on");
+document.querySelectorAll(".pick").forEach(p => p.onclick = () => { document.querySelectorAll(".pick").forEach(x => x.classList.remove("sel")); p.classList.add("sel"); });
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+</script>
+</body>
+</html>

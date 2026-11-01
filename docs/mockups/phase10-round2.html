@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Round 2 Mockup</title>
+<style>
+:root {
+  --bg: #e9ecf3; --side: rgba(255,255,255,.55); --card: rgba(255,255,255,.72); --line: rgba(0,0,0,.08);
+  --text: #1d1d1f; --sub: #6e6e73; --accent: #6b5bd6; --glass: rgba(255,255,255,.6);
+  --sel: rgba(107,91,214,.14); --red: #c4302b; --field: #fff;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141a2e; --side: rgba(30,36,58,.7); --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08);
+  --text: #f2f2f7; --sub: #a1a1aa; --accent: #9d8ff0; --glass: rgba(40,46,70,.75);
+  --sel: rgba(157,143,240,.2); --red: #ff6961; --field: rgba(255,255,255,.06);
+}}
+:root[data-theme="dark"] {
+  --bg: #141a2e; --side: rgba(30,36,58,.7); --card: rgba(60,66,90,.55); --line: rgba(255,255,255,.08);
+  --text: #f2f2f7; --sub: #a1a1aa; --accent: #9d8ff0; --glass: rgba(40,46,70,.75);
+  --sel: rgba(157,143,240,.2); --red: #ff6961; --field: rgba(255,255,255,.06);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+.note { max-width: 1100px; margin: 16px auto 0; padding: 0 16px; color: var(--sub); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.note b { color: var(--text); }
+.note button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.note button.on { background: var(--sel); color: var(--accent); border-color: var(--accent); }
+.win { max-width: 1100px; height: 700px; margin: 12px auto 40px; display: flex; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.18); background: var(--bg); position: relative; }
+.side { width: 210px; flex: none; background: var(--side); border-right: 1px solid var(--line); padding: 14px 10px; }
+.brand { display: flex; gap: 10px; align-items: center; padding: 6px 8px 14px; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: conic-gradient(from 200deg, #ff453a, #ff9f0a, #ffd60a, #30d158, #0a84ff, #bf5af2, #ff453a); }
+.brand b { font-size: 15px; display: block; } .brand span { color: var(--sub); font-size: 11px; }
+.group { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); margin: 12px 8px 4px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; }
+.item.sel { background: var(--sel); color: var(--accent); font-weight: 600; }
+.item .n { margin-left: auto; color: var(--sub); font-size: 11px; font-weight: 400; }
+.ico { width: 16px; text-align: center; opacity: .8; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--glass); }
+.toggle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--sub); display: grid; place-items: center; }
+.bar h1 { font-size: 14px; margin: 0; line-height: 1.2; } .bar .sub2 { color: var(--sub); font-size: 11.5px; }
+.subrow { display: flex; align-items: center; gap: 10px; padding: 6px 18px 10px; border-bottom: 1px solid var(--line); background: var(--glass); flex-wrap: wrap; }
+.search { flex: 1; min-width: 160px; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 6px 12px; }
+select, input[type=text] { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg span { background: var(--card); color: var(--sub); padding: 5px 10px; cursor: pointer; }
+.seg span.on { background: var(--sel); color: var(--accent); }
+.content { flex: 1; overflow-y: auto; padding: 16px 18px; }
+.list { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row:last-child { border-bottom: 0; } .row:hover { background: var(--sel); }
+.app { width: 28px; height: 28px; border-radius: 7px; flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
+.name { font-weight: 600; } .ver { color: var(--sub); font-size: 11.5px; }
+.pill { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.spacer { flex: 1; }
+.btn { border: 0; border-radius: 7px; padding: 6px 12px; font: 600 12px -apple-system, sans-serif; cursor: pointer; background: var(--accent); color: #fff; }
+.btn.quiet { background: var(--line); color: var(--text); font-weight: 500; }
+.link { background: none; border: 0; color: var(--red); font: 500 12px -apple-system, sans-serif; cursor: pointer; }
+.remind { display: flex; align-items: center; gap: 8px; padding: 6px 18px; font-size: 12px; background: rgba(255,159,10,.12); color: var(--text); border-bottom: 1px solid var(--line); }
+.remind .dot2 { width: 7px; height: 7px; border-radius: 50%; background: #ff9f0a; }
+.remind a { color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: none; }
+/* Settings */
+.pane { max-width: 640px; }
+.sec { font-size: 12px; font-weight: 600; color: var(--sub); margin: 18px 4px 6px; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.srow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.srow:last-child { border-bottom: 0; }
+.help { color: var(--sub); font-size: 11.5px; margin: 6px 4px 0; }
+.sw { width: 32px; height: 18px; border-radius: 9px; background: #30d158; position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.sw.off { background: var(--line); } .sw.off::after { right: auto; left: 2px; }
+/* Sheets */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.28); display: none; align-items: flex-start; justify-content: center; padding-top: 60px; }
+.scrim.on { display: flex; }
+.sheet { width: 500px; max-width: calc(100% - 32px); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.sheet h2 { font-size: 15px; margin: 0; }
+.choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.opt { border: 1.5px solid var(--line); border-radius: 10px; padding: 12px; cursor: pointer; background: var(--card); }
+.opt.on { border-color: var(--accent); background: var(--sel); }
+.opt b { display: block; margin-bottom: 3px; } .opt span { color: var(--sub); font-size: 11.5px; }
+.form { display: grid; grid-template-columns: 150px 1fr; gap: 8px 10px; align-items: center; }
+.form label { color: var(--sub); text-align: right; font-size: 12px; }
+.result { padding: 8px 10px; border-radius: 8px; background: rgba(48,209,88,.14); color: #1f9d48; font-size: 12px; }
+details summary { color: var(--sub); font-size: 12px; cursor: pointer; }
+.foot { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+/* Alert */
+.alert { width: 300px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.35); padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.alert .logo { width: 52px; height: 52px; border-radius: 12px; }
+.alert p { margin: 0; color: var(--sub); font-size: 12px; }
+.alert .btn { width: 100%; padding: 7px; }
+.alert label { font-size: 11.5px; color: var(--sub); }
+/* Notes page */
+.notes li { margin-bottom: 8px; } .notes b { color: var(--text); }
+.callout { position: absolute; background: #ffd60a; color: #1d1d1f; font-size: 11px; padding: 4px 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.2); max-width: 230px; z-index: 5; pointer-events: none; }
+.hide-notes .callout { display: none; }
+@media (max-width: 760px) { .side { display: none; } .form { grid-template-columns: 1fr; } .form label { text-align: left; } .choice { grid-template-columns: 1fr; } }
+
+/* Selection: faint rainbow, neutral grey accents (Nick, 1 Nov 2026). */
+:root { --accent: #4b5263; --sel: rgba(0,0,0,.06);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.16), rgba(255,159,10,.16), rgba(255,214,10,.16), rgba(48,209,88,.16), rgba(10,132,255,.16), rgba(191,90,242,.16)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); } }
+:root[data-theme="dark"] { --accent: #737b8f; --sel: rgba(255,255,255,.08);
+  --rainbow: linear-gradient(90deg, rgba(255,69,58,.24), rgba(255,159,10,.24), rgba(255,214,10,.24), rgba(48,209,88,.24), rgba(10,132,255,.24), rgba(191,90,242,.24)); }
+.item.sel, .seg button.on, .seg span.on, .opt.on, .pick.sel, .note button.on { background: var(--rainbow) !important; color: var(--text) !important; }
+.remind a, .link-accent { color: var(--text) !important; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="note">
+  <b>Phase 10, round 2.</b>
+  <button data-v="installed" class="on">Installed</button>
+  <button data-v="sources">Settings: Other sources</button>
+  <button data-v="add">Add a source</button>
+  <button data-v="quit">⌘Q prompt</button>
+  <button data-v="consistency">Consistency list</button>
+  <span class="spacer"></span>
+  <button id="theme">Light / Dark</button>
+  <button id="notes">Hide notes</button>
+</div>
+
+<div class="win" id="win">
+  <aside class="side">
+    <div class="brand"><div class="logo"></div><div><b>PrismPack</b><span>Version 2.0.0</span></div></div>
+    <div class="item"><span class="ico">⌕</span>Discover</div>
+    <div class="group">Library</div>
+    <div class="item"><span class="ico">↻</span>Updates<span class="n">12</span></div>
+    <div class="item" id="navInstalled"><span class="ico">✓</span>Installed<span class="n">278</span></div>
+    <div class="item"><span class="ico">▢</span>Orphaned App Files</div>
+    <div class="group">&nbsp;</div>
+    <div class="item"><span class="ico">◷</span>Activity</div>
+    <div class="item" id="navSettings"><span class="ico">⚙</span>Settings</div>
+  </aside>
+  <section class="main">
+    <div class="bar"><div class="toggle">◧</div><div><h1 id="title"></h1><div class="sub2" id="subtitle"></div></div></div>
+    <div class="subrow" id="subrow"></div>
+    <div class="remind" id="remind"><span class="dot2"></span>12 updates available<span style="color:var(--sub)">·</span><a title="Opens the Updates page">Review</a></div>
+    <div class="content" id="content"></div>
+  </section>
+  <div class="scrim" id="scrim"></div>
+</div>
+
+<script>
+const src = {
+  "Homebrew": "#a0673a", "App Store": "#0a84ff", "Sparkle": "#30b0c7", "GitHub": "#6e40c9",
+  "Python": "#e8870e", "npm": "#b8211f", "Rust": "#b5582a", "Ruby": "#ad0f5c", "Editors": "#007aff", "Not managed": "#8e8e93"
+};
+const installed = [
+  ["Claude", "1.4.2", "Homebrew", "ok"], ["Firefox", "142.0", "Homebrew", "ok"], ["Zen", "1.16", "Homebrew", "1.17"],
+  ["Xcode", "27.0", "App Store", "ok"], ["Pages", "15.0", "App Store", "ok"], ["Transmit", "5.11", "Sparkle", "5.12"],
+  ["ClaudeCounter", "0.9.1", "GitHub", "ok"], ["black", "25.9", "Python", "ok"], ["cowsay", "1.6.0", "npm", "ok"],
+  ["ripgrep", "14.1.1", "Rust", "ok"], ["rubocop", "1.80", "Ruby", "1.81"], ["Prettier", "11.0", "Editors", "ok"],
+  ["DisplayLink Manager", "1.12", "Not managed", "ok"]
+];
+let view = "installed", listMode = "list", sortBy = "Name", desc = false;
+const labels = { "Name": ["A → Z", "Z → A"], "Size": ["Largest first", "Smallest first"], "Date installed": ["Newest first", "Oldest first"], "Installation type": ["A → Z", "Z → A"] };
+const dates = ["2026-10-30", "2026-03-02", "2025-11-18", "2024-06-01", "2025-01-15", "2026-08-21", "2026-05-09", "2026-10-12", "2026-07-03", "2025-12-24", "2026-09-30", "2026-02-14", "2023-04-11"];
+const sizes = [512, 380, 640, 12400, 610, 95, 8, 6, 1, 9, 22, 3, 74];
+installed.forEach((a, i) => { a[4] = sizes[i]; a[5] = dates[i]; a[6] = new Date(dates[i]).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); });
+
+function pill(text, color) { return `<span class="pill" style="background:${color}22;color:${color}">${text}</span>`; }
+function status(s) { return s === "ok" ? pill("Up to date", "#28a745") : pill("Update to " + s, "#e8870e"); }
+
+function render() {
+  document.querySelectorAll(".callout").forEach(n => n.remove());
+  document.getElementById("scrim").classList.remove("on");
+  document.querySelectorAll(".note [data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === view));
+  const onSettings = ["sources", "add", "quit", "consistency"].includes(view) && view !== "quit";
+  document.getElementById("navInstalled").classList.toggle("sel", !onSettings);
+  document.getElementById("navSettings").classList.toggle("sel", onSettings);
+  if (onSettings) settings(); else installedPage();
+  if (view === "add") addSheet();
+  if (view === "quit") quitAlert();
+  if (view === "consistency") consistency();
+}
+
+function installedPage() {
+  title("Installed", "278 items");
+  document.getElementById("subrow").innerHTML = `
+    <input class="search" placeholder="Filter installed apps and packages">
+    <div class="seg"><span class="on">All</span><span>Updates</span><span>Hidden</span></div>
+    <select aria-label="Source"><option>Every source</option>${Object.keys(src).map(s => `<option>${s}</option>`).join("")}</select>
+    <select aria-label="Sort" id="sortBy"><option>Name</option><option>Size</option><option>Date installed</option><option>Installation type</option></select>
+    <div class="seg"><span class="on" id="dir" title="Reverse the order">A → Z</span></div>`;
+  const by = document.getElementById("sortBy"), dir = document.getElementById("dir");
+  const flip = ["Size", "Date installed"].includes(sortBy);
+  by.value = sortBy; dir.textContent = labels[sortBy][(desc !== flip) ? 1 : 0];
+  by.onchange = () => { sortBy = by.value; desc = ["Size", "Date installed"].includes(sortBy); installedPage(); };
+  dir.onclick = () => { desc = !desc; installedPage(); };
+  const key = { "Name": a => a[0].toLowerCase(), "Size": a => a[4], "Date installed": a => a[5], "Installation type": a => a[2] + a[0].toLowerCase() }[sortBy];
+  const rows = [...installed].sort((x, y) => (key(x) > key(y) ? 1 : key(x) < key(y) ? -1 : 0) * (desc ? -1 : 1));
+  document.getElementById("content").innerHTML = `<div class="list">${rows.map(a => `
+    <div class="row"><div class="app" style="background:${src[a[2]]}">${a[0].slice(0, 2)}</div>
+      <div style="flex:1;min-width:0"><div class="name">${a[0]}</div><div class="ver">Version ${a[1]} · ${a[4] >= 1000 ? (a[4] / 1000).toFixed(1) + " GB" : a[4] + " MB"} · installed ${a[6]}</div></div>
+      ${pill(a[2], src[a[2]])} ${status(a[3])}</div>`).join("")}</div>`;
+  note("Source pill uses the same colour as that source's section on Updates.", { right: "150px", top: "150px" });
+  note("Source menu shows one installation type. Sort: Name, Size, Date installed, Installation type; the button beside it reverses.", { right: "20px", top: "8px" });
+  note("Click a row anywhere: the same details pop-up as Discover.", { left: "240px", bottom: "14px" });
+}
+
+function settings() {
+  title("Settings", "");
+  document.getElementById("subrow").innerHTML = "";
+  document.getElementById("subrow").style.display = "none";
+  document.getElementById("remind").style.display = "none";
+  document.getElementById("content").innerHTML = `<div class="pane">
+    <div class="sec">Other sources</div>
+    <div class="box">
+      <div class="srow"><div class="app" style="background:${src.GitHub}">Cl</div><div style="flex:1"><div class="name">ClaudeCounter</div><div class="ver">GitHub · github.com/Benjamin/ClaudeCounter</div></div><button class="link">Remove</button></div>
+      <div class="srow"><div class="app" style="background:#8e8e93">DL</div><div style="flex:1"><div class="name">DisplayLink Manager</div><div class="ver">Command · checks synaptics.com</div></div><div class="sw" title="Check in the background"></div><button class="btn quiet">Edit…</button><button class="link">Remove</button></div>
+      <div class="srow"><div class="spacer"></div><button class="btn" id="addBtn">Add a Source…</button></div>
+    </div>
+    <p class="help">Apps that Homebrew, the App Store and Sparkle don't cover. GitHub apps only install a download signed by the same developer as your copy.</p>
+  </div>`;
+  document.getElementById("addBtn").onclick = () => { view = "add"; render(); };
+  if (view === "sources") {
+    note("GitHub releases and Custom sources become one list with one button.", { left: "260px", top: "70px" });
+    note("No more 'Open File' to edit JSON by hand.", { right: "40px", top: "210px" });
+  }
+}
+
+function addSheet() {
+  const s = document.getElementById("scrim");
+  s.innerHTML = `<div class="sheet" role="dialog" aria-label="Add a source">
+    <h2>Add a Source</h2>
+    <div class="choice">
+      <div class="opt" id="oGit"><b>An app on GitHub</b><span>Paste the project's link. Most open source apps.</span></div>
+      <div class="opt on" id="oCmd"><b>Something else</b><span>Check a web page for the latest version.</span></div>
+    </div>
+    <div id="form"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn quiet" id="cancel">Cancel</button><button class="btn">Add</button></div>
+  </div>`;
+  s.classList.add("on");
+  const cmdForm = `<div class="form">
+      <label>App</label><select><option>DisplayLink Manager (/Applications)</option><option>Choose another app…</option></select>
+      <label>Latest version page</label><input type="text" value="https://www.synaptics.com/products/displaylink-graphics/downloads/macos">
+      <label>When there's an update</label><select><option>Open the download page</option><option>Run a command</option></select>
+    </div>
+    <div class="result">Test: installed 1.12, latest 1.13. Found automatically on the page.</div>
+    <details><summary>Advanced: pattern, JSON key, version command</summary><p class="help">Only needed when the version can't be found automatically. Same options as today's custom_sources.json.</p></details>
+    <div style="display:flex"><span class="spacer"></span><button class="btn quiet">Test</button></div>`;
+  const gitForm = `<div class="form"><label>GitHub link</label><input type="text" placeholder="github.com/owner/project"></div>
+    <p class="help">${"PrismPack"} finds the matching app on your Mac and checks it against the latest release.</p>`;
+  const f = document.getElementById("form"); f.innerHTML = cmdForm;
+  document.getElementById("oGit").onclick = () => { f.innerHTML = gitForm; oGit.classList.add("on"); oCmd.classList.remove("on"); };
+  document.getElementById("oCmd").onclick = () => { f.innerHTML = cmdForm; oCmd.classList.add("on"); oGit.classList.remove("on"); };
+  document.getElementById("cancel").onclick = () => { view = "sources"; render(); };
+  note("Two choices, then three plain fields. The version is found for you; regex and JSON keys hide under Advanced.", { right: "20px", top: "70px" });
+}
+
+function quitAlert() {
+  installedPage();
+  document.querySelectorAll(".callout").forEach(n => n.remove());
+  const s = document.getElementById("scrim");
+  s.style.alignItems = "center"; s.style.paddingTop = "0"; s.style.gap = "20px"; s.style.flexWrap = "wrap";
+  const alert = (msg, label) => `<div><div class="help" style="text-align:center;margin-bottom:6px">${label}</div><div class="alert" role="alertdialog">
+    <div class="logo"></div><b>Quit PrismPack?</b><p>${msg}</p>
+    <button class="btn">Close Window (⌘W)</button><button class="btn quiet">Quit</button>
+    <label><input type="checkbox"> Don't ask again</label></div></div>`;
+  s.innerHTML = alert("Checks and automatic updates keep running in the background either way. Closing the window keeps the menu bar prism and update notifications in PrismPack.", "The prompt");
+  s.classList.add("on");
+  note("Close Window is the default (Return). With background checking off, the first sentence becomes: Checks and automatic updates stop until you open PrismPack again.", { left: "20px", bottom: "14px" });
+}
+
+function consistency() {
+  document.getElementById("content").innerHTML = `<div class="pane"><div class="sec">What the consistency pass changes</div><div class="box" style="padding:12px 16px"><ul class="notes" style="margin:0;padding-left:18px">
+    <li><b>One top bar on every page:</b> the sidebar button, the title and a one-line subtitle. Page controls sit in the row under it.</li>
+    <li><b>Clicking a row or card opens its details</b> on Updates, Installed and Discover. No separate ⓘ buttons.</li>
+    <li><b>Pop-up buttons:</b> helpers bottom left, Close then the main action bottom right, Remove in red set apart. Applies to the details pop-up, Move to Trash, adoption, duplicates, and major-upgrade review.</li>
+    <li><b>Source colours:</b> the same colour for a source everywhere: Updates section, Installed pill, Discover tag and its Install button.</li>
+    <li><b>Status pills:</b> Installed / Up to date green, Update orange, Failed red, Not managed grey. Nothing else uses those colours.</li>
+    <li><b>Versions</b> in the normal text font everywhere, written "Version 1.2".</li>
+    <li><b>Filters:</b> segmented control for 2 to 4 choices, a menu for more. No rows of chips.</li>
+    <li><b>Settings:</b> GitHub releases and Custom sources merged into Other sources. The Button lab page is removed.</li>
+    <li><b>Memory:</b> Discover's catalogue is freed when the window closes; pulled details capped at 50 MB on disk.</li>
+  </ul></div></div>`;
+}
+
+function title(t, s) { document.getElementById("title").textContent = t; document.getElementById("subtitle").textContent = s; document.getElementById("subrow").style.display = ""; document.getElementById("remind").style.display = ""; }
+function note(text, css) { const d = document.createElement("div"); d.className = "callout"; d.textContent = text; Object.assign(d.style, css); document.getElementById("win").appendChild(d); }
+
+document.querySelectorAll(".note [data-v]").forEach(b => b.onclick = () => { view = b.dataset.v; const s = document.getElementById("scrim"); s.removeAttribute("style"); render(); });
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+document.getElementById("notes").onclick = e => { document.body.classList.toggle("hide-notes"); e.target.textContent = document.body.classList.contains("hide-notes") ? "Show notes" : "Hide notes"; };
+render();
+</script>
+</body>
+</html>

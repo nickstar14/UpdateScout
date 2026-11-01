@@ -14,7 +14,7 @@ extension NSWindow {
 
 /// The pages in the sidebar.
 enum Page: String, CaseIterable, Identifiable {
-    case updates, discover, installed, orphans, activity, settings, buttonLab
+    case updates, discover, installed, orphans, activity, settings
     var id: String { rawValue }
 
     var title: String {
@@ -25,7 +25,6 @@ enum Page: String, CaseIterable, Identifiable {
         case .orphans: "Orphaned App Files"
         case .activity: "Activity"
         case .settings: "Settings"
-        case .buttonLab: "Button lab"
         }
     }
 
@@ -37,14 +36,9 @@ enum Page: String, CaseIterable, Identifiable {
         case .orphans: "archivebox"
         case .activity: "clock.arrow.circlepath"
         case .settings: "gearshape"
-        case .buttonLab: "flask"
         }
     }
 
-    /// In the sidebar, in order. The Button lab only while it's compiled in.
-    static var sidebar: [Page] {
-        [.updates, .discover, .installed, .orphans, .activity, .settings] + (ButtonLab.enabled ? [.buttonLab] : [])
-    }
 }
 
 /// The main window: an edge-to-edge sidebar and one unified toolbar.
@@ -121,7 +115,6 @@ struct MainView: View {
                     case .orphans: OrphansPage()
                     case .activity: ActivityPage()
                     case .settings: SettingsView()
-                    case .buttonLab: ButtonLabPage()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,13 +155,31 @@ struct MainView: View {
     }
 }
 
-/// App icon, name and version at the top, a visible gap, then the pages as
-/// standard rows (so the system's sidebar icon size setting applies).
+/// App icon, name and version at the top, then the Library group and
+/// Discover last (its parts open under it while it's the page); Activity and
+/// Settings are pinned at the bottom (Phase 10). Standard rows, so the system's sidebar icon size applies.
 private struct Sidebar: View {
     @EnvironmentObject var controller: UpdateController
+    @ObservedObject private var discover = DiscoverModel.shared
+
+    /// A page, or one of Discover's parts.
+    enum Item: Hashable { case page(Page), discover(DiscoverModel.Spot) }
+
+    private var selection: Binding<Item?> {
+        Binding(
+            get: { controller.page == .discover ? .discover(discover.spot) : .page(controller.page) },
+            set: { item in
+                switch item {
+                case .page(.discover)?: controller.page = .discover; discover.show(.featured)
+                case .page(let page)?: controller.page = page
+                case .discover(let spot)?: controller.page = .discover; discover.show(spot)
+                case nil: break
+                }
+            })
+    }
 
     var body: some View {
-        List(selection: Binding(get: { controller.page }, set: { if let p = $0 { controller.page = p } })) {
+        List(selection: selection) {
             HStack(spacing: 10) {
                 AppLogo(size: 52, trimmed: true)
                 VStack(alignment: .leading, spacing: 1) {
@@ -181,19 +192,112 @@ private struct Sidebar: View {
             .padding(.bottom, 10)
             .selectionDisabled()
 
-            ForEach(Page.sidebar) { page in
-                Label(page.title, systemImage: page.symbol)
-                    .badge(badge(for: page))
-                    .tag(page)
+            // Discover goes last: its parts open under it, so nothing above
+            // ever scrolls out of view (Nick, 1 Nov 2026).
+            Section("Library") {
+                row(.updates)
+                row(.installed)
+                row(.orphans)
+            }
+            Section {
+                row(.discover)
+                if controller.page == .discover { discoverParts }
             }
         }
         .listStyle(.sidebar)
+        .environment(\.defaultMinListRowHeight, 20)
+        // Activity and Settings stay at the bottom; the list scrolls under
+        // them in glass, as pages scroll under their own controls (Nick).
+        .pinnedHeader(edge: .bottom) {
+            VStack(spacing: 2) {
+                pinnedRow(.activity)
+                pinnedRow(.settings)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+        }
     }
 
-    private func badge(for page: Page) -> Int {
-        switch page {
-        case .updates: controller.visibleItems.count
-        default: 0
+    /// A row in the bottom bar, drawn like the list's own rows.
+    private func pinnedRow(_ page: Page) -> some View {
+        Button { controller.page = page } label: {
+            Label(page.title, systemImage: page.symbol)
+                .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                .padding(.horizontal, 8)
+                .contentShape(Rectangle())
+                .background(controller.page == page
+                            ? RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.1))
+                            : nil)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func row(_ page: Page) -> some View {
+        Label(page.title, systemImage: page.symbol)
+            .frame(minHeight: 26)
+            .badge(page == .updates ? controller.visibleItems.count : 0)
+            .tag(Item.page(page))
+    }
+
+    /// Discover's parts as one compact block: the list's own rows are all
+    /// one height, which left big gaps between categories (Nick).
+    private var discoverParts: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            part("Featured", .featured, symbol: "star")
+            part("New", .new, symbol: "sparkles")
+            if discover.chips.contains(.apps) {
+                heading("Apps")
+                ForEach(DiscoverCategories.Category.allCases) { category in
+                    part(category.rawValue, .category(category), dot: category.color,
+                         count: discover.categoryCounts[category] ?? 0)
+                }
+            }
+            heading("Tools and packages")
+            // Homebrew's own lists first, then the package managers.
+            let order: [DiscoverModel.Chip] = [.cli, .fonts, .runtimes, .python, .node, .rust, .ruby, .editors]
+            ForEach(order.filter(discover.chips.contains)) { chip in
+                part(chip.title, .chip(chip), dot: Self.color(of: chip))
+            }
+        }
+        .selectionDisabled()
+    }
+
+    private func part(_ title: String, _ spot: DiscoverModel.Spot, symbol: String? = nil,
+                      dot: Color? = nil, count: Int = 0) -> some View {
+        Button { controller.page = .discover; discover.show(spot) } label: {
+            HStack(spacing: 8) {
+                if let symbol {
+                    Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 14)
+                } else if let dot {
+                    Circle().fill(dot).frame(width: 8, height: 8).frame(width: 14)
+                }
+                Text(title)
+                Spacer(minLength: 4)
+                if count > 0 { Text("\(count)").foregroundStyle(.secondary).monospacedDigit() }
+            }
+            .font(.callout)
+            .padding(.leading, 18).padding(.trailing, 8)
+            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(discover.spot == spot
+                        ? RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.1))
+                        : nil)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func heading(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            .padding(.leading, 18).padding(.top, 8).padding(.bottom, 2)
+    }
+
+    /// Package kinds take their Updates section's colour; Homebrew's lists
+    /// take Homebrew's, and fonts stay grey.
+    private static func color(of chip: DiscoverModel.Chip) -> Color {
+        switch chip {
+        case .fonts: .gray
+        case .cli, .runtimes: SourceStyle.forSource("homebrew").color
+        default: SourceStyle.forSource(chip.sourceID).color
         }
     }
 }

@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// Homebrew casks carry no categories, so Discover ships its own mapping for
 /// the popular ones (from the 30-day install counts, October 2026). Casks not
@@ -9,6 +9,18 @@ enum DiscoverCategories {
         case browsers = "Browsers", developer = "Developer", productivity = "Productivity",
              media = "Media", communication = "Communication", utilities = "Utilities"
         var id: String { rawValue }
+
+        /// The sidebar dot.
+        var color: Color {
+            switch self {
+            case .browsers: .blue
+            case .developer: .indigo
+            case .productivity: .yellow
+            case .media: .pink
+            case .communication: .green
+            case .utilities: .cyan
+            }
+        }
     }
 
     static func category(ofCask token: String) -> Category? { map[token] }

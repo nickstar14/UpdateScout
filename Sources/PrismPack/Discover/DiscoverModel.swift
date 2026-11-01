@@ -72,8 +72,12 @@ final class DiscoverModel: ObservableObject {
     @Published var query = "" { didSet { if query != oldValue { scheduleSearch() } } }
     @Published var chip: Chip = .all { didSet { if chip != oldValue { scheduleSearch(delay: 0) } } }
     @Published var category: DiscoverCategories.Category?
+    /// The sidebar's "New" entry: Recently added only.
+    @Published var onlyNew = false
+    /// Apps in each category, for the sidebar's counts.
+    @Published private(set) var categoryCounts: [DiscoverCategories.Category: Int] = [:]
 
-    @Published private(set) var snapshot: DiscoverCatalog.Snapshot?
+    @Published private(set) var snapshot: DiscoverCatalog.Snapshot? { didSet { countCategories() } }
     @Published private(set) var loadingCatalog = false
     @Published private(set) var catalogError: String?
 
@@ -89,6 +93,36 @@ final class DiscoverModel: ObservableObject {
     private var pythonLoaded = false
 
     var chips: [Chip] { Chip.allCases.filter { !Prefs.disabledSources.contains($0.sourceID) } }
+
+    /// Where the sidebar has Discover: each entry sets the chip and category.
+    enum Spot: Hashable {
+        case featured, new, category(DiscoverCategories.Category), chip(Chip)
+    }
+
+    var spot: Spot {
+        switch chip {
+        case .all: onlyNew ? .new : .featured
+        case .apps: category.map(Spot.category) ?? .featured
+        default: .chip(chip)
+        }
+    }
+
+    func show(_ spot: Spot) {
+        switch spot {
+        case .featured: chip = .all; category = nil; onlyNew = false
+        case .new: chip = .all; category = nil; onlyNew = true
+        case .category(let c): chip = .apps; category = c; onlyNew = false
+        case .chip(let c): chip = c; category = nil; onlyNew = false
+        }
+    }
+
+    private func countCategories() {
+        var counts: [DiscoverCategories.Category: Int] = [:]
+        for e in snapshot?.entries ?? [] where e.kind == .cask && !e.isFont {
+            if let c = DiscoverCategories.category(ofCask: e.name) { counts[c, default: 0] += 1 }
+        }
+        categoryCounts = counts
+    }
 
     /// First open of the page.
     func start() {
