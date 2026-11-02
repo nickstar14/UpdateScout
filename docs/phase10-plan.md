@@ -88,13 +88,352 @@ Mockups (approved designs, open in a browser):
   - Duplicate pop-up had two identical Move to Trash buttons: on the extra
     copy the duplicate note no longer adds one (the pop-up's own button
     removes it); on the copy to keep it says "Move the Copy in <folder> to
-    Trash". `UninstallButton` gained `title:`. **Not seen live:** a fresh
-    launch hadn't found Flux's duplicates yet; check after a Check Now.
+    Trash". `UninstallButton` gained `title:`. **Seen live after a Check
+    Now (1 Nov 2026):** the extra copy (~/Applications) has one Move to Trash;
+    the copy to keep has "Move the Copy in ~/Applications to Trash" plus its
+    own Move to Trash.
   - No "…" after Move to Trash anywhere (buttons; progress text keeps it).
   - The updates reminder is a light orange strip, as in the mockup.
 
-**Next:** commit the above when Nick says, then step 4 (Discover page: drop
-both chip rows, under-row with search, Sort and Cards/List, the new cards).
+Step 3 and the fixes are committed (`1e7cf0b`).
+
+- **Step 4 built (1 Nov 2026), not committed, not yet seen on screen**
+  (the screen was locked after the build). `swift build` passes; five
+  Discover tests pass (three new: sort order, version-change dates, the
+  source-tag rule). App built and signed, test build relaunched.
+  Choices made while building: while searching, Popular keeps the best
+  matches first; Featured and New sort within their own set, other parts
+  sort the whole list and show the first 80; installed apps show Open,
+  installed tools only the trash button; an app with no category shows
+  "App". The update lookup moved from Installed to
+  `UpdateController.update(for:)` so both pages share it. Registry dates:
+  npm, crates.io, RubyGems, PyPI; editor extensions have none yet (they
+  sort after dated ones).
+
+- **Step 4 seen live (1 Nov 2026), light and dark** (Theme set back to
+  Light): Featured cards, Browsers in cards and list (Firefox and Zen show
+  Installed, Open and the trash button), search from Featured in sections
+  (Homebrew, npm, …), Sort and Cards / List in the under-row, clicking a
+  card opens its details. **Found, for the next build** (with Nick's
+  feedback):
+  1. Long Homebrew versions ("156.0.4314.58,bc665d48-…") crowd the row:
+     show only the part before the comma, one line, truncated.
+  2. While searching, the subtitle still says "Popular this month"; it
+     should say what's being searched.
+  3. Some npm descriptions show raw Markdown links ("[ripgrep](https://…)");
+     show the link text only.
+  4. The details pop-up still says "Uninstall" and is the old design; step
+     5 replaces it.
+
+- **Nick's feedback on step 4 (1 Nov 2026), plan proposed, not approved yet:**
+  - Every card and row shows its **source tag** ("Homebrew", "npm", "PyPI",
+    "cargo", "RubyGems", "Editors") so it's clear what it installs with.
+    Cards: top right, "Installed" stacked under it. List: the tag, then
+    "Installed" beside it, before the version. This replaces the earlier
+    "one source only: no tags" rule.
+  - The sidebar heading "Apps" becomes "Homebrew".
+  - Too much brown. Proposed colour roles:
+    - **Source colour = how it installs:** the source tag and the
+      Install / Update button (the earlier rule, unchanged).
+    - **Part colour = what it is:** the sidebar dot, the label under the
+      name and the card's faint tint. Categories keep their colours;
+      Command line becomes mint, Runtimes teal, Fonts grey; package pages
+      keep their source colour.
+  - Plus items 1 to 3 above.
+
+  - **Built and seen live (1 Nov 2026), light and dark** (Theme back to
+    Light), not committed. Source tags use the Installed page's names
+    ("Homebrew", "Python (pip)", "Rust (cargo)" …). Command line mint,
+    Runtimes teal (`DiscoverModel.Chip.color`, shared by the sidebar and
+    the cards). Items 1 to 3 fixed (`shortVersion`,
+    `DiscoverRegistries.plain`, search subtitle). Tests: 5 Discover tests
+    pass (the mixed-source test replaced by one for the tidy-ups).
+  - **Seen, for the next round:** in List view the tags and versions don't
+    line up from row to row (version width varies); in dark, Productivity's
+    yellow tint looks olive.
+
+- **Round 3 (Nick, 1 Nov 2026), built and seen live, not committed:**
+  Runtimes purple (mint and teal were too alike). An up/down arrow beside
+  every Sort (`SortDirectionButton` in `Views/Rows.swift`; its tooltip
+  says the order shown), remembered: Discover, and Orphaned App Files,
+  whose Size / Name / Last changed chips became the same Sort menu.
+  Undated items stay last either way. Installed gets its Sort and arrow in
+  step 8 (Nick). Every tag has a thin outline in its colour (shared
+  `StatusPill`, so app-wide). List rows: Installed stacks under the source
+  tag; tag, version and button columns are fixed widths and line up.
+  Yellow tint fainter in dark: better, though still a muted gold-brown.
+
+- **Font previews** (Nick asked where they went, 2 Nov 2026): they were
+  only ever in the mockup; step 6 builds them (full description under
+  step 6 in the build order).
+- **Screenshots** (Nick, 2 Nov 2026): the details pop-up shows up to 3
+  pictures from the app's website (step 7 in the build order); step 5's
+  pop-up leaves room for that row.
+- **Round 4 (Nick, 2 Nov 2026), built and seen in light and dark, not committed:** the
+  Sort menu (`SortMenu` in `Views/Rows.swift`) and the Cards / List switch
+  (`GlassSegmented` with symbols) are Liquid Glass, matching the search
+  field and the arrow, on Discover and Orphaned App Files.
+
+- **Round 5 plan (Nick, 2 Nov 2026), waiting for Nick's OK.** One build:
+  1. **Installed gets the new filtering now** (step 8's Installed part,
+     pulled forward): the chip rows go. Under-row: search, a Show switch
+     (All / Updates / Hidden, plus Duplicates when there are any), a
+     Source menu (every source and Not managed), Sort (Name, Size, Date
+     installed, Installation type) with the up/down arrow, and Cards /
+     List. Sort and Cards / List remembered. Size and date are read from
+     disk only when that sort is chosen, kept for the session; items
+     without one go last. Cards are Discover's card: source tag top right
+     with the status under it, "Version x", and an **Update** button in
+     place of the "Update to x" pill. Clicking opens the details.
+  2. **Updates:** more space between sections (12 → 20 points), and Cards /
+     List. In Cards, each source section holds a grid of cards: installed
+     → new version in the source's colour, the round warning symbols top
+     right, Update button. No source tag (the section says it). Clicking
+     a card opens today's details pop-up, which step 5 restyles.
+  3. **Cards / List switch, smoother and draggable:** the switch is rebuilt
+     as one glass track with a sliding glass bubble you can click or drag
+     (it follows the pointer or a finger and snaps to the nearest side on
+     release). The bubble moves first and the page swaps a moment later,
+     so the slide isn't held up by the cards being rebuilt. The Theme
+     switch in Settings uses the same control, so it gets this too.
+  4. **Sort menu glass when closed:** its button gets the same glass
+     capsule as the search field instead of the standard menu button.
+  5. **UpdateScout → PrismPack animation** (`Views/RenameWelcome.swift`):
+     the white shock ring knocks "UpdateScout" out as it passes (a quick
+     flash, blur and fade), then the rainbow reveals "PrismPack" top to
+     bottom with a soft edge, in step with the rays (Nick's ring idea,
+     2 Nov 2026, chosen over the wipe). To see it in
+     the test build, the one-time pop-up has to be shown again: Claude
+     asks before resetting its "shown" flag in preferences.
+
+- **Round 5 built and seen (2 Nov 2026), light and dark** (Theme back to
+  Light), not committed. Installed: Show switch, Source menu, Sort with
+  arrow, Cards / List, cards with tags, status, Update and trash
+  (`InstalledMetrics` reads sizes and dates on demand; test added). Updates:
+  20-point gaps, Cards / List with card grids inside sections. The glass
+  switch slides on click and on drag (drag tested). Sort and Source
+  buttons are glass capsules. Rename: ring knocks out the old name,
+  rainbow reveals the new one; **not watched live** (the pop-up had
+  finished before the first screenshot). Clicking the "UpdateScout is now
+  PrismPack" banner on Updates replays it, so no preference reset is
+  needed. Not tested: choosing from the Sort or Source menus (menus can't
+  be opened in the background), and the Size and Date sorts on Nick's apps.
+
+- **Round 6 plan (Nick's feedback, 2 Nov 2026), waiting for Nick's OK.**
+  This pulls step 5 (the details pop-up) into this round. One build:
+  1. **One details pop-up** for Updates, Installed and Discover (step 5):
+     icon, name and source at the top; versions; "What's new"; then the
+     controls in clear groups with even spacing instead of squeezed
+     rows: hide options together; "Update automatically" as the glass
+     slider (Use setting / Always / Never); Keep this version on its own
+     line with its explanation. Bottom: helpers on the left (Info page,
+     Show in Finder; the separate "Release notes" button goes, Nick),
+     Close and the main action (Update, Install, Open) on the right,
+     Move to Trash in red text set apart. Every button the same size.
+     Betas offered here. (Built: "Uninstall" stays for Homebrew and
+     packages, which are uninstalled rather than moved to the Trash; apps
+     already say "Move to Trash".)
+  2. **Updates cards show the first two lines of release notes** when the
+     update has them (headings like "What's Changed" skipped, links shown
+     as plain text). No extra downloads: the notes already come with the
+     update.
+  3. **App Store hand-off as a card**, always first in the Mac App Store
+     section, filled with a solid soft blue rather than glass, so it reads
+     as "open the App Store" rather than another update.
+  4. **Updates list:** the Update buttons were cut off at the right edge;
+     give the rows their proper trailing padding.
+  5. **Installed:** more space above the first card, matching the sides.
+  6. **Orphaned App Files:** each item gets its own buttons: Show files
+     (the existing disclosure), Show in Finder, Keep, and Move to Trash
+     (trash icon). Bulk actions for the ticked ones: Show in Finder (one
+     Finder window with them selected), Keep, Move to Trash. Keep takes
+     the item off the list and remembers it; a "Kept" section at the
+     bottom undoes it (the same shape step 9's "Assigned files" will use).
+  7. **Trash button only in the pop-up:** cards and rows no longer show a
+     trash button; Move to Trash is in the details pop-up (point 1).
+  8. **Settings, Setup:** both lines the same size. Dependencies becomes
+     a row you can open, listing each one (Homebrew, mas-cli and the
+     others PrismPack uses) with its version and Reinstall; Remove only
+     for the small tools, never Homebrew itself (removing Homebrew would
+     remove everything it installed; PrismPack points to Homebrew's own
+     uninstall instructions instead).
+
+  9. **Updates top bar like the other pages** (Nick): the row of controls
+     (Cards / List, with the "Click an app for details" hint) moves out
+     of the scrolling list into the pinned glass header, above the
+     "UpdateScout is now PrismPack" banner, with the same hard edge the
+     other pages have, so the sections scroll in behind it.
+  Nick's answers: trash in the pop-up only, on every page; Keep hides and
+  remembers, with a Kept section to undo; dependencies: Remove only for the
+  small tools, never Homebrew.
+
+- **Round 6 built (2 Nov 2026), not committed.** Seen live in light:
+  Updates header (controls above the banner, sections scroll behind),
+  list buttons no longer cut off, cards with two lines of release notes
+  (`UpdateDetailView.preview`, tested), the App Store card (solid blue,
+  first), the new pop-up's groups, slider and footer (only partly visible
+  in a capture), Orphans' bulk buttons, Settings' Setup lines and the
+  dependency list (a plain button, not a disclosure group, which didn't
+  open from an accessibility click). Installed's list panel is no longer
+  lazy (its bottom edge drew in the wrong place). Not tested: Reinstall /
+  Remove for mas-cli (real tool), Keep / Put back and the per-item buttons
+  on real orphans, dark mode for this round.
+
+- **Round 7 (Nick, 2 Nov 2026), built and checked in light and dark:**
+  "Info page" is "Website"; every pop-up (details pop-ups, warning
+  badges, the log and adoption sheets) closes with a small glass circle
+  top right (`.popupClose()`, Escape too) instead of a Close button; Move
+  to Trash / Uninstall is a red button again in every pop-up and on each
+  orphan; the rename banner is a rainbow strip the same shape as the
+  orange updates strip, inside the header's controls; Discover's pop-up
+  for an installed app has Open as its main button, as on Installed;
+  Stable / Beta uses the glass slider. Long lists (Installed and Discover
+  in List view) sit on a frosted `ListPanel`: Liquid Glass draws only what's
+  on screen and put a rim where the window cut it off, which was the false
+  bottom edge Nick saw while scrolling. Dependencies now list pipx, Node
+  and npm, Rust and cargo, and Homebrew's Ruby too (optional: not flagged
+  when missing), with Install, Reinstall and a red Remove, the last two
+  only for copies Homebrew installed (versioned formulae like `node@22`
+  included); Homebrew itself links to its own uninstall steps.
+
+## Status at handoff (2 Nov 2026, end of this session)
+
+**Consistency is the first rule from here on (Nick).** Before adding or
+changing anything, match what's below; when something new doesn't fit,
+ask Nick rather than invent a new pattern.
+
+**The patterns now in place** (use these, don't make new ones):
+
+- **Page layout:** the window's top bar (title, subtitle). The page's own
+  controls sit in the pinned glass header (`PageControls`), above any
+  banner strip; the content scrolls in behind it.
+- **Controls:** search is `GlassSearchField`; menus are `SortMenu` (a glass
+  capsule, also the Source menu); sort direction is `SortDirectionButton`
+  (its tooltip says the order shown); any choice between a few options is
+  `GlassSegmented` (click or drag, the page swaps just after the bubble
+  moves): Show filters, Cards / List, Theme, Update automatically,
+  Stable / Beta. No chip rows for filters.
+- **Cards / List** on Discover, Installed and Updates, remembered per page.
+- **Cards:** icon, name, a label under the name; tags top right (source
+  tag, then status under it); "Version x"; buttons bottom right; clicking
+  anywhere else opens the details. No trash button on cards or rows.
+- **Tags:** `StatusPill`, with a thin outline in its own colour; source
+  names as on Installed ("Homebrew", "Python (pip)", "Rust (cargo)"…).
+- **Colours:** the source's colour says how it installs (source tags,
+  Install and Update buttons); the part's colour says what it is (sidebar
+  dot, card tint, the label under the name). Discover: the 12 categories'
+  colours; Command line mint, Runtimes purple, Fonts grey; package pages
+  use their source colour. Selection is grey, never purple.
+- **Pop-ups:** close circle top right (`.popupClose()`); helpers bottom
+  left (Website, Show in Finder); Move to Trash or Uninstall as a red
+  button; the main action (Update, Install, Open) bottom right; every
+  button the same size; options in labelled groups with even spacing.
+- **Destructive actions are always red** (`glassProminent(.red)`).
+- **Strips:** the orange updates strip and the rainbow rename strip share
+  one shape.
+- **Long lists:** `ListPanel` (frosted), never one tall glass panel.
+- **Wording:** "Website" (not "Info page"); "Move to Trash" for apps,
+  "Uninstall" for things that are uninstalled; never "…" after Move to
+  Trash; "Version 1.2" in the normal font.
+- **Motion:** pages, Discover's parts and Cards / List fade in 0.14 s.
+
+**Done in Phase 10:** steps 1 to 4; most of step 5 (one pop-up layout on
+Updates, Installed and Discover; the beta offer is still the Stable / Beta
+section where an app has one); step 8's Installed and Updates work
+(pulled forward); Orphaned App Files' item and bulk buttons and Kept;
+Settings' dependency list; the rename animation (the white ring knocks out
+"UpdateScout", the rainbow reveals "PrismPack"; replay it from the rainbow
+strip on Updates).
+
+**Left in Phase 10:** step 6 (font previews, written out above), step 7
+(web details with up to 3 pictures), step 9 ("Belongs to…"), step 10
+(other sources), step 11 (⌘Q prompt), step 12 (consistency pass across
+every tab) and step 13 (final review). Also from Nick's rounds: Productivity's
+yellow tint still looks gold-brown in dark.
+
+**Not verified live:** choosing from the Sort and Source menus (menus can't
+be opened while Claude works in the background); the Size and Date sorts
+on Installed; the whole details pop-up in one view (it ran past the edge of
+what a capture shows); Reinstall / Remove / Install in Settings (real
+tools, not throwaway); Keep, Put back and the per-item buttons on real
+orphans; watching the rename animation play. The Orphaned App Files scan
+starts again on every visit to the page and takes a while.
+
+**Testing notes from this session:** buttons look grey in captures when the
+window isn't in front (macOS draws inactive windows that way) and while a
+check runs. Run only the Discover tests that don't touch the data folder
+(the filter list in this session's commands); the full suite needs Nick's
+OK. Clicking the rainbow strip on Updates replays the rename pop-up, so no
+preference reset is needed to see it.
+
+**Next:** a new session starts with step 12's consistency pass across
+every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.
+
+## Step 4 plan: Discover page
+
+Files: `Views/DiscoverPage.swift`, `Discover/DiscoverModel.swift`,
+`Discover/DiscoverCatalog.swift` (only if Nick picks option A for the first question), `Prefs`, tests in
+`DiscoverTests`. The details pop-up stays as it is until step 5, apart from
+the change in point 4.
+
+1. **Top bar.** Title "Discover" on Featured, "Discover · Browsers" (and so
+   on) elsewhere. Subtitle: "Popular this month", "Added in the last 30
+   days", "N apps" (categories), "N tools" (Command line, Runtimes), "N fonts",
+   or what a package page searches ("Searches npm. Packages install
+   globally.").
+2. **Row under the top bar** (`PageControls`): search field, a Sort menu
+   (Popular, Name, Newest, Recently updated) and a Cards / List switch, then
+   the orange updates strip. Both chip rows go. Sort and Cards / List are
+   remembered in preferences.
+3. **What each part shows.**
+   - Featured: popular apps. New: added in the last 30 days (today's
+     hint while it's empty). A category: its apps. Command line, Runtimes,
+     Fonts: their Homebrew lists. Fonts get ordinary cards until step 6.
+   - Python, Node, Rust, Ruby, Editor extensions: a one-line note on what
+     it searches and how it installs, popular ones first where we have
+     them (Python's list), results once you type.
+   - **Search covers the part you're in.** On Featured and New it covers
+     everything (Homebrew and every source that's switched on).
+   - Sort applies to every list. Popular means installs for Homebrew,
+     downloads for the other sources.
+4. **Cards** (as in the mockup): icon, name, and the category in its colour
+   under it (package pages show the source name in the source's colour);
+   tags top right (source tag only when the list mixes sources, "Installed"
+   under it); two lines of description; "Version 1.2"; buttons bottom right:
+   - not installed: **Install** in the source's colour
+   - update waiting: **Update** (same queue and password batch) and a
+     trash button
+   - installed app: **Open** and a trash button
+   - installed tool or package: the trash button only
+   The trash button runs today's Move to Trash, with its confirmation.
+   Clicking anywhere else on the card opens the details. The download
+   count comes out of the details pop-up ("No download counts anywhere").
+5. **List** shows one row per item: icon, name and category, a one-line
+   description, the tags, "Version 1.2" and the same buttons. Clicking a
+   row opens the details too. Switching between Cards and List uses the
+   same fade as moving between pages.
+6. **Tests:** sort order and the mixed-source tag rule, as pure functions
+   (no data folder touched). `swift build`, these tests, one app build,
+   then a check in light and dark (app Theme, set back to Light) and
+   screenshots for Nick.
+
+**Nick's answers:** dates, option A, track version changes (1 Nov 2026).
+Search from Featured: **a section per source**, as today, no source tags
+(Nick, after the pros and cons: each section sorts fairly by its own numbers
+and nothing shifts while slower sources answer). Sort applies within each
+section.
+
+**Questions as asked:**
+- *Newest / Recently updated for Homebrew:* Homebrew's list has no dates.
+  PrismPack already notes when an app first appears (that's how New works).
+  (A) It also notes when an app's version changes. The dates fill in over
+  the following days, and undated apps sort after dated ones by
+  popularity. That adds one small file next to the existing one.
+  (B) Leave Recently updated out for Homebrew. The other sources give real
+  dates either way.
+- *Searching from Featured:* (A) one list with source tags on every card,
+  as the tag rule says, or (B) one section per source, as today, with no
+  tags.
 
 ## Build order
 
@@ -119,12 +458,23 @@ the next. No rebuild while Nick is mid-step.
 5. **Details pop-up** (new `Views/DetailsPopup.swift`): one pop-up for
    Discover, Installed and Updates. Helpers bottom left, Close then the main
    action bottom right, Move to Trash in red set apart; beta offer;
-   web description and screenshot (step 7).
-6. **Fonts:** sample line drawn from Google Fonts while the Fonts page is on
-   screen; name only when a font isn't on Google Fonts.
+   web description and a row of up to 3 screenshots (step 7).
+6. **Fonts** (font previews; Nick asked for them again, 2 Nov 2026): as in
+   the mockup, each font card draws a sample line ("The quick brown fox
+   jumps over the lazy dog") in that font, previewed from Google Fonts
+   without installing it. The cask's name (`font-inter`) maps to the Google
+   Fonts family ("Inter"); fonts that aren't on Google Fonts show their name
+   only. A line at the top of the page says so. Font files are fetched only
+   while the Fonts page is on screen, for the cards being shown, and are
+   neither installed nor kept: they're released when the page closes.
+   Cards and List both show the sample.
 7. **Web details** (new `Discover/DiscoverDetails.swift`): page description and
-   preview image from the app's homepage, image shrunk before saving, on-disk
-   cache capped at 50 MB, oldest removed first.
+   **up to 3 pictures** from the app's homepage (Nick, 2 Nov 2026): the
+   page's main preview image, plus up to two more large, screen-shaped
+   images from the page (logos and small images skipped; one or none when
+   nothing good is found), shown as a small row to click through. Fetched
+   only when details open, shrunk before saving, dropped from memory when
+   the pop-up closes; on-disk cache capped at 50 MB, oldest removed first.
 8. **Installed and Updates pages** (`Views/InstalledPage.swift`,
    `Views/UpdatesPage.swift`, shared card in `Views/Rows.swift`): Cards / List
    switch on both; Discover's card; Updates kept in source sections with
@@ -172,7 +522,7 @@ the next. No rebuild while Nick is mid-step.
 
 - Free Discover's catalogue and search results when the main window closes;
   read back from the disk copy when it reopens.
-- Web details: text plus one shrunk image per app, fetched only on opening
+- Web details: text plus up to three shrunk images per app, fetched only on opening
   details; 50 MB cap.
 - Font previews load only while Fonts is on screen and aren't kept.
 - Icons in memory stay capped at 300.

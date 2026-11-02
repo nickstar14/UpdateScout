@@ -30,6 +30,11 @@ Phase 9 (leftover cleanup) has its own record in
 - **Filesystem.** Nick's global rules apply: ask before reading or writing
   outside this folder.
 - **Commit only when Nick asks.** Show `git status` first.
+- **Consistency is the first rule (Nick, 2 Nov 2026).** Every page, card,
+  pop-up, button, tag and colour follows the patterns listed under
+  "Status at handoff" in `docs/phase10-plan.md`. Match them; if something
+  new doesn't fit, ask Nick instead of inventing a new pattern. Check every
+  change in light and dark (the app's Theme setting, back to Light after).
 - **Plan the whole step before building.** Research, write the plan, show it,
   get Nick's OK. No trial-and-error builds, nothing built beyond the plan.
 - **Batch feedback into one build.** Build, gather all of Nick's feedback,
