@@ -114,4 +114,67 @@ struct DiscoverTests {
         #expect(state.ignoredApps == ["homebrew|x"])
         #expect(state.activity.map(\.title) == ["Itsycal"])
     }
+
+    @Test func sortsByPopularityNameAndDates() {
+        let day: TimeInterval = 86_400, now = Date()
+        var a = entry(.cask, "alpha", pop: 5), b = entry(.cask, "bravo", pop: 50), c = entry(.cask, "charlie", pop: 20)
+        a.added = now - 2 * day; b.added = nil; c.added = now - day
+        a.updated = now; c.updated = now - 3 * day
+        let names = { (sort: DiscoverModel.Sort) in DiscoverModel.sorted([a, b, c], by: sort).map(\.name) }
+        #expect(names(.popular) == ["bravo", "charlie", "alpha"])
+        #expect(names(.name) == ["alpha", "bravo", "charlie"])
+        // Undated ones go last, most popular first.
+        #expect(names(.newest) == ["charlie", "alpha", "bravo"])
+        #expect(names(.updated) == ["alpha", "charlie", "bravo"])
+        // Reversed flips the order; undated ones stay last.
+        let back = { (sort: DiscoverModel.Sort) in DiscoverModel.sorted([a, b, c], by: sort, reversed: true).map(\.name) }
+        #expect(back(.popular) == ["alpha", "charlie", "bravo"])
+        #expect(back(.name) == ["charlie", "bravo", "alpha"])
+        #expect(back(.newest) == ["alpha", "charlie", "bravo"])
+    }
+
+    @Test func versionChangesAreDatedFromTheSecondLook() {
+        let then = Date(timeIntervalSince1970: 1_000), now = Date(timeIntervalSince1970: 2_000)
+        let changed = DiscoverCatalog.testTrackVersions(
+            old: ["cask:a": "1", "cask:b": "1", "cask:gone": "1"], changed: ["cask:b": then],
+            current: [("cask:a", "2"), ("cask:b", "1"), ("cask:new", "1")], now: now)
+        #expect(changed == ["cask:a": now, "cask:b": then])
+    }
+
+    @Test func registryTextAndVersionsAreTidied() {
+        #expect(DiscoverRegistries.plain("[ripgrep](https://github.com/x) in a ![badge](https://b.svg) package")
+                == "ripgrep in a package")
+        #expect(DiscoverRegistries.plain("  ") == nil)
+        var edge = entry(.cask, "microsoft-edge")
+        edge.version = "156.0.4314.58,bc665d48-ec9a-4625"
+        #expect(edge.shortVersion == "156.0.4314.58")
+        #expect(entry(.cask, "zen").shortVersion == "1")
+    }
+
+    @Test func installedSortsWithUnmeasuredLast() {
+        let a = InstalledPackage(name: "Alpha", version: "1", sourceID: "homebrew")
+        let b = InstalledPackage(name: "bravo", version: "1", sourceID: "npm")
+        let c = InstalledPackage(name: "Charlie", version: "1", sourceID: "homebrew")
+        let sizes: [String: Int64] = [a.id: 10, c.id: 30]
+        let names = { (sort: String, reversed: Bool) in
+            InstalledMetrics.sorted([a, b, c], by: sort, reversed: reversed, sizes: sizes, dates: [:]).map(\.name)
+        }
+        #expect(names("name", false) == ["Alpha", "bravo", "Charlie"])
+        #expect(names("name", true) == ["Charlie", "bravo", "Alpha"])
+        #expect(names("size", false) == ["Charlie", "Alpha", "bravo"])
+        #expect(names("size", true) == ["Alpha", "Charlie", "bravo"])
+        #expect(names("date", false) == ["Alpha", "bravo", "Charlie"])
+    }
+
+    @Test @MainActor func releaseNotesPreviewSkipsHeadingsAndLinks() {
+        let notes = """
+        ## What's Changed
+        * fix(macos): retry stapler validate by @aiongg in https://github.com/x/pull/1116
+        * Add [TextureCraft](https://x.com) to the suite
+        * Third line
+        """
+        #expect(UpdateDetailView.preview(notes) == "fix(macos): retry stapler validate by @aiongg\nAdd TextureCraft to the suite")
+        #expect(UpdateDetailView.preview("<h2>Changes</h2><ul><li>Faster sync</li></ul>") == "Faster sync")
+        #expect(UpdateDetailView.preview("## What's new") == nil)
+    }
 }

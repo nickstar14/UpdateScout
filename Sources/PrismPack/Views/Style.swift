@@ -81,7 +81,7 @@ struct WarningBadge: View {
         .buttonStyle(.plain)
         .help(message)
         .popover(isPresented: $showing, arrowEdge: .bottom) {
-            WarningCard(title: title, message: message, symbol: symbol, color: color)
+            WarningCard(title: title, message: message, symbol: symbol, color: color).popupClose()
         }
     }
 }
@@ -249,6 +249,59 @@ struct AppLogo: View {
 /// A section's container: tinted Liquid Glass in the section's colour, like
 /// the icon's front card. Clear glass, a thin white edge, a soft neutral
 /// shadow, and nothing glass stacked inside it (rows are plain).
+/// The close button every pop-up shares (Nick, 2 Nov 2026): a small glass
+/// circle in the top-right corner, which leaves the footer room for its
+/// real buttons. Escape closes too.
+struct PopupClose: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .topTrailing) {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .background {
+                        if #available(macOS 26.0, *) {
+                            Circle().fill(.clear).glassEffect(.regular.interactive(), in: Circle())
+                        } else {
+                            Circle().fill(.regularMaterial)
+                        }
+                    }
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            .help("Close")
+            .accessibilityLabel("Close")
+            .padding(10)
+        }
+    }
+}
+
+extension View {
+    func popupClose() -> some View { modifier(PopupClose()) }
+}
+
+/// The panel behind a long list (Installed and Discover in List view).
+/// Frosted rather than Liquid Glass: glass draws only the part on screen
+/// and puts its rim where the window cuts it off, which showed as a false
+/// bottom edge while scrolling (Nick, 2 Nov 2026).
+struct ListPanel: ViewModifier {
+    let color: Color
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: SectionPanel.radius, style: .continuous)
+        content
+            .background {
+                shape.fill(.regularMaterial)
+                shape.fill(color.opacity(0.14))
+            }
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.08)))
+    }
+}
+
 struct SectionPanel: ViewModifier {
     let color: Color
     static let radius: CGFloat = 16
@@ -520,39 +573,86 @@ extension Color {
 }
 
 /// A segmented control whose selection is a Liquid Glass bubble that slides
-/// to the chosen segment, like the system's own on macOS 26 and later.
+/// to the chosen segment. Click a segment, or drag the bubble with the
+/// pointer or a finger; it snaps to the nearest one on release (Nick,
+/// 2 Nov 2026). The bubble moves at once and `selection` follows a beat
+/// later, so a page swapping its contents doesn't hold up the slide.
 struct GlassSegmented<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(value: Value, label: String)]
-    @Namespace private var bubble
+    /// Labels are SF Symbol names (Cards / List), with these tooltips.
+    var symbols = false
+    var tips: [String] = []
+    /// The segment the bubble shows until `selection` catches up.
+    @State private var chosen: Int?
+    @State private var frames: [Int: CGRect] = [:]
+    @State private var dragX: CGFloat?
+    private static var space: String { "glassSegmented" }
+
+    private var selectedIndex: Int { options.firstIndex { $0.value == selection } ?? 0 }
+    private var index: Int { dragX.map(nearest) ?? chosen ?? selectedIndex }
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(options.indices, id: \.self) { i in
-                let option = options[i]
-                let selected = option.value == selection
-                Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { selection = option.value }
-                } label: {
-                    Text(option.label)
-                        .font(.callout.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? .primary : .secondary)
-                        .padding(.horizontal, 14).padding(.vertical, 5)
-                        .frame(maxWidth: .infinity)
-                        .background {
-                            if selected {
-                                SelectionBubble()
-                                    .matchedGeometryEffect(id: "bubble", in: bubble)
-                            }
-                        }
-                        .contentShape(Capsule())
+                Group {
+                    if symbols { Image(systemName: options[i].label) } else { Text(options[i].label) }
                 }
-                .buttonStyle(.plain)
+                .font(.callout.weight(i == index ? .semibold : .regular))
+                .foregroundStyle(i == index ? .primary : .secondary)
+                .padding(.horizontal, symbols ? 12 : 14).padding(.vertical, 5)
+                .contentShape(Capsule())
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[i] = $0 }
+                .help(tip(i))
+                .accessibilityElement()
+                .accessibilityLabel(tip(i))
+                .accessibilityAddTraits(i == index ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { choose(i) }
             }
         }
+        .background(alignment: .topLeading) { bubble }
+        .coordinateSpace(name: Self.space)
+        .contentShape(Capsule())
+        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
+            .onChanged { dragX = $0.location.x }
+            .onEnded { value in
+                let i = nearest(value.location.x)
+                dragX = nil
+                choose(i)
+            })
         .padding(3)
         .background(Capsule().fill(Color.primary.opacity(0.07)))
         .fixedSize()
+    }
+
+    /// Follows the pointer while dragging, clamped to the track; otherwise
+    /// sits on its segment.
+    @ViewBuilder
+    private var bubble: some View {
+        if let frame = frames[index] {
+            let end = frames.values.map(\.maxX).max() ?? frame.maxX
+            let x = dragX.map { min(max($0 - frame.width / 2, 0), end - frame.width) } ?? frame.minX
+            SelectionBubble()
+                .frame(width: frame.width, height: frame.height)
+                .offset(x: x, y: frame.minY)
+                .animation(dragX == nil ? .snappy(duration: 0.22) : .interactiveSpring(duration: 0.1), value: x)
+                .animation(.snappy(duration: 0.22), value: frame.width)
+        }
+    }
+
+    private func tip(_ i: Int) -> String { i < tips.count ? tips[i] : options[i].label }
+
+    private func nearest(_ x: CGFloat) -> Int {
+        frames.min { abs($0.value.midX - x) < abs($1.value.midX - x) }?.key ?? selectedIndex
+    }
+
+    private func choose(_ i: Int) {
+        chosen = i
+        let value = options[i].value
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            selection = value
+            chosen = nil
+        }
     }
 }
 
@@ -587,13 +687,19 @@ struct GlassSearchField: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background {
-            if #available(macOS 26.0, *) {
-                Capsule().fill(.clear).glassEffect(.regular.interactive(), in: Capsule())
-            } else {
-                Capsule().fill(.regularMaterial)
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
-            }
+        .background { GlassCapsule() }
+    }
+}
+
+/// The search field's glass capsule, shared with the Sort button so both
+/// look the same closed. Material on macOS 15.
+struct GlassCapsule: View {
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            Capsule().fill(.clear).glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            Capsule().fill(.regularMaterial)
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
         }
     }
 }

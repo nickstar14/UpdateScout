@@ -41,6 +41,7 @@ struct UpdatesPage: View {
     }
 
     @AppStorage(Migration.noticeKey) private var showRenameNotice = false
+    @AppStorage("updatesLayout") private var layout = CardLayout.list
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,10 +52,8 @@ struct UpdatesPage: View {
                 UpToDateView()
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Click an app's icon or name for details, release notes and hide options.")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
+                    // More room between sections (Nick, 2 Nov 2026).
+                    VStack(alignment: .leading, spacing: 20) {
                         if nothingToDo { UpToDateView(compact: true) }
                         ForEach(grouped, id: \.id) { group in
                             section(group.id, count: group.items.count, items: group.items) {
@@ -71,6 +70,7 @@ struct UpdatesPage: View {
                     // with the one that's rolling instead of snapping.
                     .animation(Self.roll, value: collapsedRaw)
                     .animation(Self.roll, value: showHidden)
+                    .animation(.easeInOut(duration: 0.14), value: layout)
                 }
             }
         }
@@ -78,7 +78,17 @@ struct UpdatesPage: View {
         // them in glass.
         .pinnedHeader {
             VStack(spacing: 0) {
-                if Migration.showsRenameBanner { renameBanner }
+                // The page's controls first, as on the other pages, then the
+                // banners (Nick, 2 Nov 2026).
+                PageControls {
+                    HStack {
+                        Text("Click an app for details, release notes and hide options.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        LayoutSwitch(layout: $layout)
+                    }
+                    if Migration.showsRenameBanner { renameBanner }
+                }
                 AdoptionBanner()
                 DuplicatesNote()
             }
@@ -102,11 +112,22 @@ struct UpdatesPage: View {
         // row: per-app rows would offer a button that can't do anything.
         let handoff = group.items.filter { !$0.scriptedInstall && $0.sourceID == "mas" }
         let rows = group.items.filter { !handoff.contains($0) }
-        ForEach(rows) { item in
-            UpdateRow(item: item)
-            if item.id != rows.last?.id || !handoff.isEmpty { Divider() }
+        if layout == .cards {
+            // Cards inside each source's section (Nick, 2 Nov 2026); the App
+            // Store hand-off is always the first card.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 10)], spacing: 10) {
+                if !handoff.isEmpty { AppStoreHandoffRow(items: handoff, asCard: true) }
+                ForEach(rows) { item in UpdateRow(item: item, asCard: true) }
+            }
+            .padding(.bottom, 4)
+            .transition(.opacity)
+        } else {
+            ForEach(rows) { item in
+                UpdateRow(item: item)
+                if item.id != rows.last?.id || !handoff.isEmpty { Divider() }
+            }
+            if !handoff.isEmpty { AppStoreHandoffRow(items: handoff) }
         }
-        if !handoff.isEmpty { AppStoreHandoffRow(items: handoff) }
     }
 
     // MARK: Sections
@@ -144,7 +165,10 @@ struct UpdatesPage: View {
             // The rows stay in the layout; their height rolls between zero and
             // natural size, clipped at the header, while they fade. Nothing
             // slides, so the wording fades in place as the section rolls.
+            // A little room at the sides so the clip below doesn't cut the
+            // buttons' glass edges (Nick, 2 Nov 2026).
             VStack(alignment: .leading, spacing: 0) { content() }
+                .padding(.horizontal, 4)
                 .padding(.top, 6)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(height: isExpanded ? nil : 0, alignment: .top)
@@ -223,15 +247,21 @@ struct UpdatesPage: View {
         Button {
             showRenameNotice = true
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
-                Text("UpdateScout is now \(AppIdentity.name)").font(.callout)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            // A rainbow strip, the same shape as the orange updates strip on
+            // Installed and Discover (Nick, 2 Nov 2026).
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                Text("UpdateScout is now \(AppIdentity.name)")
+                Text("·").foregroundStyle(.secondary)
+                Text("See what's new").foregroundStyle(Color.accentColor)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 20).padding(.vertical, 9)
-            .background(Color.accentColor.opacity(0.08))
-            .contentShape(Rectangle())
+            .font(.callout)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(LinearGradient(colors: PrismBlur.spectrum.map { $0.opacity(0.22) },
+                                       startPoint: .leading, endPoint: .trailing),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .help("Why the new name")

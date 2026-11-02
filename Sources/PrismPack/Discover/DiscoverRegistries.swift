@@ -12,9 +12,10 @@ enum DiscoverRegistries {
         return objects.compactMap { obj in
             guard let pkg = obj["package"] as? [String: Any], let name = pkg["name"] as? String else { return nil }
             let monthly = (obj["downloads"] as? [String: Any])?["monthly"] as? Int ?? 0
-            return DiscoverEntry(kind: .npm, name: name, title: name, summary: pkg["description"] as? String,
+            return DiscoverEntry(kind: .npm, name: name, title: name, summary: plain(pkg["description"]),
                                  version: pkg["version"] as? String ?? "",
-                                 homepage: ((pkg["links"] as? [String: Any])?["npm"] as? String), popularity: monthly)
+                                 homepage: ((pkg["links"] as? [String: Any])?["npm"] as? String), popularity: monthly,
+                                 updated: date(pkg["date"]))
         }
     }
 
@@ -24,9 +25,10 @@ enum DiscoverRegistries {
               let crates = json["crates"] as? [[String: Any]] else { throw PrismPackError.parseFailure("crates.io search") }
         return crates.compactMap { c in
             guard let name = c["name"] as? String else { return nil }
-            return DiscoverEntry(kind: .crate, name: name, title: name, summary: c["description"] as? String,
+            return DiscoverEntry(kind: .crate, name: name, title: name, summary: plain(c["description"]),
                                  version: c["max_stable_version"] as? String ?? c["max_version"] as? String ?? "",
-                                 homepage: "https://crates.io/crates/\(name)", popularity: c["downloads"] as? Int ?? 0)
+                                 homepage: "https://crates.io/crates/\(name)", popularity: c["downloads"] as? Int ?? 0,
+                                 added: date(c["created_at"]), updated: date(c["updated_at"]))
         }
     }
 
@@ -35,9 +37,10 @@ enum DiscoverRegistries {
               let gems = try await Net.json(url) as? [[String: Any]] else { throw PrismPackError.parseFailure("RubyGems search") }
         return gems.prefix(25).compactMap { g in
             guard let name = g["name"] as? String else { return nil }
-            return DiscoverEntry(kind: .gem, name: name, title: name, summary: g["info"] as? String,
+            return DiscoverEntry(kind: .gem, name: name, title: name, summary: plain(g["info"]),
                                  version: g["version"] as? String ?? "",
-                                 homepage: g["project_uri"] as? String, popularity: g["downloads"] as? Int ?? 0)
+                                 homepage: g["project_uri"] as? String, popularity: g["downloads"] as? Int ?? 0,
+                                 updated: date(g["version_created_at"]))
         }
     }
 
@@ -55,7 +58,8 @@ enum DiscoverRegistries {
         else { throw PrismPackError.parseFailure("PyPI lookup") }
         return DiscoverEntry(kind: .pypi, name: real, title: real, summary: info["summary"] as? String,
                              version: info["version"] as? String ?? "",
-                             homepage: "https://pypi.org/project/\(real)/")
+                             homepage: "https://pypi.org/project/\(real)/",
+                             updated: date((json["urls"] as? [[String: Any]])?.first?["upload_time_iso_8601"]))
     }
 
     /// Command line apps that install well with pipx. PyPI can't be searched,
@@ -123,6 +127,27 @@ enum DiscoverRegistries {
                       homepage: market ? "https://marketplace.visualstudio.com/items?itemName=\(id)"
                                        : "https://open-vsx.org/extension/\(OpenVSX.path(of: id))",
                       popularity: installs)
+    }
+
+    /// A description without Markdown links or images: "[ripgrep](https://…)"
+    /// becomes "ripgrep", and badges go.
+    static func plain(_ value: Any?) -> String? {
+        guard let text = value as? String else { return nil }
+        let noImages = text.replacingOccurrences(of: #"!\[[^\]]*\]\([^)]*\)"#, with: "", options: .regularExpression)
+        let noLinks = noImages.replacingOccurrences(of: #"\[([^\]]*)\]\([^)]*\)"#, with: "$1", options: .regularExpression)
+        let tidy = noLinks.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+        return tidy.isEmpty ? nil : tidy
+    }
+
+    /// An ISO 8601 date from a registry, with or without fractions of a second.
+    private static func date(_ value: Any?) -> Date? {
+        guard let text = value as? String else { return nil }
+        let plain = ISO8601DateFormatter()
+        if let d = plain.date(from: text) { return d }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text)
     }
 
     private static func query(_ base: String, _ items: [String: String]) -> URL? {

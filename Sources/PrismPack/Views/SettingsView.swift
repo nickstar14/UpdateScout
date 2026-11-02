@@ -4,6 +4,7 @@ import ServiceManagement
 struct SettingsView: View {
     @EnvironmentObject var controller: UpdateController
     @StateObject private var deps = DependencyManager()
+    @State private var showDeps = false
     @State private var intervalMinutes = Prefs.checkIntervalMinutes
     @State private var disabled = Prefs.disabledSources
     @State private var agentInstalled = LaunchAgent.isInstalled
@@ -53,11 +54,52 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private func dependencyRow(_ dep: DependencyManager.Dependency) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(dep.name + (deps.versions[dep.id].map { " \($0)" } ?? ""))
+                Text(dep.purpose).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if deps.installingID == dep.id {
+                ProgressView().controlSize(.small)
+            } else if let formula = dep.brewFormula, !dep.installed {
+                Button("Install") { deps.install(dep) }.glassProminent(SourceStyle.forSource("homebrew").color).controlSize(.small)
+                    .help("Installs \(formula) with Homebrew")
+            } else if dep.brewFormula != nil, !deps.managedLoaded {
+                ProgressView().controlSize(.small)
+            } else if deps.managedFormula(dep) != nil {
+                Button("Reinstall") { deps.reinstall(dep) }.glass().controlSize(.small)
+                // Red, like every removal (Nick, 2 Nov 2026).
+                Button("Remove") { confirmRemove(dep) }.glassProminent(.red).controlSize(.small)
+            } else if dep.brewFormula != nil {
+                Text("Installed outside Homebrew").font(.caption).foregroundStyle(.secondary)
+                    .help("\(AppIdentity.name) only reinstalls or removes copies Homebrew installed.")
+            } else if dep.id == "brew", let page = URL(string: "https://github.com/Homebrew/install#uninstall-homebrew") {
+                // Never removed from here: it would take everything it installed with it.
+                Link("How to remove", destination: page).font(.caption)
+                    .help("Removing Homebrew removes everything it installed. Homebrew's own page explains how.")
+            }
+        }
+    }
+
+    private func confirmRemove(_ dep: DependencyManager.Dependency) {
+        let alert = NSAlert()
+        alert.messageText = "Remove \(dep.name)?"
+        alert.informativeText = "\(dep.purpose.prefix(1).uppercased() + dep.purpose.dropFirst()). Without it, that stops until you install it again from here."
+        alert.alertStyle = .warning
+        let go = alert.addButton(withTitle: "Remove")
+        go.hasDestructiveAction = true
+        go.keyEquivalent = ""
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        if alert.runModal() == .alertFirstButtonReturn { deps.remove(dep) }
+    }
+
     private var settingsForm: some View {
         Form {
             if deps.anyMissing {
                 Section("Setup") {
-                    ForEach(deps.dependencies.filter { !$0.installed }) { dep in
+                    ForEach(deps.dependencies.filter { !$0.installed && !$0.optional }) { dep in
                         HStack {
                             VStack(alignment: .leading, spacing: 1) {
                                 Label(dep.name, systemImage: "exclamationmark.triangle")
@@ -81,8 +123,30 @@ struct SettingsView: View {
                 }
             } else {
                 Section("Setup") {
-                    Label("All dependencies installed (Homebrew, mas-cli)", systemImage: "checkmark.circle")
-                        .foregroundStyle(Color.green.readable).font(.callout)
+                    // Same size as the Full Disk Access line, and opens to
+                    // each tool with Reinstall and Remove (Nick, 2 Nov 2026).
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) { showDeps.toggle() }
+                        if showDeps { deps.loadVersions() }
+                    } label: {
+                        HStack {
+                            Label("Everything \(AppIdentity.name) needs is installed", systemImage: "checkmark.circle")
+                                .foregroundStyle(Color.green.readable)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .rotationEffect(.degrees(showDeps ? 90 : 0))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(showDeps ? "Hide the list" : "Show each dependency")
+                    if showDeps {
+                        ForEach(deps.dependencies) { dep in dependencyRow(dep) }
+                        if let error = deps.installError {
+                            Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
+                        }
+                    }
                     FullDiskAccessRow()
                 }
             }

@@ -18,6 +18,8 @@ struct RenameWelcome: View {
     @State private var ballGone = false
     @State private var morphed = false
     @State private var spread = false
+    /// The shock ring has reached the old name and knocked it out.
+    @State private var struck = false
     @State private var renamed = false
     @State private var settled = false
     @State private var breathe = false
@@ -162,12 +164,24 @@ struct RenameWelcome: View {
                 .opacity(ballGone ? 0 : (ball ? 0.9 : 0))
                 .offset(y: Self.iconCentre - 60)
             ZStack {
+                // The white shock ring knocks the old name out as it passes;
+                // the rainbow then reveals the new one top to bottom, in step
+                // with the rays (Nick, 2 Nov 2026).
                 Text("UpdateScout")
-                    .opacity(renamed ? 0 : 1).blur(radius: renamed ? 8 : 0)
-                    .scaleEffect(renamed ? 0.92 : 1)
+                    .brightness(struck ? 0.6 : 0)
+                    .blur(radius: struck ? 10 : 0)
+                    .scaleEffect(struck ? 1.12 : 1)
+                    .opacity(struck ? 0 : 1)
                 Text(AppIdentity.name)
-                    .opacity(renamed ? 1 : 0).blur(radius: renamed ? 0 : 8)
-                    .scaleEffect(renamed ? 1 : 1.08)
+                    .mask(alignment: .top) {
+                        VStack(spacing: 0) {
+                            Rectangle().frame(height: 60)
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 24)
+                        }
+                        .offset(y: renamed ? 0 : -84)
+                    }
+                    .opacity(renamed ? 1 : 0).blur(radius: renamed ? 0 : 4)
             }
             .font(.largeTitle.weight(.bold))
             .shadow(color: .black.opacity(0.12), radius: 4, y: 1)
@@ -220,7 +234,7 @@ struct RenameWelcome: View {
 
     private func play() async {
         guard !reduceMotion else {
-            beam = true; morphed = true; ballGone = true; spread = true; renamed = true; settled = true
+            beam = true; morphed = true; ballGone = true; struck = true; spread = true; renamed = true; settled = true
             return
         }
         try? await Task.sleep(for: .milliseconds(450))
@@ -237,12 +251,16 @@ struct RenameWelcome: View {
         try? await Task.sleep(for: .milliseconds(350))
         // The ball clears outward, revealing the new icon.
         withAnimation(.easeOut(duration: 1.0)) { ballGone = true }
-        try? await Task.sleep(for: .milliseconds(450))
+        // The ring reaches the old name about 150 ms in and knocks it out.
+        try? await Task.sleep(for: .milliseconds(150))
+        withAnimation(.easeOut(duration: 0.3)) { struck = true }
+        try? await Task.sleep(for: .milliseconds(300))
         // The prism splits the light into colour.
         withAnimation(.spring(duration: 1.8, bounce: 0.15)) { spread = true }
-        try? await Task.sleep(for: .milliseconds(500))
-        withAnimation(.easeInOut(duration: 0.9)) { renamed = true }
-        try? await Task.sleep(for: .milliseconds(1100))
+        // The rays reach the name line about a quarter second in.
+        try? await Task.sleep(for: .milliseconds(250))
+        withAnimation(.easeOut(duration: 0.7)) { renamed = true }
+        try? await Task.sleep(for: .milliseconds(1350))
         withAnimation(.easeOut(duration: 0.8)) { settled = true }
         try? await Task.sleep(for: .milliseconds(800))
         withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { breathe = true }

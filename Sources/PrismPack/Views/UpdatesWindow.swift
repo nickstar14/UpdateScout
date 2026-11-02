@@ -132,7 +132,7 @@ struct MainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(GlassBackground())
         }
-        .navigationTitle(controller.page.title)
+        .navigationTitle(controller.page == .discover ? discover.title : controller.page.title)
         .toolbar {
             // The system didn't add its own sidebar toggle to this window, so
             // put the standard one where it goes, at the toolbar's leading end.
@@ -252,7 +252,7 @@ private struct Sidebar: View {
             part("Featured", .featured, symbol: "star")
             part("New", .new, symbol: "sparkles")
             if discover.chips.contains(.apps) {
-                heading("Apps")
+                heading("Homebrew")
                 ForEach(DiscoverCategories.Category.allCases) { category in
                     part(category.rawValue, .category(category), dot: category.color,
                          count: discover.categoryCounts[category] ?? 0)
@@ -262,7 +262,7 @@ private struct Sidebar: View {
             // Homebrew's own lists first, then the package managers.
             let order: [DiscoverModel.Chip] = [.cli, .fonts, .runtimes, .python, .node, .rust, .ruby, .editors]
             ForEach(order.filter(discover.chips.contains)) { chip in
-                part(chip.title, .chip(chip), dot: Self.color(of: chip))
+                part(chip.title, .chip(chip), dot: chip.color)
             }
         }
         .selectionDisabled()
@@ -299,15 +299,6 @@ private struct Sidebar: View {
             .padding(.leading, 10).padding(.top, 8).padding(.bottom, 2)
     }
 
-    /// Package kinds take their Updates section's colour; Homebrew's lists
-    /// take Homebrew's, and fonts stay grey.
-    private static func color(of chip: DiscoverModel.Chip) -> Color {
-        switch chip {
-        case .fonts: .gray
-        case .cli, .runtimes: SourceStyle.forSource("homebrew").color
-        default: SourceStyle.forSource(chip.sourceID).color
-        }
-    }
 }
 
 /// The window background: the plain system background, with the Glass

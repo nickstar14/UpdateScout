@@ -8,7 +8,6 @@ struct DiscoverPage: View {
     @EnvironmentObject var controller: UpdateController
     @ObservedObject private var model = DiscoverModel.shared
 
-    private var installedKeys: Set<String> { Set(controller.installed.compactMap(\.discoverKey)) }
     private var searchingText: Bool { !model.query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
@@ -21,17 +20,24 @@ struct DiscoverPage: View {
             }
             .padding([.horizontal, .bottom], 16)
             .padding(.top, 4)
+            // Cards / List fades like moving between pages.
+            .id(model.layout)
+            .transition(.opacity)
         }
-        // Search and chips stay put; the tiles scroll under them in glass.
+        .animation(.easeInOut(duration: 0.14), value: model.layout)
+        // The controls stay put; the cards scroll under them in glass.
         .pinnedHeader {
             PageControls {
-                GlassSearchField(prompt: "Search apps, command line tools and packages", text: $model.query)
-                chipRow
-                if model.chip == .apps { categoryRow }
+                HStack(spacing: 8) {
+                    GlassSearchField(prompt: "Search apps, command line tools and packages", text: $model.query)
+                    SortMenu(selection: $model.sort, options: DiscoverModel.Sort.allCases.map { ($0, $0.title) })
+                    SortDirectionButton(reversed: $model.reversed, order: model.sort.order(reversed: model.reversed))
+                    LayoutSwitch(layout: $model.layout)
+                }
                 UpdatesReminder()
             }
         }
-        .navigationSubtitle("Apps and tools from Homebrew, pip, npm and more")
+        .navigationSubtitle(model.subtitle)
         .onAppear {
             model.start()
             if controller.installed.isEmpty { controller.loadInstalled() }
@@ -41,83 +47,53 @@ struct DiscoverPage: View {
 
     private var usesHomebrew: Bool { [.all, .apps, .cli, .runtimes, .fonts].contains(model.chip) }
 
-    // The chips wrap rather than scroll, so none hide past the edge.
-    private var chipRow: some View {
-        ChipFlow(spacing: 6) {
-            ForEach(model.chips) { chip in
-                ChipButton(title: chip.title, selected: model.chip == chip, size: .small) {
-                    model.chip = chip; model.category = nil; model.onlyNew = false
-                }
-            }
-        }
-    }
-
-    private var categoryRow: some View {
-        ChipFlow(spacing: 6) {
-            ChipButton(title: "Every app", selected: model.category == nil, size: .mini) { model.category = nil }
-            ForEach(DiscoverCategories.Category.allCases) { category in
-                ChipButton(title: category.rawValue, selected: model.category == category, size: .mini) {
-                    model.category = category
-                }
-            }
-        }
-    }
-
     // MARK: Before typing
 
     @ViewBuilder
     private var home: some View {
-        switch model.chip {
-        case .all:
-            if model.snapshot == nil && model.loadingCatalog {
-                loading("Loading Homebrew's lists…")
-            } else {
-                if !model.onlyNew { group("Popular this month", model.popular) }
-                if model.recent.isEmpty {
-                    hint("Recently added", "New apps and tools show here once \(AppIdentity.name) has seen Homebrew's list change, usually after a day or two.")
-                } else {
-                    group("Recently added", model.recent)
-                }
-            }
-        case .python:
-            hint(nil, "PyPI can't be searched, so here are some popular command line apps. Type a package's exact name to find any other. Python apps install with pipx.")
-            group("Popular Python apps", model.python)
-        case .node, .rust, .ruby, .editors:
-            hint(nil, searchHint(model.chip))
+        switch model.spot {
+        case .new where model.snapshot != nil && model.browse.isEmpty:
+            hint("New apps and tools show here once \(AppIdentity.name) has seen Homebrew's list change, usually after a day or two.")
+        case .chip(.python):
+            hint("PyPI can't be searched, so here are some popular command line apps. Type a package's exact name to find any other.")
+            items(model.ordered(model.python))
+        case .chip(let chip) where [.node, .rust, .ruby, .editors].contains(chip):
+            hint(searchHint(chip))
         default:
             if model.snapshot == nil && model.loadingCatalog {
                 loading("Loading Homebrew's lists…")
             } else {
-                group(model.category.map { "Popular in \($0.rawValue)" } ?? "Popular this month", model.browse)
+                items(model.browse)
             }
         }
     }
 
     private func searchHint(_ chip: DiscoverModel.Chip) -> String {
         switch chip {
-        case .node: "Type to search npm. Packages install globally with npm."
-        case .rust: "Type to search crates.io. Crates install with cargo, which builds them from source and can take a few minutes."
-        case .ruby: "Type to search RubyGems. Gems install with Homebrew's Ruby, never the Ruby built into macOS."
+        case .node: "Type to search npm."
+        case .rust: "Type to search crates.io. cargo builds crates from source, which can take a few minutes."
+        case .ruby: "Type to search RubyGems. \(AppIdentity.name) never uses the Ruby built into macOS."
         default: "Type to search for extensions for VS Code, VSCodium and Cursor."
         }
     }
 
     // MARK: After typing
 
+    /// One section per source (Nick, 1 Nov 2026), each in the chosen order.
     @ViewBuilder
     private var results: some View {
         if usesHomebrew {
             if model.snapshot == nil && model.loadingCatalog {
                 loading("Loading Homebrew's lists…")
             } else {
-                let found = model.homebrewResults
+                let found = model.ordered(model.homebrewResults)
                 if !found.isEmpty || model.chip != .all { group("Homebrew", found, empty: "Nothing in Homebrew matches.") }
             }
         }
         if model.chip == .python {
             let text = model.query.lowercased()
             let curated = model.python.filter { $0.name.contains(text) || ($0.summary ?? "").lowercased().contains(text) }
-            if !curated.isEmpty { group("Popular Python apps", curated) }
+            if !curated.isEmpty { group("Popular Python apps", model.ordered(curated), sectionID: "pip") }
         }
         ForEach(model.activeRegistries) { registry in
             registryGroup(registry)
@@ -148,7 +124,7 @@ struct DiscoverPage: View {
                 if let note = model.liveNotes[registry] {
                     Text(note).font(.caption).foregroundStyle(.secondary)
                 }
-                group(registry.title, entries, sectionID: registry.sectionID,
+                group(registry.title, model.ordered(entries), sectionID: registry.sectionID,
                       empty: registry == .pypi ? "PyPI has no package with exactly that name." : "No matches.")
             }
         }
@@ -164,12 +140,50 @@ struct DiscoverPage: View {
             if entries.isEmpty {
                 if let empty { Text(empty).font(.callout).foregroundStyle(.secondary) }
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 10)], spacing: 10) {
-                    ForEach(entries) { entry in
-                        DiscoverTile(entry: entry, installed: installedKeys.contains(entry.installKey))
-                    }
+                items(entries)
+            }
+        }
+    }
+
+    /// Cards or a list.
+    @ViewBuilder
+    private func items(_ entries: [DiscoverEntry]) -> some View {
+        let installed = Dictionary(controller.installed.compactMap { p in p.discoverKey.map { ($0, p) } },
+                                   uniquingKeysWith: { first, _ in first })
+        if model.layout == .cards {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 10)], spacing: 10) {
+                ForEach(entries) { entry in
+                    DiscoverItem(entry: entry, pkg: installed[entry.installKey], label: label(of: entry), asRow: false)
                 }
             }
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 { Divider().padding(.leading, 50) }
+                    DiscoverItem(entry: entry, pkg: installed[entry.installKey], label: label(of: entry), asRow: true)
+                }
+            }
+            .modifier(ListPanel(color: entries.first.map { label(of: $0).color } ?? .gray))
+        }
+    }
+
+    /// The line under a name, and the card's tint: what it is, in the same
+    /// colour as its sidebar dot (Nick, 1 Nov 2026). The source tag and the
+    /// Install button keep the source's colour.
+    private func label(of entry: DiscoverEntry) -> (text: String, color: Color) {
+        if let category = model.category(of: entry) { return (category.rawValue, category.color) }
+        let color = SourceStyle.forSource(entry.sectionID).color
+        switch entry.kind {
+        case .cask where entry.isFont: return ("Font", DiscoverModel.Chip.fonts.color)
+        case .cask where entry.isRuntime: return ("Runtime", DiscoverModel.Chip.runtimes.color)
+        case .cask: return ("App", color)
+        case .formula where entry.isRuntime: return ("Runtime", DiscoverModel.Chip.runtimes.color)
+        case .formula: return ("Command line", DiscoverModel.Chip.cli.color)
+        case .npm: return ("npm", color)
+        case .pypi: return ("PyPI", color)
+        case .crate: return ("crates.io", color)
+        case .gem: return ("RubyGems", color)
+        case .ext: return ("Editor extension", color)
         }
     }
 
@@ -180,11 +194,8 @@ struct DiscoverPage: View {
         }
     }
 
-    private func hint(_ title: String?, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let title { Text(title).font(.headline) }
-            Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }
+    private func hint(_ text: String) -> some View {
+        Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
     private func loading(_ text: String) -> some View {
@@ -200,13 +211,22 @@ struct DiscoverPage: View {
     }
 }
 
-/// One result: icon, name, description with its source tag, and Install or
-/// an Installed pill. Clicking the icon or name opens its card.
-private struct DiscoverTile: View {
+/// One entry as a card or a list row (Phase 10 mockup). Clicking anywhere
+/// but its buttons opens its details.
+private struct DiscoverItem: View {
     @EnvironmentObject var controller: UpdateController
     let entry: DiscoverEntry
-    let installed: Bool
+    /// The installed copy, if any.
+    let pkg: InstalledPackage?
+    let label: (text: String, color: Color)
+    let asRow: Bool
     @State private var showingCard = false
+    @Environment(\.colorScheme) private var scheme
+
+    /// The card's tint. Yellow is fainter in dark, where it turned olive.
+    private var tint: Color {
+        label.color.opacity(scheme == .dark && label.color == .yellow ? 0.15 : 0.35)
+    }
 
     private var item: UpdateItem { DiscoverInstaller.item(for: entry) }
     private var style: SourceStyle { SourceStyle.forSource(entry.sectionID) }
@@ -220,34 +240,137 @@ private struct DiscoverTile: View {
         return controller.installStates[item.id]
     }
 
+    private var installed: Bool { pkg != nil || state == .done }
+
+    /// A waiting update for the installed copy, unless it's hidden.
+    private var update: UpdateItem? {
+        guard let pkg, let found = controller.update(for: pkg), !controller.isIgnored(found) else { return nil }
+        return found
+    }
+
     var body: some View {
+        Group {
+            if asRow { row } else { card }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { showingCard = true }
+        .popover(isPresented: $showingCard, arrowEdge: .bottom) {
+            DiscoverCard(entry: entry, installed: installed, appPath: pkg?.appPath).environmentObject(controller)
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button { showingCard = true } label: {
-                HStack(spacing: 10) {
-                    DiscoverIcon(entry: entry)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
-                        Text([entry.summary, entry.tag].compactMap { $0 }.joined(separator: " · "))
-                            // Always two lines tall, so every tile and its
-                            // button line up (Nick).
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+            HStack(alignment: .top, spacing: 10) {
+                DiscoverIcon(entry: entry)
+                nameAndLabel
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 4) { tags }
             }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showingCard, arrowEdge: .bottom) {
-                DiscoverCard(entry: entry, installed: installed).environmentObject(controller)
-            }
+            // Always two lines tall, so every card and its buttons line up.
+            Text(entry.summary ?? "").font(.callout).foregroundStyle(.secondary)
+                .lineLimit(2, reservesSpace: true)
+            Text(versionLine(entry.shortVersion)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             HStack {
                 Spacer()
-                DiscoverAction(entry: entry, installed: installed, state: state)
+                actions
             }
         }
         .padding(12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .modifier(SectionPanel(color: style.color.opacity(0.35)))
+        .modifier(SectionPanel(color: tint))
+    }
+
+    private var row: some View {
+        HStack(spacing: 10) {
+            DiscoverIcon(entry: entry, size: 28)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
+                    Text(label.text).font(.caption).foregroundStyle(label.color.readable).lineLimit(1)
+                }
+                Text(entry.summary ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            // Fixed columns, so tags, versions and buttons line up row to row.
+            // Installed stacks under the source tag, as on cards, to keep
+            // the column narrow.
+            VStack(alignment: .trailing, spacing: 3) { tags }.frame(width: 115, alignment: .trailing)
+            Text(versionLine(entry.shortVersion)).font(.callout).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.tail)
+                .frame(width: 120, alignment: .leading)
+            actions.frame(minWidth: 96, alignment: .trailing)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+    }
+
+    private var nameAndLabel: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
+            Text(label.text).font(.caption).foregroundStyle(label.color.readable).lineLimit(1)
+        }
+    }
+
+    /// What it installs with, always (Nick, 1 Nov 2026), and Installed.
+    @ViewBuilder
+    private var tags: some View {
+        StatusPill.source(entry.sectionID)
+        if installed { StatusPill.installed }
+    }
+
+    /// Install for new things; Update or Open, plus the trash button, for
+    /// installed ones.
+    @ViewBuilder
+    private var actions: some View {
+        if let pkg {
+            HStack(spacing: 6) {
+                if let update {
+                    UpdateAction(item: update, color: style.color)
+                } else if let path = pkg.appPath, entry.kind == .cask {
+                    Button("Open") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+                        .glass().controlSize(.small)
+                }
+                // Move to Trash lives in the details pop-up (Nick, 2 Nov 2026).
+            }
+        } else {
+            DiscoverAction(entry: entry, installed: false, state: state)
+        }
+    }
+}
+
+/// A card's Update button: the same queue and password batch as the
+/// Updates page, with its progress while it runs (Discover and Installed).
+struct UpdateAction: View {
+    @EnvironmentObject var controller: UpdateController
+    let item: UpdateItem
+    let color: Color
+
+    var body: some View {
+        let state = controller.installStates[item.id]
+        if let state, state.isActive {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(state == .queued ? "Queued" : "Updating").font(.caption).foregroundStyle(.secondary)
+                    .help(state.label)
+            }
+        } else {
+            Button(state?.errorMessage == nil ? item.actionLabel : "Retry") { controller.requestUpdate(item) }
+                .glassProminent(color).controlSize(.small)
+        }
+    }
+}
+
+extension DiscoverModel.Chip {
+    /// A part's colour: its sidebar dot, and the tint and label of its
+    /// cards. Command line and Runtimes get their own, so Homebrew's brown
+    /// isn't everywhere (Nick, 1 Nov 2026); fonts stay grey.
+    var color: Color {
+        switch self {
+        case .fonts: .gray
+        case .cli: .mint
+        case .runtimes: .purple
+        default: SourceStyle.forSource(sourceID).color
+        }
     }
 }
 
@@ -257,6 +380,8 @@ private struct DiscoverAction: View {
     let entry: DiscoverEntry
     let installed: Bool
     let state: InstallState?
+    /// Small on cards; regular in the pop-up, beside its other buttons.
+    var size: ControlSize = .small
 
     private var style: SourceStyle { SourceStyle.forSource(entry.sectionID) }
 
@@ -295,12 +420,12 @@ private struct DiscoverAction: View {
                     }
                 }
             }
-            .menuStyle(.button).glassProminent(style.color).controlSize(.small).fixedSize()
+            .menuStyle(.button).glassProminent(style.color).controlSize(size).fixedSize()
         } else {
             Button(title) {
                 controller.update(DiscoverInstaller.item(for: entry, editorKey: editors.first?.key))
             }
-            .glassProminent(style.color).controlSize(.small)
+            .glassProminent(style.color).controlSize(size)
             .disabled(entry.kind == .ext && editors.isEmpty)
             .help(entry.kind == .ext && editors.isEmpty ? "Install VS Code, VSCodium or Cursor first." : "")
         }
@@ -310,8 +435,11 @@ private struct DiscoverAction: View {
 /// The floating card: what it is, where it comes from, and how it installs.
 private struct DiscoverCard: View {
     @EnvironmentObject var controller: UpdateController
+    @Environment(\.dismiss) private var dismiss
     let entry: DiscoverEntry
     let installed: Bool
+    /// The installed app, so the main button is Open, as on Installed.
+    var appPath: String? = nil
 
     private var source: String {
         switch entry.kind {
@@ -348,24 +476,30 @@ private struct DiscoverCard: View {
                 }
             }
             if let summary = entry.summary { Text(summary).fixedSize(horizontal: false, vertical: true) }
-            if !entry.version.isEmpty { LabeledContent("Latest version", value: entry.version) }
-            if entry.popularity > 0 {
-                LabeledContent(entry.kind == .cask || entry.kind == .formula ? "Installs, last 30 days" : "Downloads",
-                               value: entry.popularity.formatted())
-            }
+            if !entry.version.isEmpty { LabeledContent("Version", value: entry.shortVersion) }
             if let note { Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
-            HStack {
+            // As on every details pop-up: helpers left, Move to Trash in red
+            // and the main action right, one size; close is the circle.
+            HStack(spacing: 8) {
                 if let page = entry.homepage.flatMap(URL.init(string:)) {
                     Button("Website") { NSWorkspace.shared.open(page) }.glass()
                 }
                 Spacer()
                 let state = controller.installStates[DiscoverInstaller.item(for: entry).id]
-                if installed || state == .done { UninstallButton(removal: Removal(entry)) }
-                DiscoverAction(entry: entry, installed: installed, state: state)
+                if installed || state == .done {
+                    UninstallButton(removal: Removal(entry))
+                }
+                if let appPath, installed {
+                    Button("Open") { dismiss(); NSWorkspace.shared.open(URL(fileURLWithPath: appPath)) }
+                        .glassProminent(SourceStyle.forSource(entry.sectionID).color)
+                } else {
+                    DiscoverAction(entry: entry, installed: installed, state: state, size: .regular)
+                }
             }
         }
-        .padding(16)
-        .frame(width: 340)
+        .padding(18)
+        .frame(width: 400)
+        .popupClose()
     }
 }
 

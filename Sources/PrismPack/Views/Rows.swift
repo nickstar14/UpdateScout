@@ -65,6 +65,9 @@ struct StatusPill: View {
             .foregroundStyle(color.readable)
             .padding(.horizontal, 8).padding(.vertical, 2)
             .background(color.opacity(0.15), in: Capsule())
+            // A thin outline, so a tag stays readable on a card of a similar
+            // colour (Homebrew on a red card; Nick, 1 Nov 2026).
+            .overlay(Capsule().strokeBorder(color.readable.opacity(0.45), lineWidth: 0.75))
     }
 }
 
@@ -84,6 +87,70 @@ extension StatusPill {
 /// "Version 1.2", in the normal text font, the same on every page.
 func versionLine(_ version: String, _ extras: String?...) -> String {
     ([version.isEmpty ? nil : "Version \(version)"] + extras).compactMap { $0 }.joined(separator: " · ")
+}
+
+/// Cards or List, chosen per page and remembered (Phase 10).
+enum CardLayout: String {
+    case cards, list
+}
+
+/// The Cards / List switch in a page's control row.
+struct LayoutSwitch: View {
+    @Binding var layout: CardLayout
+
+    var body: some View {
+        // Liquid Glass, like the Theme switch (Nick, 2 Nov 2026).
+        GlassSegmented(selection: $layout,
+                       options: [(.cards, "square.grid.2x2"), (.list, "list.bullet")],
+                       symbols: true, tips: ["Cards", "List"])
+    }
+}
+
+/// A Sort menu as a Liquid Glass button showing the current choice, to
+/// match the search field and the direction arrow (Nick, 2 Nov 2026).
+struct SortMenu<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, title: String)]
+    /// The tooltip; the Source menu on Installed uses this too.
+    var help = "Sort"
+
+    var body: some View {
+        Menu {
+            Picker("Sort", selection: $selection) {
+                ForEach(options.indices, id: \.self) { i in Text(options[i].title).tag(options[i].value) }
+            }
+            .pickerStyle(.inline).labelsHidden()
+        } label: {
+            HStack(spacing: 5) {
+                Text(options.first { $0.value == selection }?.title ?? "Sort")
+                Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background { GlassCapsule() }
+            .contentShape(Capsule())
+        }
+        // Plain, so the menu draws our glass capsule rather than its own
+        // button (it wasn't glass while closed; Nick, 2 Nov 2026).
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+        .fixedSize()
+        .help(help)
+    }
+}
+
+/// The arrow beside a Sort menu: flips the order. Its tooltip says the
+/// order shown now ("A to Z", "Largest first"). Every Sort has one (Nick).
+struct SortDirectionButton: View {
+    @Binding var reversed: Bool
+    let order: String
+
+    var body: some View {
+        Button { reversed.toggle() } label: {
+            Image(systemName: reversed ? "arrow.up" : "arrow.down")
+        }
+        .glass()
+        .help(order)
+        .accessibilityLabel(order)
+    }
 }
 
 /// A page's own controls, in the row under the window's title bar. Same
@@ -154,6 +221,9 @@ private struct RowTitle<Detail: View>: View {
 struct UpdateRow: View {
     @EnvironmentObject var controller: UpdateController
     let item: UpdateItem
+    /// Updates' Cards view (Phase 10): the same pieces as a card.
+    var asCard = false
+    @State private var showingCard = false
 
     private var style: SourceStyle { SourceStyle.forSource(item.sectionID) }
     private var installState: InstallState? { controller.installStates[item.id] }
@@ -169,15 +239,53 @@ struct UpdateRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            RowTitle(icon: RowIcon(name: item.name, appPath: item.appPath, sectionID: item.sectionID),
-                     name: item.name, subtitle: subtitle) {
-                UpdateDetailView(item: item).environmentObject(controller)
+        if asCard { card } else {
+            HStack(spacing: 10) {
+                RowTitle(icon: RowIcon(name: item.name, appPath: item.appPath, sectionID: item.sectionID),
+                         name: item.name, subtitle: subtitle) {
+                    UpdateDetailView(item: item).environmentObject(controller)
+                }
+                badges
+                trailing
             }
-            badges
-            trailing
+            .padding(.vertical, 6)
+            .help(item.caveat ?? "")
         }
-        .padding(.vertical, 6)
+    }
+
+    /// Icon and name, warnings top right, installed → new version in the
+    /// source's colour, and the button. No source tag: the section says it.
+    /// Clicking anywhere but the buttons opens the details.
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                RowIcon(name: item.name, appPath: item.appPath, sectionID: item.sectionID)
+                Text(item.name).font(.body.weight(.semibold)).lineLimit(2)
+                Spacer(minLength: 0)
+                badges
+            }
+            Text("\(item.installedVersion) → \(item.latestVersion)")
+                .font(.callout.weight(.medium)).foregroundStyle(style.color.readable).lineLimit(1)
+            // The first lines of the release notes when the update has them
+            // (Nick, 2 Nov 2026); otherwise pinned and caveat notes.
+            let caveats = subtitle.components(separatedBy: " · ").dropFirst().joined(separator: " · ")
+            Text(item.releaseNotes.flatMap(UpdateDetailView.preview) ?? (caveats.isEmpty ? " " : caveats))
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(2, reservesSpace: true)
+            HStack {
+                Spacer()
+                trailing
+            }
+            .frame(minHeight: 22)
+        }
+        .padding(12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture { showingCard = true }
+        .popover(isPresented: $showingCard, arrowEdge: .bottom) {
+            UpdateDetailView(item: item).environmentObject(controller)
+        }
         .help(item.caveat ?? "")
     }
 
@@ -266,21 +374,52 @@ struct UpdateRow: View {
 /// Every App Store item PrismPack can't install itself, as one hand-off row.
 struct AppStoreHandoffRow: View {
     let items: [UpdateItem]
+    /// Updates' Cards view: a solid soft-blue card, first in its section,
+    /// so it reads as "open the App Store" (Nick, 2 Nov 2026).
+    var asCard = false
+
+    private var title: String {
+        items.count == 1 ? "1 app updates in the App Store" : "\(items.count) apps update in the App Store"
+    }
+
+    private func open() { NSWorkspace.shared.open(URL(string: "macappstore://showUpdatesPage")!) }
 
     var body: some View {
+        if asCard { card } else { row }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                RowIcon(name: "App Store", appPath: "/System/Applications/App Store.app", sectionID: "mas")
+                Text(title).font(.body.weight(.semibold)).lineLimit(2)
+                Spacer(minLength: 0)
+            }
+            Text(items.map(\.name).joined(separator: ", ")).font(.callout).lineLimit(1)
+            Text("The App Store has to do these itself.").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Open in App Store", action: open).glassProminent(.blue).controlSize(.small)
+            }
+            .frame(minHeight: 22)
+        }
+        .padding(12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.blue.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.blue.opacity(0.35)))
+    }
+
+    private var row: some View {
         HStack(spacing: 10) {
             RowIcon(name: "App Store", appPath: "/System/Applications/App Store.app", sectionID: "mas")
             VStack(alignment: .leading, spacing: 1) {
-                Text(items.count == 1 ? "1 app updates in the App Store" : "\(items.count) apps update in the App Store")
-                    .font(.body.weight(.semibold))
+                Text(title).font(.body.weight(.semibold))
                 Text(items.map(\.name).joined(separator: ", ") + " · the App Store has to do these itself")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Button("Open in App Store") {
-                NSWorkspace.shared.open(URL(string: "macappstore://showUpdatesPage")!)
-            }
-            .glassProminent(.blue).controlSize(.small)
+            Button("Open in App Store", action: open)
+                .glassProminent(.blue).controlSize(.small)
         }
         .padding(.vertical, 6)
     }

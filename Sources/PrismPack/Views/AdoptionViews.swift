@@ -102,7 +102,6 @@ struct AdoptionReviewSheet: View {
             }
             Divider()
             HStack {
-                Button("Close") { dismiss() }.glass().keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Adopt all safe ones (\(safe.count))") { controller.adoptAllSafe() }
                     .prismProminent()
@@ -112,6 +111,7 @@ struct AdoptionReviewSheet: View {
             .padding(16)
         }
         .frame(width: 560, height: 600)
+        .popupClose()
     }
 }
 

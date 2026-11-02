@@ -70,6 +70,14 @@ final class UpdateController: ObservableObject {
     /// Hidden by any of the three ignore options.
     func isIgnored(_ item: UpdateItem) -> Bool { state.isHidden(item) }
 
+    /// The listed update for an installed package, if there is one
+    /// (Installed's status, Discover's Update button).
+    func update(for pkg: InstalledPackage) -> UpdateItem? {
+        state.items.first {
+            $0.sectionID == pkg.sourceID && $0.name.caseInsensitiveCompare(pkg.name) == .orderedSame
+        } ?? (pkg.appPath.flatMap { path in state.items.first { $0.appPath == path } })
+    }
+
     /// Why a hidden item is hidden, for the Hidden section.
     func ignoreReason(_ item: UpdateItem) -> String {
         if state.ignoredApps.contains(item.appKey) { return "All updates hidden" }

@@ -60,10 +60,8 @@ struct ChannelSection: View {
             if let info, info.offersBeta || channel == .beta || info.stableBelow != nil {
                 VStack(alignment: .leading, spacing: 8) {
                     LabeledContent("Updates") {
-                        Picker("Updates", selection: $channel) {
-                            ForEach(Channel.allCases) { Text($0.title).tag($0) }
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        // The glass slider, as everywhere (Nick, 2 Nov 2026).
+                        GlassSegmented(selection: $channel, options: Channel.allCases.map { ($0, $0.title) })
                     }
                     caption(info)
                     if channel == .stable, let version = info.stableBelow { goBack(info, version: version) }

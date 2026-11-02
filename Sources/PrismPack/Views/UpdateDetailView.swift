@@ -28,13 +28,15 @@ struct UpdateDetailView: View {
             }
             notesSection
             Divider()
+            // Clear groups with even spacing, not squeezed rows (Nick, 2 Nov 2026).
             ignoreGroup
             AutoUpdateControls(item: item)
             Divider()
             footer
         }
-        .padding(18)
-        .frame(width: 480)
+        .padding(20)
+        .frame(width: 500)
+        .popupClose()
         // Uninstall needs the Installed list to know how the item got here.
         .onAppear { if controller.installed.isEmpty, !controller.loadingInstalled { controller.loadInstalled() } }
     }
@@ -49,15 +51,6 @@ struct UpdateDetailView: View {
                     .labelStyle(.titleOnly)
             }
             Spacer()
-            // At the top, so the footer has room for the other buttons.
-            if !controller.isBusy(item) && !controller.isIgnored(item) {
-                Button {
-                    dismiss(); controller.requestUpdate(item)
-                } label: {
-                    Label(item.actionLabelLong, systemImage: item.actionSymbol)
-                }
-                .glassProminent(style.color)
-            }
         }
     }
 
@@ -126,10 +119,16 @@ struct UpdateDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: 220)
+            } else if let notesURL = item.releaseNotesURL.flatMap(URL.init(string:)) {
+                // The notes link lives here now; the footer's Release notes
+                // button went (Nick, 2 Nov 2026).
+                HStack(spacing: 4) {
+                    Text("This vendor publishes its notes on the web.").foregroundStyle(.secondary)
+                    Button("Read them") { NSWorkspace.shared.open(notesURL) }.buttonStyle(.link)
+                }
+                .font(.callout)
             } else {
-                Text(item.releaseNotesURL != nil
-                     ? "This vendor publishes notes on the web — use the Release notes button below."
-                     : "No release notes are published for this update. Homebrew formulae and cask updates don't carry changelogs; the project page usually does.")
+                Text("No release notes are published for this update. Homebrew formulae and cask updates don't carry changelogs; the project page usually does.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -147,37 +146,39 @@ struct UpdateDetailView: View {
                 Button("Unhide") { controller.unhide(item); dismiss() }.glass()
             }
         } else {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Button("Hide this version") { controller.dismiss(item); dismiss() }
-                        .glass().controlSize(.small)
-                        .help("Hide \(item.latestVersion). The next version shows again.")
-                    Button("Hide all updates") { controller.ignoreApp(item); dismiss() }
-                        .glass().controlSize(.small)
-                        .help("Hide every update for \(item.name) until you unhide it.")
-                    Button("Hide major upgrades") { controller.ignoreMajors(item); dismiss() }
-                        .glass().controlSize(.small)
-                        .help("Keep offering minor fixes, never the next major version.")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Hide").font(.callout.weight(.semibold))
+                HStack(spacing: 10) {
+                    Button { controller.dismiss(item); dismiss() } label: {
+                        Text("This version").frame(maxWidth: .infinity)
+                    }
+                    .glass()
+                    .help("Hide \(item.latestVersion). The next version shows again.")
+                    Button { controller.ignoreApp(item); dismiss() } label: {
+                        Text("All updates").frame(maxWidth: .infinity)
+                    }
+                    .glass()
+                    .help("Hide every update for \(item.name) until you unhide it.")
+                    Button { controller.ignoreMajors(item); dismiss() } label: {
+                        Text("Major upgrades").frame(maxWidth: .infinity)
+                    }
+                    .glass()
+                    .help("Keep offering minor fixes, never the next major version.")
                 }
             }
         }
     }
 
+    /// Helpers on the left; Move to Trash (or Uninstall) in red, set apart,
+    /// and the main action on the right; close is the circle top right.
+    /// Every button the same size.
     private var footer: some View {
         HStack(spacing: 8) {
-            if let notesURL = item.releaseNotesURL.flatMap(URL.init(string:)) {
-                Button {
-                    NSWorkspace.shared.open(notesURL)
-                } label: {
-                    Label("Release notes", systemImage: "doc.text")
-                }
-                .glass()
-            }
             if let url = item.url.flatMap(URL.init(string:)) {
                 Button {
                     NSWorkspace.shared.open(url)
                 } label: {
-                    Label("Info page", systemImage: "safari")
+                    Label("Website", systemImage: "safari")
                 }
                 .glass()
             }
@@ -193,7 +194,39 @@ struct UpdateDetailView: View {
             if !controller.isBusy(item), let pkg = controller.installedPackage(for: item), let removal = Removal(pkg) {
                 UninstallButton(removal: removal, updateID: item.id)
             }
+            if !controller.isBusy(item) && !controller.isIgnored(item) {
+                Button {
+                    dismiss(); controller.requestUpdate(item)
+                } label: {
+                    Label(item.actionLabelLong, systemImage: item.actionSymbol)
+                }
+                .glassProminent(style.color)
+            }
         }
+    }
+
+    /// The first two lines of release notes, as plain text, for a card:
+    /// tags, headings ("What's Changed"), bullets, links and web addresses
+    /// left out. Nil when nothing readable is left.
+    static func preview(_ notes: String) -> String? {
+        let text = notes
+            .replacingOccurrences(of: "<h[1-6][^>]*>", with: "\n# ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "<br\\s*/?>|</p>|</li>|</h[1-6]>|</div>", with: "\n", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"!?\[([^\]]*)\]\([^)]*\)"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"\s*(in )?https?://\S+"#, with: "", options: .regularExpression)
+        let lines = text.components(separatedBy: .newlines).compactMap { raw -> String? in
+            var line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("#") { return nil }
+            line = line.replacingOccurrences(of: #"^([-*+•]|\d+\.)\s+"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+            let lower = line.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ": "))
+            if line.isEmpty || ["what's changed", "what's new", "changes", "changelog", "release notes"].contains(lower) {
+                return nil
+            }
+            return line
+        }
+        return lines.isEmpty ? nil : lines.prefix(2).joined(separator: "\n")
     }
 
     /// Rendered notes, keyed by their source text: the HTML importer is slow,
@@ -261,7 +294,7 @@ struct AutoUpdateControls: View {
     var body: some View {
         let _ = controller.autoRulesVersion
         let pinned = controller.isPinned(item)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 if pinned {
                     Label("Pinned at \(item.installedVersion)", systemImage: "pin.fill").font(.callout)
@@ -271,24 +304,25 @@ struct AutoUpdateControls: View {
                     }
                 } else {
                     // Segmented, not a menu: a pop-up menu inside the card's
-                    // popover dropped the choice (tested 30 Oct 2026).
-                    Text("Update automatically").font(.callout).fixedSize()
+                    // popover dropped the choice (tested 30 Oct 2026). The
+                    // glass slider, as on the pages (Nick, 2 Nov 2026).
+                    Text("Update automatically").font(.callout.weight(.semibold)).fixedSize()
                     Spacer()
-                    Picker("Update automatically", selection: rule) {
-                        Text("Use setting").tag("setting")
-                        Text("Always").tag(AutoUpdate.Rule.always.rawValue)
-                        Text("Never").tag(AutoUpdate.Rule.never.rawValue)
-                    }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    GlassSegmented(selection: rule, options: [("setting", "Use setting"),
+                                                              (AutoUpdate.Rule.always.rawValue, "Always"),
+                                                              (AutoUpdate.Rule.never.rawValue, "Never")])
                 }
             }
             if !pinned {
-                HStack {
-                    Text("Pin it to keep \(item.installedVersion): never automatic, not in Update All.")
-                        .font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep \(item.installedVersion)").font(.callout.weight(.semibold))
+                        Text("Pinned: never automatic, not in Update All.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Button("Keep this version") { controller.setPinned(item, true) }
-                        .glass().controlSize(.small).fixedSize()
+                        .glass().fixedSize()
                 }
             }
             if !pinned, let reason = controller.autoBlocker(item) {

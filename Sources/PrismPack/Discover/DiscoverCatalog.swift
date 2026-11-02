@@ -14,6 +14,12 @@ struct DiscoverEntry: Identifiable, Hashable, Sendable {
     var homepage: String?
     /// Installs over 30 days (Homebrew), or downloads (registries).
     var popularity: Int = 0
+    /// When it first appeared (Homebrew: first seen by PrismPack; crates.io:
+    /// published), for the Newest sort. Nil when unknown.
+    var added: Date? = nil
+    /// When its version last changed (Homebrew: seen changing by PrismPack;
+    /// registries: last publish), for the Recently updated sort.
+    var updated: Date? = nil
 
     var id: String { "\(kind.rawValue):\(name)" }
 
@@ -48,6 +54,11 @@ struct DiscoverEntry: Identifiable, Hashable, Sendable {
         case .gem: "gem"
         case .ext: "extension"
         }
+    }
+
+    /// The version without Homebrew's build suffix ("156.0.4314.58,bc665d48…").
+    var shortVersion: String {
+        String(version.split(separator: ",", maxSplits: 1).first ?? Substring(version))
     }
 
     var isFont: Bool { kind == .cask && name.hasPrefix("font-") }
@@ -134,11 +145,18 @@ enum DiscoverCatalog {
         snap.entries.reserveCapacity(casks.count + formulae.count)
         for var e in casks { e.popularity = popularity.casks[e.name] ?? 0; snap.entries.append(e) }
         for var e in formulae { e.popularity = popularity.formulae[e.name] ?? 0; snap.entries.append(e) }
+        let added = recentlyAdded(casks: casks.map(\.name), formulae: formulae.map(\.name))
+        let addedOn = Dictionary(added.map { ($0.id, $0.date) }, uniquingKeysWith: { first, _ in first })
+        let changed = versionChanges(snap.entries)
+        for i in snap.entries.indices {
+            let id = snap.entries[i].id
+            snap.entries[i].added = addedOn[id]
+            snap.entries[i].updated = changed[id] ?? addedOn[id]
+        }
         for e in snap.entries { snap.byID[e.id] = e }
         snap.popularCasks = popularity.caskOrder.compactMap { snap.byID["cask:\($0)"] }
         snap.popularFormulae = popularity.formulaOrder.compactMap { snap.byID["formula:\($0)"] }
-        snap.recent = recentlyAdded(casks: casks.map(\.name), formulae: formulae.map(\.name))
-            .compactMap { snap.byID[$0] }
+        snap.recent = added.compactMap { snap.byID[$0.id] }
         return snap
     }
 
@@ -322,7 +340,7 @@ enum DiscoverCatalog {
     /// Homebrew doesn't publish when something was added, so compare today's
     /// lists with the ones seen last time. Empty until a second list has been
     /// seen. Entries stay for 30 days.
-    static func recentlyAdded(casks: [String], formulae: [String], now: Date = Date()) -> [String] {
+    static func recentlyAdded(casks: [String], formulae: [String], now: Date = Date()) -> [(id: String, date: Date)] {
         let current = casks.map { "cask:\($0)" } + formulae.map { "formula:\($0)" }
         var known = readJSON(Known.self, knownURL) ?? Known()
         let next = diff(known: known, current: current, now: now)
@@ -330,7 +348,7 @@ enum DiscoverCatalog {
             writeJSON(next, knownURL)
         }
         known = next
-        return known.added.sorted { $0.date > $1.date }.map(\.id)
+        return known.added.sorted { $0.date > $1.date }.map { ($0.id, $0.date) }
     }
 
     private static func diff(known: Known, current: [String], now: Date) -> Known {
@@ -342,6 +360,38 @@ enum DiscoverCatalog {
         let present = Set(current)
         next.added.removeAll { now.timeIntervalSince($0.date) > 30 * day || !present.contains($0.id) }
         next.ids = current.sorted()
+        return next
+    }
+
+    // MARK: Recently updated
+
+    /// Each entry's version as last seen, and when it was seen to change.
+    /// Homebrew doesn't publish update dates, so these fill in over the
+    /// days after Discover first loads (Nick, 1 Nov 2026).
+    private struct Versions: Codable {
+        var versions: [String: String] = [:]
+        var changed: [String: Date] = [:]
+    }
+
+    private static var versionsURL: URL { folder.appendingPathComponent("discover-versions.json") }
+
+    /// Entry id → when its version last changed.
+    static func versionChanges(_ entries: [DiscoverEntry], now: Date = Date()) -> [String: Date] {
+        let old = readJSON(Versions.self, versionsURL) ?? Versions()
+        let next = trackVersions(old, current: entries.map { ($0.id, $0.version) }, now: now)
+        if next.versions != old.versions { writeJSON(next, versionsURL) }
+        return next.changed
+    }
+
+    /// Entries no longer listed drop out; a first sighting has no date.
+    private static func trackVersions(_ old: Versions, current: [(String, String)], now: Date) -> Versions {
+        var next = Versions()
+        next.versions.reserveCapacity(current.count)
+        for (id, version) in current {
+            next.versions[id] = version
+            if let before = old.versions[id], before != version { next.changed[id] = now }
+            else if let date = old.changed[id] { next.changed[id] = date }
+        }
         return next
     }
 
@@ -366,5 +416,11 @@ extension DiscoverCatalog {
     static func testDiff(knownIDs: [String], added: [(String, Date)], current: [String], now: Date) -> [String] {
         let known = Known(ids: knownIDs, added: added.map { Known.Added(id: $0.0, date: $0.1) })
         return diff(known: known, current: current, now: now).added.map(\.id)
+    }
+
+    /// For tests: version tracking without touching disk.
+    static func testTrackVersions(old: [String: String], changed: [String: Date],
+                                  current: [(String, String)], now: Date) -> [String: Date] {
+        trackVersions(Versions(versions: old, changed: changed), current: current, now: now).changed
     }
 }

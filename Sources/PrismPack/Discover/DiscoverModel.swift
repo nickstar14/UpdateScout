@@ -69,6 +69,40 @@ final class DiscoverModel: ObservableObject {
         }
     }
 
+    /// Discover's Sort menu (Phase 10). Remembered.
+    enum Sort: String, CaseIterable, Identifiable {
+        case popular, name, newest, updated
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .popular: "Popular"
+            case .name: "Name"
+            case .newest: "Newest"
+            case .updated: "Recently updated"
+            }
+        }
+
+        /// The order shown, for the direction button's tooltip.
+        func order(reversed: Bool) -> String {
+            switch self {
+            case .popular: reversed ? "Least popular first" : "Most popular first"
+            case .name: reversed ? "Z to A" : "A to Z"
+            case .newest: reversed ? "Oldest first" : "Newest first"
+            case .updated: reversed ? "Least recently updated first" : "Most recently updated first"
+            }
+        }
+    }
+
+    @Published var sort = Sort(rawValue: UserDefaults.standard.string(forKey: "discoverSort") ?? "") ?? .popular {
+        didSet { UserDefaults.standard.set(sort.rawValue, forKey: "discoverSort") }
+    }
+    @Published var reversed = UserDefaults.standard.bool(forKey: "discoverSortReversed") {
+        didSet { UserDefaults.standard.set(reversed, forKey: "discoverSortReversed") }
+    }
+    @Published var layout = CardLayout(rawValue: UserDefaults.standard.string(forKey: "discoverLayout") ?? "") ?? .cards {
+        didSet { UserDefaults.standard.set(layout.rawValue, forKey: "discoverLayout") }
+    }
+
     @Published var query = "" { didSet { if query != oldValue { scheduleSearch() } } }
     @Published var chip: Chip = .all { didSet { if chip != oldValue { scheduleSearch(delay: 0) } } }
     @Published var category: DiscoverCategories.Category?
@@ -194,28 +228,101 @@ final class DiscoverModel: ObservableObject {
         DiscoverCatalog.search(query, in: scoped)
     }
 
-    /// What a chip shows before anything is typed.
+    /// What a part shows before anything is typed, in the chosen order.
+    /// Featured and New are fixed sets sorted among themselves; the other
+    /// parts sort their whole list and show the first 80.
     var browse: [DiscoverEntry] {
         guard let snap = snapshot else { return [] }
-        switch chip {
-        case .apps:
-            if category != nil { return scoped.sorted { $0.popularity > $1.popularity }.prefix(80).map { $0 } }
-            return snap.popularCasks.filter { !$0.isFont }.prefix(60).map { $0 }
-        case .cli: return snap.popularFormulae.filter { !$0.isRuntime }.prefix(60).map { $0 }
-        case .runtimes, .fonts: return scoped.sorted { $0.popularity > $1.popularity }.prefix(60).map { $0 }
-        default: return []
+        switch spot {
+        case .featured: return Self.sorted(snap.popularCasks.filter { !$0.isFont }.prefix(60).map { $0 }, by: sort, reversed: reversed)
+        case .new: return Self.sorted(snap.recent.prefix(80).map { $0 }, by: sort, reversed: reversed)
+        default: return Array(Self.sorted(scoped, by: sort, reversed: reversed).prefix(80))
         }
     }
 
-    /// Popular this month for the All page: apps and command line tools in turn.
-    var popular: [DiscoverEntry] {
-        guard let snap = snapshot else { return [] }
-        let casks = snap.popularCasks.filter { !$0.isFont }.prefix(12)
-        let formulae = snap.popularFormulae.prefix(12)
-        return zip(casks, formulae).flatMap { [$0, $1] }
+    /// Search results in the chosen order. Popular keeps the best matches
+    /// first, as each search already ranks them.
+    func ordered(_ results: [DiscoverEntry]) -> [DiscoverEntry] {
+        if sort == .popular { return reversed ? results.reversed() : results }
+        return Self.sorted(results, by: sort, reversed: reversed)
     }
 
-    var recent: [DiscoverEntry] { Array((snapshot?.recent ?? []).prefix(24)) }
+    /// Popular: most installs or downloads. Name: A to Z. Newest and
+    /// Recently updated: latest date first; undated ones after, most popular
+    /// first. Reversed flips the order; undated ones stay last either way.
+    nonisolated static func sorted(_ entries: [DiscoverEntry], by sort: Sort, reversed: Bool = false) -> [DiscoverEntry] {
+        let ordered = sorted(entries, by: sort)
+        guard reversed else { return ordered }
+        let date: (DiscoverEntry) -> Date? = { sort == .newest ? $0.added : sort == .updated ? $0.updated : nil }
+        if sort == .newest || sort == .updated {
+            return ordered.filter { date($0) != nil }.reversed() + ordered.filter { date($0) == nil }
+        }
+        return ordered.reversed()
+    }
+
+    private nonisolated static func sorted(_ entries: [DiscoverEntry], by sort: Sort) -> [DiscoverEntry] {
+        func byPopularity(_ a: DiscoverEntry, _ b: DiscoverEntry) -> Bool {
+            a.popularity != b.popularity ? a.popularity > b.popularity
+                : a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+        func byDate(_ a: Date?, _ b: Date?, _ x: DiscoverEntry, _ y: DiscoverEntry) -> Bool {
+            switch (a, b) {
+            case let (a?, b?) where a != b: a > b
+            case (_?, nil): true
+            case (nil, _?): false
+            default: byPopularity(x, y)
+            }
+        }
+        switch sort {
+        case .popular: return entries.sorted(by: byPopularity)
+        case .name: return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .newest: return entries.sorted { byDate($0.added, $1.added, $0, $1) }
+        case .updated: return entries.sorted { byDate($0.updated, $1.updated, $0, $1) }
+        }
+    }
+
+    /// The category an app is listed under, if any.
+    func category(of entry: DiscoverEntry) -> DiscoverCategories.Category? {
+        entry.kind == .cask ? categoryOf[entry.name] : nil
+    }
+
+    /// The window title: "Discover" on Featured, "Discover · Browsers" elsewhere.
+    var title: String {
+        switch spot {
+        case .featured: "Discover"
+        case .new: "Discover · New"
+        case .category(let c): "Discover · \(c.rawValue)"
+        case .chip(let c): "Discover · \(c.title)"
+        }
+    }
+
+    /// The subtitle under the title. While searching, it says where.
+    var subtitle: String {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        if !text.isEmpty {
+            switch spot {
+            case .featured, .new: return "Results for “\(text)” from every source"
+            case .category(let c): return "Results for “\(text)” in \(c.rawValue)"
+            case .chip(let c): return "Results for “\(text)” in \(c.title)"
+            }
+        }
+        switch spot {
+        case .featured: return "Popular this month"
+        case .new: return "Added in the last 30 days"
+        case .category(let c): return "\(categoryCounts[c] ?? 0) apps"
+        case .chip(let c):
+            switch c {
+            case .cli, .runtimes: return "\(scoped.count.formatted()) tools"
+            case .fonts: return "\(scoped.count.formatted()) fonts"
+            case .python: return "Searches PyPI. Apps install with pipx."
+            case .node: return "Searches npm. Packages install globally."
+            case .rust: return "Searches crates.io. Crates install with cargo."
+            case .ruby: return "Searches RubyGems. Gems install with Homebrew's Ruby."
+            case .editors: return "Searches the VS Code and Open VSX stores."
+            default: return ""
+            }
+        }
+    }
 
     // MARK: Live registries
 

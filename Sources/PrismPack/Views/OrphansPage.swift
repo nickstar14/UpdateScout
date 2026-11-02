@@ -15,17 +15,34 @@ struct OrphansPage: View {
     @State private var moving = false
     @State private var outcome: Leftovers.Outcome?
     @State private var filter = ""
-    @State private var sort = "size"
+    @AppStorage("orphansSort") private var sort = "size"
+    @AppStorage("orphansSortReversed") private var reversed = false
 
     private static let sorts = [("size", "Size"), ("name", "Name"), ("changed", "Last changed")]
 
-    /// Filtered by the search box, in the chosen order.
+    /// The order shown, for the direction button's tooltip.
+    private var order: String {
+        switch sort {
+        case "name": reversed ? "Z to A" : "A to Z"
+        case "changed": reversed ? "Least recently changed first" : "Most recently changed first"
+        default: reversed ? "Smallest first" : "Largest first"
+        }
+    }
+
+    /// Filtered by the search box, in the chosen order. Reversed flips it;
+    /// files with no change date stay last either way.
     private var shown: [Leftovers.Orphan] {
         let list = (orphans ?? []).filter { filter.isEmpty || $0.id.localizedCaseInsensitiveContains(filter) }
         switch sort {
-        case "name": return list.sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
-        case "changed": return list.sorted { ($0.lastChanged ?? .distantPast) > ($1.lastChanged ?? .distantPast) }
-        default: return list.sorted { $0.size > $1.size }
+        case "name":
+            let sorted = list.sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+            return reversed ? sorted.reversed() : sorted
+        case "changed":
+            let dated = list.filter { $0.lastChanged != nil }.sorted { $0.lastChanged! > $1.lastChanged! }
+            return (reversed ? dated.reversed() : dated) + list.filter { $0.lastChanged == nil }
+        default:
+            let sorted = list.sorted { $0.size > $1.size }
+            return reversed ? sorted.reversed() : sorted
         }
     }
 
@@ -40,7 +57,10 @@ struct OrphansPage: View {
                     ContentUnavailableView("No orphaned app files", systemImage: "archivebox",
                                            description: Text("Everything in your Library that's named for an app belongs to one that's installed."))
                 } else {
-                    List(shown) { orphan in row(orphan) }
+                    List {
+                        ForEach(shown) { orphan in row(orphan) }
+                        if !kept.isEmpty { keptSection }
+                    }
                         .listStyle(.inset)
                         .scrollContentBackground(.hidden)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -69,11 +89,11 @@ struct OrphansPage: View {
                 // window and its sidebar off screen (31 Oct 2026).
                 .lineLimit(3)
             if let outcome { result(outcome) }
-            GlassSearchField(prompt: "Filter by app ID", text: $filter)
-            HStack(spacing: 6) {
-                ForEach(Self.sorts, id: \.0) { key, title in
-                    ChipButton(title: title, selected: sort == key, size: .small) { sort = key }
-                }
+            // Search, Sort and its direction, as on Discover.
+            HStack(spacing: 8) {
+                GlassSearchField(prompt: "Filter by app ID", text: $filter)
+                SortMenu(selection: $sort, options: Self.sorts.map { ($0.0, $0.1) })
+                SortDirectionButton(reversed: $reversed, order: order)
             }
             HStack {
                 let items = tickedItems
@@ -81,6 +101,12 @@ struct OrphansPage: View {
                      : "\(ticked.count) app\(ticked.count == 1 ? "" : "s"), \(UninstallPanelText.bytes(items.reduce(0) { $0 + $1.size })) ticked")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                // Bulk actions for the ticked ones (Nick, 2 Nov 2026).
+                Button { showInFinder(items) } label: { Label("Show in Finder", systemImage: "folder") }
+                    .glass().disabled(items.isEmpty)
+                Button("Keep") { tickedOrphans.forEach(keep) }
+                    .glass().disabled(items.isEmpty)
+                    .help("Stop listing the ticked apps. Their files stay where they are.")
                 Button(role: .destructive) { confirmMove() } label: { Label("Move to Trash", systemImage: "trash") }
                     .glassProminent(.red)
                     .disabled(items.isEmpty || moving)
@@ -118,12 +144,25 @@ struct OrphansPage: View {
                     }
                 }
                 Spacer()
+                // Each item's own buttons (Nick, 2 Nov 2026).
                 Button(expanded.contains(orphan.id) ? "Hide files" : "Show files") {
                     if expanded.contains(orphan.id) { expanded.remove(orphan.id) } else { expanded.insert(orphan.id) }
                 }
                 .buttonStyle(.link).font(.caption)
+                if !orphan.isGroup {
+                    Button { showInFinder(orphan.items) } label: { Image(systemName: "folder") }
+                        .glass().help("Show in Finder").accessibilityLabel("Show in Finder")
+                }
                 Button("Keep") { keep(orphan) }.glass()
                     .help("Stop listing these. They stay where they are.")
+                if !orphan.isGroup {
+                    // Red, like every Move to Trash (Nick, 2 Nov 2026).
+                    Button(role: .destructive) { confirmMove(orphan.items.filter(\.movable), names: [orphan.id]) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .glassProminent(.red).disabled(moving)
+                    .help("Move to Trash").accessibilityLabel("Move to Trash")
+                }
             }
             if expanded.contains(orphan.id) {
                 ForEach(orphan.items) { item in
@@ -174,6 +213,34 @@ struct OrphansPage: View {
         scanning = false
     }
 
+    /// Kept apps' IDs, newest choices included, for the Kept section.
+    private var kept: [String] { Prefs.keptOrphans.sorted() }
+
+    private var tickedOrphans: [Leftovers.Orphan] { (orphans ?? []).filter { ticked.contains($0.id) } }
+
+    /// What Keep took off the list, with a way to put each back.
+    private var keptSection: some View {
+        Section("Kept") {
+            ForEach(kept, id: \.self) { id in
+                HStack {
+                    Text(id).font(.callout).lineLimit(1).truncationMode(.middle)
+                    Spacer()
+                    Button("Put back") {
+                        Prefs.keptOrphans.remove(id)
+                        Task { await scan() }
+                    }
+                    .glass().controlSize(.small)
+                    .help("List this app's files again")
+                }
+            }
+        }
+    }
+
+    /// One Finder window with them all selected.
+    private func showInFinder(_ items: [Leftovers.Found]) {
+        NSWorkspace.shared.activateFileViewerSelecting(items.map { URL(fileURLWithPath: $0.path) })
+    }
+
     private func keep(_ orphan: Leftovers.Orphan) {
         Prefs.keptOrphans.insert(orphan.id.lowercased())
         ticked.remove(orphan.id)
@@ -181,11 +248,15 @@ struct OrphansPage: View {
     }
 
     private func confirmMove() {
-        let items = tickedItems
+        confirmMove(tickedItems, names: tickedOrphans.map(\.id))
+    }
+
+    private func confirmMove(_ items: [Leftovers.Found], names: [String]) {
+        guard !items.isEmpty else { return }
         let alert = NSAlert()
         alert.icon = AskpassDialog.badgeIcon(symbol: "exclamationmark")
         alert.messageText = "Move \(items.count) item\(items.count == 1 ? "" : "s") to the Trash?"
-        alert.informativeText = (orphans ?? []).filter { ticked.contains($0.id) }.map(\.id).joined(separator: "\n")
+        alert.informativeText = names.joined(separator: "\n")
             + "\n\nYou can put them back from the Trash."
         alert.alertStyle = .warning
         let go = alert.addButton(withTitle: "Move to Trash")
