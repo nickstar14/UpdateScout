@@ -54,9 +54,23 @@ struct GlassButton: ViewModifier {
     }
 }
 
+/// Every delete, remove and Move to Trash button: Liquid Glass tinted red
+/// with a red label, so it reads as glass and as destructive (Nick,
+/// 2 Nov 2026).
+struct GlassDestructiveButton: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.buttonStyle(.glass).tint(.red).foregroundStyle(Color.red.readable)
+        } else {
+            content.buttonStyle(.bordered).tint(.red)
+        }
+    }
+}
+
 extension View {
     func glassProminent(_ tint: Color) -> some View { modifier(GlassProminentButton(tint: tint)) }
     func glass() -> some View { modifier(GlassButton()) }
+    func glassDestructive() -> some View { modifier(GlassDestructiveButton()) }
 }
 
 /// A small warning triangle that explains itself on hover (tooltip) and on
@@ -282,24 +296,6 @@ struct PopupClose: ViewModifier {
 
 extension View {
     func popupClose() -> some View { modifier(PopupClose()) }
-}
-
-/// The panel behind a long list (Installed and Discover in List view).
-/// Frosted rather than Liquid Glass: glass draws only the part on screen
-/// and puts its rim where the window cuts it off, which showed as a false
-/// bottom edge while scrolling (Nick, 2 Nov 2026).
-struct ListPanel: ViewModifier {
-    let color: Color
-
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: SectionPanel.radius, style: .continuous)
-        content
-            .background {
-                shape.fill(.regularMaterial)
-                shape.fill(color.opacity(0.14))
-            }
-            .overlay(shape.strokeBorder(Color.primary.opacity(0.08)))
-    }
 }
 
 struct SectionPanel: ViewModifier {

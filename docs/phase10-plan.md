@@ -328,10 +328,15 @@ ask Nick rather than invent a new pattern.
   left (Website, Show in Finder); Move to Trash or Uninstall as a red
   button; the main action (Update, Install, Open) bottom right; every
   button the same size; options in labelled groups with even spacing.
-- **Destructive actions are always red** (`glassProminent(.red)`).
+- **Destructive actions are always red tinted glass** (`glassDestructive()`):
+  delete, remove, Move to Trash and Uninstall, everywhere.
+- **Dropdowns are glass menus** (`SortMenu`), Settings included; no plain
+  system pop-up buttons, no unstyled buttons.
 - **Strips:** the orange updates strip and the rainbow rename strip share
   one shape.
-- **Long lists:** `ListPanel` (frosted), never one tall glass panel.
+- **Lists:** each row is its own small glass panel, like the cards (never
+  one tall glass panel: glass draws only what's on screen and put a rim
+  where the window cut it off).
 - **Wording:** "Website" (not "Info page"); "Move to Trash" for apps,
   "Uninstall" for things that are uninstalled; never "…" after Move to
   Trash; "Version 1.2" in the normal font.
@@ -365,6 +370,44 @@ check runs. Run only the Discover tests that don't touch the data folder
 (the filter list in this session's commands); the full suite needs Nick's
 OK. Clicking the rainbow strip on Updates replays the rename pop-up, so no
 preference reset is needed to see it.
+
+**Round 8 (Nick, 2 Nov 2026, after the handoff notes):** list rows back on
+glass, every delete button red tinted glass, Settings' and the GitHub
+sheet's dropdowns and plain buttons in glass, the GitHub sheet closes with
+the circle. Adoption for apps nothing manages is built ("Can adopt" on
+Installed, the review sheet, Settings → Homebrew adoption) but can't be
+seen in a test build while the 1.8.0 agent rewrites `state.json` without
+2.0's fields; checking it needs the agent paused (ask Nick).
+
+**Round 9 plan (Nick, 2 Nov 2026), not built; waiting for Nick's OK.**
+One build:
+1. **Installed tags:** status pills never wrap or cut off ("Update to
+   3.0.0-beta.5" wrapped to two lines, "Update to 22.23.4_2" was cut);
+   pills stay one line at their own width, and the tag column sizes to
+   them. When a card or row has no line under the name, the name gets that
+   room (up to two lines on cards).
+2. **App Store apps found by their App Store receipt** (Creator Studio
+   apps showed as Not managed): `mas list` names them "Pages", "Keynote",
+   and so on, while the apps are "Pages Creator Studio.app"; match on the
+   bundle's own name (CFBundleName / display name) among apps with an
+   `_MASReceipt`, so they count as App Store apps. Unit test for the match.
+3. **Update at once:** one glass pill with − number + inside it (a shared
+   `GlassStepper`), not the system stepper.
+4. **Glass menus' text** in primary colour (it read grey, e.g. "5 minutes").
+5. **Settings top bar like the other pages:** the pinned glass header holds
+   a search field (and Check for Updates); the PrismPack name and version
+   become the first section of the form. **Search** filters Settings to
+   the sections and rows whose words match.
+6. **Activity:** each entry on its own glass row (no broken bubble); kinds
+   in their own colours (Updated green, Installed blue, Removed pink,
+   Failed red, Skipped grey, Checked purple-free neutral; one table); the
+   under-row gets search, a Show menu by kind, and the date and time on
+   every row; tick entries to delete them, or Delete all. Entries stay
+   until deleted (check there's no automatic trim; if there is, show it).
+7. **Not bugs, testing setup:** Activity emptying and Zoom's missing "Can
+   adopt" come from the installed 1.8.0's agent rewriting `state.json`
+   every 5 minutes without 2.0's fields. Checking both needs the 1.8.0
+   agent paused (ask Nick; turn it back on after).
 
 **Next:** a new session starts with step 12's consistency pass across
 every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.

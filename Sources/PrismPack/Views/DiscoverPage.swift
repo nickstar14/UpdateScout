@@ -157,13 +157,12 @@ struct DiscoverPage: View {
                 }
             }
         } else {
-            VStack(spacing: 0) {
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    if index > 0 { Divider().padding(.leading, 50) }
+            // Each row on its own glass, like the cards (Nick, 2 Nov 2026).
+            LazyVStack(spacing: 6) {
+                ForEach(entries) { entry in
                     DiscoverItem(entry: entry, pkg: installed[entry.installKey], label: label(of: entry), asRow: true)
                 }
             }
-            .modifier(ListPanel(color: entries.first.map { label(of: $0).color } ?? .gray))
         }
     }
 
@@ -302,6 +301,7 @@ private struct DiscoverItem: View {
             actions.frame(minWidth: 96, alignment: .trailing)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        .modifier(SectionPanel(color: tint))
     }
 
     private var nameAndLabel: some View {

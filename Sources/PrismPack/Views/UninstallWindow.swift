@@ -152,7 +152,7 @@ private struct UninstallPanel: View {
             Button(role: .destructive) { Task { await go(look) } } label: {
                 Label(removal.actionTitle, systemImage: "trash")
             }
-            .glassProminent(.red)
+            .glassDestructive()
             .disabled(running)
         }
     }

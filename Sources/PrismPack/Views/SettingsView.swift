@@ -71,7 +71,7 @@ struct SettingsView: View {
             } else if deps.managedFormula(dep) != nil {
                 Button("Reinstall") { deps.reinstall(dep) }.glass().controlSize(.small)
                 // Red, like every removal (Nick, 2 Nov 2026).
-                Button("Remove") { confirmRemove(dep) }.glassProminent(.red).controlSize(.small)
+                Button("Remove") { confirmRemove(dep) }.glassDestructive().controlSize(.small)
             } else if dep.brewFormula != nil {
                 Text("Installed outside Homebrew").font(.caption).foregroundStyle(.secondary)
                     .help("\(AppIdentity.name) only reinstalls or removes copies Homebrew installed.")
@@ -111,6 +111,7 @@ struct SettingsView: View {
                                 ProgressView().controlSize(.small)
                             } else if dep.brewFormula != nil {
                                 Button("Install") { deps.install(dep) }
+                                    .glassProminent(SourceStyle.forSource("homebrew").color)
                             } else if let manual = dep.manualURL.flatMap(URL.init(string:)) {
                                 Link("Get…", destination: manual)
                             }
@@ -165,8 +166,10 @@ struct SettingsView: View {
                 Toggle("Install updates automatically", isOn: $autoEnabled)
                     .onChange(of: autoEnabled) { _, value in AutoUpdate.enabled = value }
                 if autoEnabled {
-                    Picker("How often", selection: $autoSchedule) {
-                        ForEach(AutoUpdate.Schedule.allCases) { Text($0.title).tag($0) }
+                    // Glass menus, like Sort on the pages (Nick, 2 Nov 2026).
+                    LabeledContent("How often") {
+                        SortMenu(selection: $autoSchedule,
+                                 options: AutoUpdate.Schedule.allCases.map { ($0, $0.title) }, help: "How often")
                     }
                     .onChange(of: autoSchedule) { _, value in AutoUpdate.schedule = value }
                     Toggle("Only on Wi-Fi or Ethernet", isOn: $autoUnmetered)
@@ -213,10 +216,9 @@ struct SettingsView: View {
                             agentStalled = LaunchAgent.isStalled
                         }
                     }
-                Picker("Check every", selection: $intervalMinutes) {
-                    ForEach(Prefs.checkIntervalChoices, id: \.self) {
-                        Text(Prefs.intervalLabel($0)).tag($0)
-                    }
+                LabeledContent("Check every") {
+                    SortMenu(selection: $intervalMinutes,
+                             options: Prefs.checkIntervalChoices.map { ($0, Prefs.intervalLabel($0)) }, help: "Check every")
                 }
                 .onChange(of: intervalMinutes) { _, minutes in
                     Prefs.checkIntervalMinutes = minutes
@@ -300,6 +302,7 @@ struct SettingsView: View {
                     Button("Open File") {
                         NSWorkspace.shared.activateFileViewerSelecting([CustomSource.configURL])
                     }
+                    .glass()
                 }
                 ForEach(customNames, id: \.self) { name in
                     Toggle("Check \(name) in the background", isOn: Binding(
@@ -425,7 +428,7 @@ private struct FullDiskAccessRow: View {
             }
             Spacer()
             if !granted {
-                Button("Allow…") { FullDiskAccess.openSettings() }
+                Button("Allow…") { FullDiskAccess.openSettings() }.glass()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

@@ -36,7 +36,7 @@ struct UninstallButton: View {
                 Button(role: .destructive) { confirm() } label: {
                     Label(title ?? removal.actionTitle, systemImage: "trash")
                 }
-                .glassProminent(.red)
+                .glassDestructive()
             }
         }
     }

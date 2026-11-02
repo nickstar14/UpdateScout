@@ -122,7 +122,9 @@ struct SortMenu<Value: Hashable>: View {
             .pickerStyle(.inline).labelsHidden()
         } label: {
             HStack(spacing: 5) {
-                Text(options.first { $0.value == selection }?.title ?? "Sort")
+                // The first option until the choice is in the list (Installed's
+                // Source menu read "Sort" while its list loaded).
+                Text(options.first { $0.value == selection }?.title ?? options.first?.title ?? help)
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12).padding(.vertical, 7)
@@ -450,7 +452,7 @@ struct LeftoverRow: View {
                 Button("Hide this one") { controller.dismissLeftover(kext) }
                     .glass().controlSize(.small)
                 Button("Remove…", role: .destructive) { confirmingRemoval = true }
-                    .glassProminent(.red).controlSize(.small)
+                    .glassDestructive().controlSize(.small)
                     .confirmationDialog("Remove \(kext.name)?", isPresented: $confirmingRemoval) {
                         Button("Remove", role: .destructive) { controller.removeLeftover(kext) }
                         Button("Cancel", role: .cancel) {}

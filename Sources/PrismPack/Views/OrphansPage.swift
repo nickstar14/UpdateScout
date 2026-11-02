@@ -108,7 +108,7 @@ struct OrphansPage: View {
                     .glass().disabled(items.isEmpty)
                     .help("Stop listing the ticked apps. Their files stay where they are.")
                 Button(role: .destructive) { confirmMove() } label: { Label("Move to Trash", systemImage: "trash") }
-                    .glassProminent(.red)
+                    .glassDestructive()
                     .disabled(items.isEmpty || moving)
             }
         }
@@ -160,7 +160,7 @@ struct OrphansPage: View {
                     Button(role: .destructive) { confirmMove(orphan.items.filter(\.movable), names: [orphan.id]) } label: {
                         Image(systemName: "trash")
                     }
-                    .glassProminent(.red).disabled(moving)
+                    .glassDestructive().disabled(moving)
                     .help("Move to Trash").accessibilityLabel("Move to Trash")
                 }
             }

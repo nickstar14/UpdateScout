@@ -113,16 +113,11 @@ struct InstalledPage: View {
                 ForEach(list) { pkg in InstalledItem(pkg: pkg, item: update(for: pkg), asRow: false) }
             }
         } else {
-            // Not lazy: the glass panel behind a lazy stack was measured
-            // before its last rows were, so its bottom edge drew in the
-            // wrong place (Nick, 2 Nov 2026).
-            VStack(spacing: 0) {
-                ForEach(Array(list.enumerated()), id: \.element.id) { index, pkg in
-                    if index > 0 { Divider().padding(.leading, 50) }
-                    InstalledItem(pkg: pkg, item: update(for: pkg), asRow: true)
-                }
+            // Each row on its own glass, like the cards: one tall glass panel
+            // drew a false edge where the window cut it off (Nick, 2 Nov 2026).
+            LazyVStack(spacing: 6) {
+                ForEach(list) { pkg in InstalledItem(pkg: pkg, item: update(for: pkg), asRow: true) }
             }
-            .modifier(ListPanel(color: .gray))
         }
     }
 }
@@ -294,6 +289,7 @@ private struct InstalledItem: View {
             actions.frame(minWidth: 96, alignment: .trailing)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        .modifier(SectionPanel(color: color.opacity(0.35)))
     }
 
     @ViewBuilder
