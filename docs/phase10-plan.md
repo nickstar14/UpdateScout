@@ -296,7 +296,7 @@ Step 3 and the fixes are committed (`1e7cf0b`).
   only for copies Homebrew installed (versioned formulae like `node@22`
   included); Homebrew itself links to its own uninstall steps.
 
-## Status at handoff (2 Nov 2026, end of this session)
+## Status at handoff (2 Nov 2026; patterns updated after rounds 9-11)
 
 **Consistency is the first rule from here on (Nick).** Before adding or
 changing anything, match what's below; when something new doesn't fit,
@@ -341,6 +341,19 @@ ask Nick rather than invent a new pattern.
   "Uninstall" for things that are uninstalled; never "…" after Move to
   Trash; "Version 1.2" in the normal font.
 - **Motion:** pages, Discover's parts and Cards / List fade in 0.14 s.
+- **Numbers:** `GlassStepper` (− n + on one glass capsule), never the
+  system stepper.
+- **Tags:** never wrap (`StatusPill` is one line at its own width).
+- **Refresh arrows** spin while working and aren't greyed out (Updates'
+  Check Now, Installed's Refresh, Orphaned App Files' Rescan).
+- **Settings** is a page like the others: full width, search and Check
+  for Updates in the pinned header, name and version as the first card.
+- **Pop-ups** stay arrow pop-ups (Nick chose this over sheets); Updates'
+  and Installed's are 540 wide.
+- **Anything that moves a user's app** (duplicates, Use Homebrew's copy,
+  Move to Homebrew) asks first naming the folders, re-checks right
+  before acting (not open, the kept copy whole, never the last copy),
+  and puts things back if a step fails. Nick: "airtight".
 
 **Done in Phase 10:** steps 1 to 4; most of step 5 (one pop-up layout on
 Updates, Installed and Discover; the beta offer is still the Stable / Beta
@@ -536,6 +549,15 @@ Outlook (2 Nov, 11:58): moved to Homebrew; the old app went to the Trash
 and Microsoft's 1.2 GB installer ran for about a minute, so Outlook was
 missing meanwhile. Installed and working (Nick confirmed). Its data folder
 was never touched.
+
+**Open items from rounds 9-11** (not bugs found in code, just unchecked):
+Activity rows, colours, ticking and deleting (needs the 1.8.0 agent
+paused; ask Nick); Creator Studio apps as App Store (none on this Mac);
+linking a GitHub project end to end; moving a Homebrew-installed duplicate
+copy; the put-back path of Use Homebrew's copy; the list-order fix in
+`loadInstalled` (in `44b7156`, compiled, not seen in a build). Nick's
+RoTools is ad-hoc signed: it can be linked after the warning once he
+pastes its project link.
 
 **Next:** a new session starts with step 12's consistency pass across
 every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.

@@ -121,6 +121,18 @@ Phase 9 (leftover cleanup) has its own record in
   checks afterwards; keep that. App-group folders are never moved, and
   nothing with `com.apple.` anywhere in its name is touched: a stuck Apple
   container can make the Trash impossible to empty.
+- **Moving a user's app must be airtight (Nick, 2 Nov 2026).** Duplicates
+  are grouped by bundle ID; two copies share one ID, so "is it open" is
+  checked by path (`Duplicates.isRunning`), never by bundle ID. Every move
+  goes through `Duplicates.refusal` right before acting. Test moves only on
+  throwaway dummy apps (a minimal `.app` with its own bundle ID in
+  `~/Applications`), never on Nick's apps without his go-ahead.
+- **Testing Installed from the background:** menus can't be opened, so the
+  Source filter can only be changed with
+  `defaults write com.nickszun.updatescout installedSource ""` (Nick's own
+  setting is `unmanaged`: put it back). Installed takes about 20 s to load
+  (it calls `brew info`). An `NSAlert` opens as its own window: find it with
+  `app_list_windows`.
 - **Liquid Glass:** `build-app.sh` patches the linked-SDK version so AppKit
   uses the new UI. Use the `.glass()` and `.glassProminent(_:)` helpers and
   `GlassBackground` from `Views/Style.swift`.
