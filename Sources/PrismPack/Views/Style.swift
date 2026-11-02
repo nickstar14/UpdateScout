@@ -663,6 +663,48 @@ private struct SelectionBubble: View {
     }
 }
 
+// MARK: - Stepper
+
+/// A number with − and + on one Liquid Glass capsule, like the search
+/// field, in place of the system stepper (Nick, 2 Nov 2026). Each end greys
+/// out at its limit.
+struct GlassStepper: View {
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+
+    var body: some View {
+        HStack(spacing: 2) {
+            step("minus", by: -1, enabled: value > range.lowerBound, tip: "Fewer")
+            Text("\(value)").font(.callout.weight(.semibold)).monospacedDigit()
+                .frame(minWidth: 22)
+            step("plus", by: 1, enabled: value < range.upperBound, tip: "More")
+        }
+        .padding(.horizontal, 4).padding(.vertical, 3)
+        .background { GlassCapsule() }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityValue("\(value)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: value = min(value + 1, range.upperBound)
+            case .decrement: value = max(value - 1, range.lowerBound)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func step(_ symbol: String, by delta: Int, enabled: Bool, tip: String) -> some View {
+        Button { value = min(max(value + delta, range.lowerBound), range.upperBound) } label: {
+            Image(systemName: symbol).font(.caption.weight(.semibold))
+                .frame(width: 22, height: 20).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? .primary : .tertiary)
+        .disabled(!enabled)
+        .help(tip)
+    }
+}
+
 // MARK: - Search field
 
 /// A search box on a Liquid Glass capsule: magnifying glass, plain text

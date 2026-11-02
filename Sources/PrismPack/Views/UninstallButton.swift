@@ -34,7 +34,7 @@ struct UninstallButton: View {
                                color: error == "Needs admin" ? .orange : .red).help(error)
                 }
                 Button(role: .destructive) { confirm() } label: {
-                    Label(title ?? removal.actionTitle, systemImage: "trash")
+                    Label(title ?? removal.actionTitle, systemImage: "trash").fixedSize()
                 }
                 .glassDestructive()
             }

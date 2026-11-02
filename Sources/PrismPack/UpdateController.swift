@@ -43,7 +43,12 @@ final class UpdateController: ObservableObject {
         guard !loadingInstalled else { return }
         loadingInstalled = true
         Task {
-            installed = await Inventory.load()
+            let list = await Inventory.load()
+            // Here too, not only after a check, and before the list shows:
+            // stale duplicates hid Homebrew's Flux right after a switch, and
+            // Show Duplicates read "Nothing matches" (Nick, 2 Nov 2026).
+            duplicates = await Duplicates.scan(records: await Duplicates.caskRecords())
+            installed = list
             loadingInstalled = false
             if separateBetas.isEmpty, installed.contains(where: { $0.detail?.hasPrefix("cask ") == true }) {
                 separateBetas = await CaskIndex.separateBetas()
@@ -120,6 +125,10 @@ final class UpdateController: ObservableObject {
 
     func clearActivity() {
         state = Store.mutate { $0.activity.removeAll() }
+    }
+
+    func deleteActivity(_ ids: Set<UUID>) {
+        state = Store.mutate { $0.activity.removeAll { ids.contains($0.id) } }
     }
 
     private func log(_ entry: ActivityEntry) {
@@ -408,6 +417,129 @@ final class UpdateController: ObservableObject {
 
     /// "Stop managing with Homebrew" for an adopted app, or a duplicate's
     /// "Stop Homebrew tracking it". Removes Homebrew's record only.
+    /// Copy path → "Moving…" or why it wasn't moved, for the duplicates pop-up.
+    @Published var duplicateMoves: [String: String] = [:]
+
+    /// The Homebrew cask whose app is this copy, if any.
+    func cask(at path: String) -> String? {
+        installed.first { $0.appPath?.lowercased() == path.lowercased() && $0.detail?.hasPrefix("cask ") == true }
+            .flatMap { $0.detail.map { String($0.dropFirst(5)) } }
+    }
+
+    /// Moves one copy of a duplicated app to the Trash, keeping `kept`.
+    /// The safety checks run again right here, so a copy that was opened or
+    /// a kept copy that went missing since the pop-up drew stops it. When
+    /// Homebrew installed this copy, its record goes too, so it doesn't put
+    /// the app back on its next update.
+    func moveDuplicateCopy(_ path: String, keeping kept: String, name: String) {
+        if let why = Duplicates.refusal(moving: path, keeping: kept) {
+            duplicateMoves[path] = why
+            return
+        }
+        let cask = cask(at: path)
+        duplicateMoves[path] = "Moving…"
+        Task {
+            do {
+                _ = try await Adopter.trash(path, name: name)
+                // macOS has reported a Trash move as done while the folder stayed.
+                guard !FileManager.default.fileExists(atPath: path) else {
+                    throw PrismPackError.commandFailed("Move to Trash", output: "macOS didn't move \(path).")
+                }
+                var detail = "Copy in \(Duplicates.folder(of: path)) moved to the Trash"
+                if let cask {
+                    do { try await Adopter.removeRecord(cask); detail += "; Homebrew stopped tracking it" }
+                    catch { detail += "; Homebrew's record stayed (\(error.localizedDescription))" }
+                }
+                state = Store.mutate { $0.log(ActivityEntry(kind: .removed, title: name, detail: detail)) }
+                duplicateMoves[path] = nil
+                loadInstalled()
+            } catch {
+                duplicateMoves[path] = error.localizedDescription
+            }
+        }
+    }
+
+    /// Group id → progress or why it stopped, for "Use Homebrew's copy".
+    @Published var homebrewSwitches: [String: String] = [:]
+
+    /// "Use Homebrew's copy" (Nick, 2 Nov 2026): quit any other copy that's
+    /// open, move every other copy to the Trash, and open Homebrew's copy
+    /// in its place if one was open. Nothing changes if a copy won't quit;
+    /// if Homebrew's copy won't open, the moved copies are put back.
+    func useHomebrewCopy(_ group: DuplicateGroup, brewPath: String) {
+        let others = ([group.keep] + group.extras).filter { $0 != brewPath }
+        for path in others {
+            if let why = Duplicates.refusal(moving: path, keeping: brewPath, allowOpen: true) {
+                homebrewSwitches[group.id] = why
+                return
+            }
+        }
+        let name = group.name
+        homebrewSwitches[group.id] = "Starting…"
+        Task {
+            let open = others.filter(Duplicates.isRunning)
+            if !open.isEmpty {
+                homebrewSwitches[group.id] = "Quitting \(name)…"
+                for app in NSWorkspace.shared.runningApplications {
+                    if let url = app.bundleURL, open.contains(where: { $0.lowercased() == url.standardizedFileURL.path.lowercased() }) {
+                        app.terminate()
+                    }
+                }
+                for _ in 0..<20 where open.contains(where: Duplicates.isRunning) {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                if open.contains(where: Duplicates.isRunning) {
+                    homebrewSwitches[group.id] = "\(name) didn't quit, so nothing was changed. Quit it yourself, then try again."
+                    return
+                }
+            }
+            var moved: [(from: String, to: URL)] = []
+            do {
+                for path in others {
+                    homebrewSwitches[group.id] = "Moving the copy in \(Duplicates.folder(of: path)) to the Trash…"
+                    // Checked again right before each move.
+                    if let why = Duplicates.refusal(moving: path, keeping: brewPath) {
+                        throw PrismPackError.commandFailed("Use Homebrew's copy", output: why)
+                    }
+                    let to = try await Adopter.trash(path, name: name)
+                    guard !FileManager.default.fileExists(atPath: path) else {
+                        throw PrismPackError.commandFailed("Move to Trash", output: "macOS didn't move \(path).")
+                    }
+                    moved.append((path, to))
+                }
+                if !open.isEmpty {
+                    homebrewSwitches[group.id] = "Opening Homebrew's copy…"
+                    let config = NSWorkspace.OpenConfiguration()
+                    _ = try? await NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: brewPath), configuration: config)
+                    for _ in 0..<20 where !Duplicates.isRunning(brewPath) {
+                        try? await Task.sleep(for: .milliseconds(500))
+                    }
+                    guard Duplicates.isRunning(brewPath) else {
+                        throw PrismPackError.commandFailed("Use Homebrew's copy", output: "Homebrew's copy of \(name) didn't open.")
+                    }
+                }
+                let folders = moved.map { Duplicates.folder(of: $0.from) }.joined(separator: ", ")
+                state = Store.mutate {
+                    $0.log(ActivityEntry(kind: .removed, title: name,
+                                         detail: "Switched to Homebrew's copy; the copy in \(folders) moved to the Trash"))
+                }
+                homebrewSwitches[group.id] = nil
+                loadInstalled()
+            } catch {
+                // Put back whatever was moved.
+                var restored = true
+                for item in moved.reversed() where !(await Adopter.restore(item.to, to: item.from)) { restored = false }
+                homebrewSwitches[group.id] = error.localizedDescription
+                    + (moved.isEmpty ? "" : restored ? " The moved copy was put back." : " Put the moved copy back from the Trash.")
+                if !open.isEmpty, restored, let first = open.first {
+                    _ = try? await NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: first),
+                                                                       configuration: NSWorkspace.OpenConfiguration())
+                }
+                loadInstalled()
+            }
+        }
+    }
+
     func stopManaging(cask: String, appPath: String, name: String) {
         update(Adopter.Job(action: "untrack", cask: cask, appPath: appPath).item(name: name))
     }

@@ -33,6 +33,10 @@ enum Inventory {
     /// folders avoids `brew list --cask`, which refuses to run at all while
     /// any untrusted tap is installed.
     private static func homebrew() async -> [InstalledPackage] {
+        // What each cask says it installs, for a cask named unlike its app
+        // ("flux-app" installs Flux.app; Nick, 2 Nov 2026).
+        let caskApps = Dictionary(await Duplicates.caskRecords().map { ($0.token, $0.apps) },
+                                  uniquingKeysWith: { a, _ in a })
         let fm = FileManager.default
         var found: [InstalledPackage] = []
         for prefix in ["/opt/homebrew", "/usr/local"] {
@@ -45,7 +49,9 @@ enum Inventory {
                     let tool = !isCask && Tools.isTool(formula: name)
                     // A cask's app, found by token, so it isn't listed twice
                     // and shows its real name and icon.
-                    let app = isCask ? (AppLocator.find(named: name) ?? AppLocator.findUnique(prefix: name)) : nil
+                    let app = isCask ? (AppLocator.find(named: name)
+                        ?? caskApps[name]?.lazy.compactMap { AppLocator.find(named: ($0 as NSString).deletingPathExtension) }.first
+                        ?? AppLocator.findUnique(prefix: name)) : nil
                     found.append(InstalledPackage(
                         name: app.map { (fm.displayName(atPath: $0) as NSString).deletingPathExtension } ?? name,
                         version: version, sourceID: tool ? "tools" : "homebrew", appPath: app,
@@ -59,12 +65,42 @@ enum Inventory {
     private static func appStore() async -> [InstalledPackage] {
         guard let mas = Shell.which("mas"), let result = try? await Shell.run(mas, ["list"]) else { return [] }
         let pattern = #/^\s*(\d+)\s+(.+?)\s+\(([^)]*)\)\s*$/#
+        let receipted = appStoreApps()
         return result.stdout.split(separator: "\n").compactMap { line in
             guard let m = line.firstMatch(of: pattern) else { return nil }
             let name = String(m.2)
             return InstalledPackage(name: name, version: String(m.3), sourceID: "mas",
-                                    appPath: AppLocator.find(named: name))
+                                    appPath: AppLocator.find(named: name) ?? masMatch(name, among: receipted))
         }
+    }
+
+    /// Apps with an App Store receipt, with the names their bundles give
+    /// (CFBundleDisplayName, CFBundleName).
+    private static func appStoreApps() -> [(path: String, names: [String])] {
+        let fm = FileManager.default
+        return AppFolders.appPaths().compactMap { path in
+            guard fm.fileExists(atPath: path + "/Contents/_MASReceipt"),
+                  let data = fm.contents(atPath: path + "/Contents/Info.plist"),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+            else { return nil }
+            return (path, ["CFBundleDisplayName", "CFBundleName"].compactMap { plist[$0] as? String })
+        }
+    }
+
+    /// An Apple app updated with macOS: Apple's bundle id, no App Store receipt.
+    static func isMacOSApp(bundleID: String?, hasReceipt: Bool) -> Bool {
+        !hasReceipt && (bundleID?.hasPrefix("com.apple.") ?? false)
+    }
+
+    /// The receipted app whose bundle calls itself `name`. `mas list` gives
+    /// the bundle's name ("Pages") while the app on disk can be named
+    /// otherwise ("Pages Creator Studio.app"), which left those apps showing
+    /// as Not managed (Nick, 2 Nov 2026). Only a single match counts.
+    static func masMatch(_ name: String, among apps: [(path: String, names: [String])]) -> String? {
+        let hits = apps.filter { app in
+            app.names.contains { $0.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+        }
+        return hits.count == 1 ? hits[0].path : nil
     }
 
     private static func pythonTools() async -> [InstalledPackage] {
@@ -150,8 +186,13 @@ enum Inventory {
             let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
             let version = plist["CFBundleShortVersionString"] as? String ?? plist["CFBundleVersion"] as? String ?? "?"
             let sparkle = plist["SUFeedURL"] != nil
-            let source = github.contains(path.lowercased()) ? "github" : sparkle ? "sparkle" : "unmanaged"
-            found.append(InstalledPackage(name: name, version: version, sourceID: source, appPath: path))
+            // Apple's own apps outside the App Store (Safari and the like)
+            // come with macOS and its updates (Nick, 2 Nov 2026).
+            let apple = isMacOSApp(bundleID: plist["CFBundleIdentifier"] as? String,
+                                   hasReceipt: fm.fileExists(atPath: path + "/Contents/_MASReceipt"))
+            let source = github.contains(path.lowercased()) ? "github" : sparkle ? "sparkle" : apple ? "macos" : "unmanaged"
+            found.append(InstalledPackage(name: name, version: version, sourceID: source, appPath: path,
+                                          detail: apple ? "Updated by macOS" : nil))
         }
         return found
     }

@@ -24,7 +24,7 @@ struct Store {
         var ignoredApps: Set<String> = []
         /// "Ignore major upgrades only", same key. Minor updates still show.
         var ignoredMajors: Set<String> = []
-        /// What happened, newest first, capped at `activityLimit`.
+        /// What happened, newest first. Kept until deleted (Nick, 2 Nov 2026).
         var activity: [ActivityEntry] = []
         /// Apps Homebrew could take over (Phase 7), from the last check.
         var adoptionCandidates: [AdoptionCandidate] = []
@@ -42,7 +42,6 @@ struct Store {
         /// App Store apps Homebrew could install instead: app path → cask token.
         var storeSwitches: [String: String] = [:]
 
-        static let activityLimit = 200
 
         init() {}
 
@@ -94,7 +93,6 @@ struct Store {
 
         mutating func log(_ entry: ActivityEntry) {
             activity.insert(entry, at: 0)
-            if activity.count > Self.activityLimit { activity.removeLast(activity.count - Self.activityLimit) }
         }
     }
 
@@ -359,7 +357,7 @@ struct Lossy<T: Decodable>: Decodable {
 
 /// One line in the Activity tab.
 struct ActivityEntry: Codable, Equatable, Identifiable {
-    enum Kind: String, Codable { case updated, installed, removed, failed, skipped, cancelled, checked, adopted }
+    enum Kind: String, Codable, CaseIterable { case updated, installed, removed, failed, skipped, cancelled, checked, adopted }
     var id = UUID()
     var date = Date()
     let kind: Kind

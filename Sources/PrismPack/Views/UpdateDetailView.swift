@@ -27,6 +27,9 @@ struct UpdateDetailView: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             notesSection
+            if let path = item.appPath, let group = controller.duplicateGroup(for: path), group.kind == .twoCopies {
+                DuplicateCompare(group: group)
+            }
             Divider()
             // Clear groups with even spacing, not squeezed rows (Nick, 2 Nov 2026).
             ignoreGroup
@@ -35,7 +38,9 @@ struct UpdateDetailView: View {
             footer
         }
         .padding(20)
-        .frame(width: 500)
+        // Wide enough for all four footer buttons in full ("Show in Fin…"
+        // was cut on Sparkle apps; Nick, 2 Nov 2026).
+        .frame(width: 540)
         .popupClose()
         // Uninstall needs the Installed list to know how the item got here.
         .onAppear { if controller.installed.isEmpty, !controller.loadingInstalled { controller.loadInstalled() } }
@@ -178,7 +183,7 @@ struct UpdateDetailView: View {
                 Button {
                     NSWorkspace.shared.open(url)
                 } label: {
-                    Label("Website", systemImage: "safari")
+                    Label("Website", systemImage: "safari").fixedSize()
                 }
                 .glass()
             }
@@ -186,12 +191,14 @@ struct UpdateDetailView: View {
                 Button {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
                 } label: {
-                    Label("Show in Finder", systemImage: "folder")
+                    Label("Show in Finder", systemImage: "folder").fixedSize()
                 }
                 .glass()
             }
             Spacer()
-            if !controller.isBusy(item), let pkg = controller.installedPackage(for: item), let removal = Removal(pkg) {
+            // Duplicates have a Move to Trash on each copy instead.
+            if !controller.isBusy(item), let pkg = controller.installedPackage(for: item), let removal = Removal(pkg),
+               item.appPath.flatMap({ controller.duplicateGroup(for: $0) })?.kind != .twoCopies {
                 UninstallButton(removal: removal, updateID: item.id)
             }
             if !controller.isBusy(item) && !controller.isIgnored(item) {

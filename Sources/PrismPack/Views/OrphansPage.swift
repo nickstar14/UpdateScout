@@ -73,8 +73,13 @@ struct OrphansPage: View {
         .navigationSubtitle(orphans.map { "\($0.count) app\($0.count == 1 ? "" : "s")" } ?? "")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { Task { await scan() } } label: { Label("Rescan", systemImage: "arrow.clockwise") }
-                    .disabled(scanning || moving)
+                // Spins while scanning and isn't greyed out, like Check Now
+                // on Updates (Nick, 2 Nov 2026).
+                Button { if !scanning && !moving { Task { await scan() } } } label: {
+                    Label(scanning ? "Scanning…" : "Rescan", systemImage: "arrow.clockwise")
+                        .symbolEffect(.rotate, options: .repeat(.continuous), isActive: scanning)
+                }
+                .help(scanning ? "Scanning…" : "Scan again")
             }
         }
         .task { if orphans == nil { await scan() } }

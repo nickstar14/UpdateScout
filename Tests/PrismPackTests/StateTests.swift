@@ -21,12 +21,10 @@ struct StateTests {
         #expect(back.activity.first?.title == "z3 5.3.2 to 5.3.3")
     }
 
-    @Test func activityIsCapped() {
+    @Test func activityIsKeptUntilDeleted() {
         var state = Store.State()
-        for i in 0..<(Store.State.activityLimit + 20) {
-            state.log(ActivityEntry(kind: .checked, title: "\(i)"))
-        }
-        #expect(state.activity.count == Store.State.activityLimit)
-        #expect(state.activity.first?.title == "\(Store.State.activityLimit + 19)")
+        for i in 0..<250 { state.log(ActivityEntry(kind: .checked, title: "\(i)")) }
+        #expect(state.activity.count == 250)
+        #expect(state.activity.first?.title == "249")
     }
 }

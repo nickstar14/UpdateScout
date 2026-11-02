@@ -409,6 +409,134 @@ One build:
    every 5 minutes without 2.0's fields. Checking both needs the 1.8.0
    agent paused (ask Nick; turn it back on after).
 
+**Round 9 built (2 Nov 2026), not committed.** Nick's choices: Activity
+colours Updated blue, Installed green (green means installed everywhere),
+Removed red, Failed pink, Skipped and Cancelled grey, Checked graphite,
+Adopted Homebrew's colour; the 200-entry cap is gone (entries stay until
+deleted); tick boxes with "Delete N" / "Delete All" (asks first) in the
+control row; full date and time on every row. Settings search matches
+section names, setting names and explanations; "No settings match" when
+empty. Status pills never wrap anywhere (`StatusPill` is one line at its
+own width). Added in the same build at Nick's request: the Sparkle
+pop-up's footer buttons no longer cut off (Update pop-up 540 wide, labels
+at full width); casks named unlike their app ("flux-app" → Flux.app) are
+tied to it from `brew info`; duplicates are worked out when Installed
+loads, not only after a check (Flux's two copies showed no tag); a "Link
+to GitHub…" row on Not managed apps' pop-ups opens the Settings link
+window with the app chosen (an unsigned app says it can't be linked). Pop-ups
+keep the arrow style (Nick); macOS still picks the side by room.
+
+Checked in the test build: Installed tags one line ("Update to 22.23.4_2"),
+rows with no detail line, menu text dark, Flux tied to its cask with
+Duplicate on both copies (light and dark), Thaw's pop-up footer, the GitHub
+window on qView (unsigned message), Settings header, search ("dock",
+"theme"), the glass stepper, Activity's controls (empty page) in light and
+dark; Theme set back to Light. Tests: the 7 Discover tests, the new App
+Store match tests and `activityIsKeptUntilDeleted` pass.
+**Not verified:** Activity rows, colours, ticking and deleting (Activity is
+empty while the 1.8.0 agent rewrites `state.json`; needs it paused);
+Creator Studio apps as App Store (no such app here to see); linking a
+signed app end to end (writes the real `github_sources.json`); Delete All's
+confirmation.
+
+**Round 10 plan (Nick, 2 Nov 2026), approved and built (see below).** One build:
+1. **Duplicates you choose between.** Installed shows one row per
+   duplicated app (tag "2 copies"), not one row per copy. Its pop-up
+   compares the copies side by side: folder, version, size, times opened
+   and last opened (macOS's own counts), and "Open now" on a running copy.
+   The suggestion goes to the copy that's open, then the one opened most;
+   the user picks which to move to the Trash. Rules that can't be skipped:
+   never the copy that's open (checked by its path at the moment of the
+   move), never the last copy, the copy kept must still be there and
+   intact, and a confirmation names the folder being moved. Data folders
+   are shared by both copies and never touched; the pop-up says so.
+   Found: Flux runs from ~/Applications (31 opens) while the old rule
+   kept /Applications (6 opens).
+2. **Apple's own apps** (Safari and the like: `com.apple.` IDs with no
+   App Store receipt) show as **macOS**, updated by Software Update, not
+   Not managed.
+3. **GitHub linking:** unsigned (ad-hoc) apps can be linked after a clear
+   warning (only the app's ID is checked; anyone who takes over the GitHub
+   project could ship a bad update). The window: the app list includes
+   unsigned apps (marked); choosing an app searches GitHub straight away
+   and lists matching projects in a search menu, the best one that checks
+   out chosen for you; you can search other words or paste a link.
+4. **Consistency:** Settings full width like the other pages; Activity
+   gets the sort direction arrow (Newest first / Oldest first); the
+   refresh arrows on Installed and Orphaned App Files spin while working
+   and aren't greyed out, like Check Now on Updates.
+
+**Round 10 built (2 Nov 2026), not committed.** As planned, plus: the
+pop-up's own Move to Trash is hidden for duplicates (each copy has its
+own); Installed's pop-up is 540 wide like Updates'; Apple's apps can't be
+removed from here; an unsigned link never runs an installer package, only
+an app download with the same ID. Checked in the test build: Flux as one
+row ("2 copies"), its pop-up comparing ~/Applications (open now, 31 opens,
+suggested) and /Applications (6 opens, Homebrew), the open copy's button
+greyed out; a real move on a throwaway app (two copies in ~/Applications):
+confirmation named both folders, the chosen copy went to the Trash and the
+list dropped to one; Safari as macOS; RoTools in the GitHub window
+(preselected, "not signed", warning and trust box, search ran by itself,
+none of the top three was Nick's project); Settings full width; Activity's
+sort arrow; the Installed refresh arrow spinning; light and dark, Theme
+back to Light. Tests: 14 pass (7 Discover, App Store match, duplicate
+choice, macOS apps, Activity). **Not verified:** linking a project end to
+end (writes the real `github_sources.json`); moving a Homebrew-installed
+copy (also drops Homebrew's record); Orphaned App Files' Rescan spin;
+Activity rows (agent).
+
+**Round 11 plan (Nick, 2 Nov 2026), approved and built (see below).** One build:
+**"Use Homebrew's copy"** for duplicates where one copy is Homebrew's.
+- **Where:** the duplicates comparison in the pop-up, under the copies,
+  shown only when one copy is Homebrew's and another isn't. Glass button in
+  Homebrew's colour (it installs from Homebrew), like the other Homebrew
+  actions.
+- **Confirmation** (asks first, names the folders):
+  "Use Homebrew's copy of Flux?" / "Flux in ~/Applications moves to the
+  Trash and the copy in /Applications, which Homebrew keeps, is the one you
+  use from now on. Settings and data are shared and stay put. [If open:]
+  Flux is open: it quits now and Homebrew's copy opens in its place. If
+  Flux opens at login, turn that on again in Flux once it's open."
+  Buttons: "Use Homebrew's Copy", "Cancel".
+- **Steps,** shown as progress on the button: quit the running copy (stop
+  if it doesn't quit within 10 s, nothing changed); the same checks as
+  every duplicate move (Homebrew's copy there and whole, same app ID,
+  never the last copy); move each other copy to the Trash; if one was open,
+  open Homebrew's copy and wait for it to run. If it doesn't open, put the
+  moved copy back from the Trash and say so.
+- **After:** one row for the app, tagged Homebrew; Activity logs
+  "Switched to Homebrew's copy" with the folder moved.
+- **Not changed:** single apps keep "Move to Homebrew…"; App Store copies
+  are never offered this; login items aren't touched (macOS keeps them by
+  location; the confirmation tells the user).
+- **Test:** throwaway only (a dummy app as a fake cask copy is not
+  possible without Homebrew, so the flow is tested with two dummy copies
+  and the Homebrew check stubbed in a pure test; the button is checked
+  visually on Flux without pressing it).
+
+**Round 11 built (2 Nov 2026), not committed.** "Use Homebrew's copy" as
+planned (`UpdateController.useHomebrewCopy`, `Duplicates.homebrewCopy`).
+Checked in the test build: Flux's pop-up shows "Keep only Homebrew's copy"
+with the button in Homebrew's colour, in light and dark; the confirmation
+reads as planned (names both folders, says Flux quits and Homebrew's copy
+opens, the login note); Cancel left both copies and the running Flux
+untouched. Tests: `HomebrewCopyTests` (offered only with exactly one
+Homebrew copy and no App Store copy) plus the earlier 14, all pass.
+**Pressed for real on Flux (Nick's go-ahead, 2 Nov 2026):** the
+~/Applications copy quit and went to the Trash, Homebrew's /Applications
+copy opened and runs, Activity logged "Switched to Homebrew's copy",
+Homebrew still tracks flux-app, and Installed shows one Flux row
+(Homebrew). The put-back path (Homebrew's copy won't open) wasn't
+exercised. Found and fixed after: Installed published the list before
+the duplicate rescan, so Homebrew's Flux was briefly hidden and Show
+Duplicates read "Nothing matches"; duplicates are now worked out first
+(compiled, not yet seen in a build).
+
+Outlook (2 Nov, 11:58): moved to Homebrew; the old app went to the Trash
+and Microsoft's 1.2 GB installer ran for about a minute, so Outlook was
+missing meanwhile. Installed and working (Nick confirmed). Its data folder
+was never touched.
+
 **Next:** a new session starts with step 12's consistency pass across
 every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.
 

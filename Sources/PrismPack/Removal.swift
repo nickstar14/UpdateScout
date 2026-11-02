@@ -75,6 +75,9 @@ struct Removal: Hashable, Sendable {
             let id = pkg.name.split(separator: " ").first.map(String.init) ?? pkg.name
             guard let editor = EditorExtensionsSource.editors().first(where: { $0.name == pkg.detail }) else { return nil }
             self.init(token: "ext-\(editor.key):\(id)", name: pkg.name)
+        case "macos":
+            // Apple's own apps come with macOS: never offered for removal.
+            return nil
         default:
             // App Store, Sparkle and unmanaged apps go to the Trash.
             guard let path = pkg.appPath, !Self.isSelf(path) else { return nil }

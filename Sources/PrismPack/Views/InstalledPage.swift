@@ -40,7 +40,12 @@ struct InstalledPage: View {
     private func update(for pkg: InstalledPackage) -> UpdateItem? { controller.update(for: pkg) }
 
     private var shown: [InstalledPackage] {
+        // One row per duplicated app: the other copies are compared in its
+        // pop-up (Nick, 2 Nov 2026).
+        let extras = Set(controller.duplicates.filter { $0.kind == .twoCopies }
+            .flatMap(\.extras).map { $0.lowercased() })
         let list = controller.installed.filter { pkg in
+            if let path = pkg.appPath, extras.contains(path.lowercased()) { return false }
             if !filter.isEmpty, !pkg.name.localizedCaseInsensitiveContains(filter) { return false }
             if !source.isEmpty, pkg.sourceID != source { return false }
             let item = update(for: pkg)
@@ -89,8 +94,13 @@ struct InstalledPage: View {
         .navigationSubtitle("\(controller.installed.count) items")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { controller.loadInstalled() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    .disabled(controller.loadingInstalled)
+                // Spins while reading and isn't greyed out, like Check Now
+                // on Updates (Nick, 2 Nov 2026).
+                Button { controller.loadInstalled() } label: {
+                    Label(controller.loadingInstalled ? "Reading…" : "Refresh", systemImage: "arrow.clockwise")
+                        .symbolEffect(.rotate, options: .repeat(.continuous), isActive: controller.loadingInstalled)
+                }
+                .help(controller.loadingInstalled ? "Reading what's installed…" : "Read what's installed again")
             }
         }
         .onAppear {
@@ -230,11 +240,13 @@ private struct InstalledItem: View {
     let item: UpdateItem?
     let asRow: Bool
     @State private var showingDetail = false
+    @State private var linkingGitHub = false
 
     private var sectionTitle: String {
         pkg.sourceID == "unmanaged" ? "Not managed" : UpdatesPage.title(of: pkg.sourceID)
     }
     private var color: Color { pkg.sourceID == "unmanaged" ? .gray : SourceStyle.forSource(pkg.sourceID).color }
+    private var hasDetail: Bool { !(pkg.detail ?? "").isEmpty }
 
     var body: some View {
         Group {
@@ -246,7 +258,18 @@ private struct InstalledItem: View {
             if let item {
                 UpdateDetailView(item: item).environmentObject(controller)
             } else {
-                InstalledDetail(pkg: pkg, sectionTitle: sectionTitle).environmentObject(controller)
+                InstalledDetail(pkg: pkg, sectionTitle: sectionTitle) {
+                    // The link window opens from the page once the pop-up has closed.
+                    showingDetail = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { linkingGitHub = true }
+                }
+                .environmentObject(controller)
+            }
+        }
+        .sheet(isPresented: $linkingGitHub) {
+            GitHubLinkSheet(preselect: pkg.appPath) { linked in
+                GitHubApps.link(linked)
+                controller.loadInstalled()
             }
         }
     }
@@ -256,8 +279,11 @@ private struct InstalledItem: View {
             HStack(alignment: .top, spacing: 10) {
                 RowIcon(name: pkg.name, appPath: pkg.appPath, sectionID: pkg.sourceID)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(pkg.name).font(.body.weight(.semibold)).lineLimit(1)
-                    Text(pkg.detail ?? " ").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    // With no line under it, the name gets that room.
+                    Text(pkg.name).font(.body.weight(.semibold)).lineLimit(hasDetail ? 1 : 2)
+                    if hasDetail {
+                        Text(pkg.detail ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
                 VStack(alignment: .trailing, spacing: 4) { tags }
@@ -279,10 +305,13 @@ private struct InstalledItem: View {
             RowIcon(name: pkg.name, appPath: pkg.appPath, sectionID: pkg.sourceID, size: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(pkg.name).font(.body.weight(.semibold)).lineLimit(1)
-                Text(pkg.detail ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if hasDetail {
+                    Text(pkg.detail ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) { tags }.frame(width: 125, alignment: .trailing)
+            // Sized to its tags, so a long "Update to …" is never cut.
+            VStack(alignment: .trailing, spacing: 3) { tags }.frame(minWidth: 125, alignment: .trailing)
             Text(versionLine(pkg.version)).font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
                 .frame(width: 120, alignment: .leading)
@@ -295,8 +324,8 @@ private struct InstalledItem: View {
     @ViewBuilder
     private var tags: some View {
         if pkg.sourceID == "unmanaged" { StatusPill.notManaged } else { StatusPill.source(pkg.sourceID) }
-        if let path = pkg.appPath, controller.duplicateGroup(for: path) != nil {
-            StatusPill(text: "Duplicate", color: .orange)
+        if let path = pkg.appPath, let group = controller.duplicateGroup(for: path) {
+            StatusPill(text: group.kind == .twoCopies ? "\(group.extras.count + 1) copies" : "Duplicate", color: .orange)
         }
         if let item, controller.isIgnored(item) {
             StatusPill(text: "Hidden", color: .secondary)
@@ -329,6 +358,11 @@ private struct InstalledDetail: View {
     @Environment(\.dismiss) private var dismiss
     let pkg: InstalledPackage
     let sectionTitle: String
+    var linkGitHub: () -> Void = {}
+
+    private var isDuplicate: Bool {
+        pkg.appPath.flatMap { controller.duplicateGroup(for: $0) }?.kind == .twoCopies
+    }
 
     private var color: Color { pkg.sourceID == "unmanaged" ? .gray : SourceStyle.forSource(pkg.sourceID).color }
 
@@ -358,6 +392,18 @@ private struct InstalledDetail: View {
             if pkg.sourceID == "unmanaged" {
                 Text("Nothing here updates this app. It may update itself.")
                     .font(.callout).foregroundStyle(.secondary)
+                if pkg.appPath != nil {
+                    // Nick, 2 Nov 2026: a way in for apps released on GitHub.
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Update from GitHub releases").font(.callout.weight(.semibold))
+                            Text("If the app publishes its releases on GitHub.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Link to GitHub…") { linkGitHub() }.glass().fixedSize()
+                    }
+                }
             }
             if let cask, controller.selfUpdatingCasks.contains(cask) {
                 Text("This app also updates itself. Either it or Homebrew can update it.")
@@ -389,7 +435,8 @@ private struct InstalledDetail: View {
                     .glass()
                 }
                 Spacer()
-                if let removal = Removal(pkg) {
+                // Duplicates have a Move to Trash on each copy instead.
+                if let removal = Removal(pkg), !isDuplicate {
                     UninstallButton(removal: removal)
                 }
                 if let path = pkg.appPath {
@@ -399,57 +446,78 @@ private struct InstalledDetail: View {
             }
         }
         .padding(18)
-        .frame(width: 420, alignment: .leading)
+        // As wide as the Updates pop-up, so the copies compare in full.
+        .frame(width: 540, alignment: .leading)
         .popupClose()
     }
 }
 
-/// Installs, failures, skips and checks, newest first.
+/// Installs, failures, skips and checks, newest first. Kept until deleted.
 struct ActivityPage: View {
     @EnvironmentObject var controller: UpdateController
     @State private var shownLog: ActivityEntry?
+    @State private var query = ""
+    @State private var show = "all"
+    @State private var ticked: Set<UUID> = []
+    @AppStorage("activityOldestFirst") private var oldestFirst = false
+
+    private var shows: [(value: String, title: String)] {
+        [("all", "All")] + ActivityEntry.Kind.allCases.map { ($0.rawValue, $0.title) }
+    }
+
+    private var shown: [ActivityEntry] {
+        let terms = query.lowercased().split(whereSeparator: \.isWhitespace)
+        let list = oldestFirst ? controller.state.activity.reversed() : controller.state.activity
+        return list.filter { entry in
+            guard show == "all" || entry.kind.rawValue == show else { return false }
+            let text = "\(entry.title) \(entry.detail) \(entry.kind.title)".lowercased()
+            return terms.allSatisfy { text.contains($0) }
+        }
+    }
 
     var body: some View {
+        let shown = shown
         Group {
             if controller.state.activity.isEmpty {
                 ContentUnavailableView("No activity yet", systemImage: "clock.arrow.circlepath",
                                        description: Text("Installs, failures and checks that find something show up here."))
+            } else if shown.isEmpty {
+                ContentUnavailableView.search(text: query)
             } else {
-                // Each entry in its own clear Liquid Glass bubble.
                 ScrollView {
+                    // Each entry on its own small glass panel, like Installed's rows.
                     LazyVStack(spacing: 8) {
-                        ForEach(controller.state.activity) { entry in
-                            HStack(spacing: 10) {
-                                pill(entry.kind).frame(width: 84, alignment: .leading)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
-                                    Text(detail(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                Spacer(minLength: 0)
-                                if [.failed, .skipped, .cancelled].contains(entry.kind),
-                                   let id = entry.itemID, let item = controller.visibleItems.first(where: { $0.id == id }),
-                                   !controller.isBusy(item) {
-                                    Button("Retry") { controller.requestUpdate(item) }.glass().controlSize(.small)
-                                }
-                                if let log = entry.log, !log.isEmpty {
-                                    Button("Show log") { shownLog = entry }.glass().controlSize(.small)
-                                }
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                            .modifier(ClearBubble())
-                        }
+                        ForEach(shown) { entry in row(entry) }
                     }
                     .padding(16)
                 }
             }
         }
-        .navigationSubtitle("What was installed, checked and skipped")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Clear") { controller.clearActivity() }
-                    .disabled(controller.state.activity.isEmpty)
+        // Fills the page, so the controls stay at the top when it's empty.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .pinnedHeader {
+            PageControls {
+                GlassSearchField(prompt: "Search activity", text: $query)
+                HStack(spacing: 8) {
+                    SortMenu(selection: $show, options: shows, help: "Show one kind")
+                    SortDirectionButton(reversed: $oldestFirst, order: oldestFirst ? "Oldest first" : "Newest first")
+                    Spacer(minLength: 8)
+                    let selected = ticked.intersection(controller.state.activity.map(\.id))
+                    if selected.isEmpty {
+                        Button("Delete All") { confirmDeleteAll() }
+                            .glassDestructive()
+                            .disabled(controller.state.activity.isEmpty)
+                    } else {
+                        Button("Delete \(selected.count)") {
+                            controller.deleteActivity(selected)
+                            ticked.removeAll()
+                        }
+                        .glassDestructive()
+                    }
+                }
             }
         }
+        .navigationSubtitle("What was installed, checked and skipped")
         .sheet(item: $shownLog) { entry in
             VStack(alignment: .leading, spacing: 10) {
                 Text(entry.title).font(.headline)
@@ -464,34 +532,79 @@ struct ActivityPage: View {
         }
     }
 
+    private func row(_ entry: ActivityEntry) -> some View {
+        HStack(spacing: 10) {
+            Toggle("Select", isOn: Binding(
+                get: { ticked.contains(entry.id) },
+                set: { on in if on { ticked.insert(entry.id) } else { ticked.remove(entry.id) } }))
+                .toggleStyle(.checkbox).labelsHidden()
+            StatusPill(text: entry.kind.title, color: entry.kind.color).frame(width: 84, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
+                Text(detail(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if [.failed, .skipped, .cancelled].contains(entry.kind),
+               let id = entry.itemID, let item = controller.visibleItems.first(where: { $0.id == id }),
+               !controller.isBusy(item) {
+                Button("Retry") { controller.requestUpdate(item) }.glass().controlSize(.small)
+            }
+            if let log = entry.log, !log.isEmpty {
+                Button("Show log") { shownLog = entry }.glass().controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .modifier(SectionPanel(color: entry.kind.color.opacity(0.35)))
+    }
+
+    /// Date and time on every row (Nick, 2 Nov 2026), then the details.
     private func detail(_ entry: ActivityEntry) -> String {
-        var parts = [entry.detail, entry.date.formatted(.relative(presentation: .named))].filter { !$0.isEmpty }
+        var parts = [entry.date.formatted(date: .abbreviated, time: .shortened), entry.detail].filter { !$0.isEmpty }
         if let s = entry.seconds { parts.append("\(s) s") }
         return parts.joined(separator: " · ")
     }
 
-    private func pill(_ kind: ActivityEntry.Kind) -> StatusPill {
-        switch kind {
-        case .updated: StatusPill(text: "Updated", color: .green)
-        case .installed: StatusPill(text: "Installed", color: .green)
-        case .removed: StatusPill(text: "Removed", color: .secondary)
-        case .failed: StatusPill(text: "Failed", color: .red)
-        case .skipped: StatusPill(text: "Skipped", color: .orange)
-        case .cancelled: StatusPill(text: "Cancelled", color: .secondary)
-        case .checked: StatusPill(text: "Checked", color: .blue)
-        case .adopted: StatusPill(text: "Adopted", color: .teal)
+    private func confirmDeleteAll() {
+        let alert = NSAlert()
+        alert.messageText = "Delete all activity?"
+        alert.informativeText = "Every entry is deleted, with its log. This can't be undone."
+        alert.alertStyle = .warning
+        let go = alert.addButton(withTitle: "Delete All")
+        go.hasDestructiveAction = true
+        go.keyEquivalent = ""
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        if alert.runModal() == .alertFirstButtonReturn {
+            controller.clearActivity()
+            ticked.removeAll()
         }
     }
 }
 
-/// A clear Liquid Glass bubble, like the toolbar's buttons.
-struct ClearBubble: ViewModifier {
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.clear, in: shape)
-        } else {
-            content.background(.thinMaterial, in: shape)
+/// Activity's kinds: one name and one colour each, used on this page only
+/// (Nick, 2 Nov 2026). Green means installed here as everywhere else.
+extension ActivityEntry.Kind {
+    var title: String {
+        switch self {
+        case .updated: "Updated"
+        case .installed: "Installed"
+        case .removed: "Removed"
+        case .failed: "Failed"
+        case .skipped: "Skipped"
+        case .cancelled: "Cancelled"
+        case .checked: "Checked"
+        case .adopted: "Adopted"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .updated: .blue
+        case .installed: .green
+        case .removed: .red
+        case .failed: Theme.leftoverPink
+        case .skipped, .cancelled: .gray
+        case .checked: Theme.graphite
+        case .adopted: SourceStyle.forSource("homebrew").color
         }
     }
 }

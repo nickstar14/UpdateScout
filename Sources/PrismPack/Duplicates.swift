@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import CoreServices
 
 /// The same app found twice (Nick, Phase 4 decisions table). Detection only
 /// reads; every fix is a click, and anything removed goes to the Trash.
@@ -12,7 +14,8 @@ struct DuplicateGroup: Identifiable, Hashable {
 
     let kind: Kind
     let name: String
-    /// The copy to keep.
+    /// The copy suggested to keep: the one that's open, else the one opened
+    /// most (Nick, 2 Nov 2026). The user chooses; this is only the default.
     let keep: String
     /// The copies the user may move to the Trash (twoCopies only).
     let extras: [String]
@@ -36,20 +39,14 @@ enum Duplicates {
         var groups: [DuplicateGroup] = []
 
         for (_, copies) in Dictionary(grouping: apps, by: \.bundleID) where copies.count > 1 {
-            // On a version tie: /Applications itself, then a folder in it, then ~/Applications.
-            func place(_ path: String) -> Int {
-                path.hasPrefix("/Applications/") ? (AppFolders.isNested(path) ? 1 : 2) : 0
-            }
-            let keep = copies.max { a, b in
-                // The newer version wins; on a tie, the one in /Applications.
-                switch compareVersions(a.version, b.version) {
-                case .orderedAscending: return true
-                case .orderedDescending: return false
-                case .orderedSame: return place(a.path) < place(b.path)
-                }
-            }!
-            groups.append(DuplicateGroup(kind: .twoCopies, name: keep.name, keep: keep.path,
-                                         extras: copies.map(\.path).filter { $0 != keep.path }))
+            let keep = preferred(copies.map { app in
+                let use = usage(app.path)
+                return Candidate(path: app.path, version: app.version, running: isRunning(app.path),
+                                 opened: use.count)
+            })
+            let name = copies.first { $0.path == keep }?.name ?? copies[0].name
+            groups.append(DuplicateGroup(kind: .twoCopies, name: name, keep: keep,
+                                         extras: copies.map(\.path).filter { $0 != keep }))
         }
 
         let masApps = Dictionary(apps.filter(\.hasMASReceipt).map { ($0.fileName.lowercased(), $0) },
@@ -62,6 +59,92 @@ enum Duplicates {
             }
         }
         return groups.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// One copy, for choosing which to suggest keeping.
+    struct Candidate {
+        let path: String
+        let version: String
+        let running: Bool
+        let opened: Int
+    }
+
+    /// The copy that's open; else the one opened most; else the newer one;
+    /// else /Applications itself, then a folder in it, then ~/Applications.
+    static func preferred(_ copies: [Candidate]) -> String {
+        func place(_ path: String) -> Int {
+            path.hasPrefix("/Applications/") ? (AppFolders.isNested(path) ? 1 : 2) : 0
+        }
+        return copies.max { a, b in
+            if a.running != b.running { return b.running }
+            if a.opened != b.opened { return a.opened < b.opened }
+            switch compareVersions(a.version, b.version) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return place(a.path) < place(b.path)
+            }
+        }!.path
+    }
+
+    /// True when this exact copy is open (by its path, not its bundle id:
+    /// two copies share one id).
+    static func isRunning(_ path: String) -> Bool {
+        let key = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path.lowercased()
+        return NSWorkspace.shared.runningApplications.contains {
+            $0.bundleURL?.standardizedFileURL.resolvingSymlinksInPath().path.lowercased() == key
+        }
+    }
+
+    /// How often macOS has seen the app opened, and when last (Spotlight's
+    /// own counts; zero and nil when it hasn't recorded any).
+    static func usage(_ path: String) -> (count: Int, last: Date?) {
+        guard let item = MDItemCreate(kCFAllocatorDefault, path as CFString) else { return (0, nil) }
+        let count = (MDItemCopyAttribute(item, "kMDItemUseCount" as CFString) as? NSNumber)?.intValue ?? 0
+        let last = MDItemCopyAttribute(item, kMDItemLastUsedDate) as? Date
+        return (count, last)
+    }
+
+    /// Why `path` mustn't go to the Trash now, keeping `kept`; nil when it
+    /// may. Checked again at the moment of the move (Nick: airtight).
+    /// `allowOpen`: "Use Homebrew's copy" quits the copy itself first.
+    static func refusal(moving path: String, keeping kept: String, allowOpen: Bool = false) -> String? {
+        let fm = FileManager.default
+        let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        guard path.lowercased() != kept.lowercased() else { return "That's the copy you're keeping." }
+        guard let moving = Adoption.facts(at: path) else { return "\(path) isn't there any more." }
+        guard let keep = Adoption.facts(at: kept) else {
+            return "The other copy (\(kept)) isn't there any more, so this is the last one. Nothing was moved."
+        }
+        guard keep.bundleID == moving.bundleID else {
+            return "The other copy isn't the same app any more. Nothing was moved."
+        }
+        // The kept copy must still be a whole app: its program is there.
+        let exe = (try? fm.contentsOfDirectory(atPath: kept + "/Contents/MacOS")) ?? []
+        guard !exe.isEmpty else { return "The other copy looks damaged (no program inside). Nothing was moved." }
+        if !allowOpen, isRunning(path) { return "\(name) in \(folder(of: path)) is open. Quit it, then try again." }
+        return nil
+    }
+
+    /// One copy as "Use Homebrew's copy" sees it.
+    struct Copy {
+        let path: String
+        let fromHomebrew: Bool
+        let fromAppStore: Bool
+    }
+
+    /// Homebrew's copy, when exactly one copy is Homebrew's, at least one
+    /// isn't, and none is from the App Store (those stay with the App
+    /// Store). Nil otherwise: then the button isn't offered.
+    static func homebrewCopy(_ copies: [Copy]) -> String? {
+        let brew = copies.filter(\.fromHomebrew)
+        guard brew.count == 1, copies.count > 1, !copies.contains(where: \.fromAppStore) else { return nil }
+        return brew[0].path
+    }
+
+    /// "~/Applications" rather than the full home path.
+    static func folder(of path: String) -> String {
+        let folder = (path as NSString).deletingLastPathComponent
+        return folder.hasPrefix(NSHomeDirectory()) ? "~" + folder.dropFirst(NSHomeDirectory().count) : folder
     }
 
     struct CaskRecord {

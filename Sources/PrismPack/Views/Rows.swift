@@ -63,6 +63,9 @@ struct StatusPill: View {
         Text(text)
             .font(.caption.weight(.medium))
             .foregroundStyle(color.readable)
+            // One line at its own width, never wrapped or cut (Nick, 2 Nov 2026).
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 8).padding(.vertical, 2)
             .background(color.opacity(0.15), in: Capsule())
             // A thin outline, so a tag stays readable on a card of a similar
@@ -125,6 +128,8 @@ struct SortMenu<Value: Hashable>: View {
                 // The first option until the choice is in the list (Installed's
                 // Source menu read "Sort" while its list loaded).
                 Text(options.first { $0.value == selection }?.title ?? options.first?.title ?? help)
+                    // Primary, not the menu's grey (Nick, 2 Nov 2026).
+                    .foregroundStyle(.primary)
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12).padding(.vertical, 7)

@@ -279,25 +279,15 @@ struct DuplicateActions: View {
     let path: String?
 
     var body: some View {
-        // On an extra copy the pop-up's own Move to Trash removes it, so no
-        // second button here (two identical buttons confused Nick).
-        let isExtra = path.map(group.extras.contains) ?? false
         VStack(alignment: .leading, spacing: 8) {
-            Label(isExtra ? "This is a second copy of \(group.name). Keep the one in \(Self.folder(of: group.keep)); Move to Trash below removes this copy."
-                          : group.advice,
-                  systemImage: "square.on.square")
-                .font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             switch group.kind {
             case .twoCopies:
-                // On the copy to keep, offer the others, each named by folder.
-                if !isExtra {
-                    ForEach(group.extras, id: \.self) { extra in
-                        UninstallButton(removal: Removal(token: "app:\(extra)", name: "\(group.name) in \(Self.folder(of: extra))"),
-                                        title: "Move the Copy in \(Self.folder(of: extra)) to Trash")
-                    }
-                }
+                // Side by side, and the user picks (Nick, 2 Nov 2026).
+                DuplicateCompare(group: group)
             case .twoStores(let cask):
+                Label(group.advice, systemImage: "square.on.square")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     StopManagingButton(cask: cask, appPath: group.keep, name: group.name,
                                        title: "Stop Homebrew tracking it")
@@ -308,11 +298,162 @@ struct DuplicateActions: View {
     }
 }
 
-extension DuplicateActions {
-    /// "~/Applications" rather than the full home path.
-    static func folder(of path: String) -> String {
-        let folder = (path as NSString).deletingLastPathComponent
-        return folder.hasPrefix(NSHomeDirectory()) ? "~" + folder.dropFirst(NSHomeDirectory().count) : folder
+/// Two or more copies of one app compared: folder, version, size, how often
+/// and when it was last opened, which is open now and what updates it. The
+/// suggestion is the open copy, else the one opened most; any copy but the
+/// last can go, never one that's open (Nick, 2 Nov 2026).
+struct DuplicateCompare: View {
+    @EnvironmentObject var controller: UpdateController
+    let group: DuplicateGroup
+
+    private var copies: [String] { [group.keep] + group.extras }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("\(copies.count) copies of \(group.name). Both use the same settings and data, which stay put whichever you remove.",
+                  systemImage: "square.on.square")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(copies, id: \.self) { path in
+                DuplicateCopyRow(group: group, path: path)
+            }
+            if let brew = brewPath {
+                useHomebrew(brew)
+            }
+        }
+    }
+
+    /// Homebrew's copy, when "Use Homebrew's copy" applies.
+    private var brewPath: String? {
+        Duplicates.homebrewCopy(copies.map { path in
+            Duplicates.Copy(path: path, fromHomebrew: controller.cask(at: path) != nil,
+                            fromAppStore: FileManager.default.fileExists(atPath: path + "/Contents/_MASReceipt"))
+        })
+    }
+
+    @ViewBuilder
+    private func useHomebrew(_ brew: String) -> some View {
+        let status = controller.homebrewSwitches[group.id]
+        let working = status.map { $0 == "Starting…" || $0.hasSuffix("…") } ?? false
+        HStack(spacing: 8) {
+            if working, let status {
+                ProgressView().controlSize(.small)
+                Text(status).font(.caption).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Keep only Homebrew's copy").font(.callout.weight(.semibold))
+                    Text(status ?? "Homebrew keeps the copy in \(Duplicates.folder(of: brew)) up to date with everything else it manages.")
+                        .font(.caption).foregroundStyle(status == nil ? Color.secondary : Color.red.readable)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button("Use Homebrew's Copy") { confirm(brew) }
+                    .glassProminent(SourceStyle.forSource("homebrew").color).controlSize(.small).fixedSize()
+            }
+        }
+    }
+
+    private func confirm(_ brew: String) {
+        let others = copies.filter { $0 != brew }
+        let open = others.contains(where: Duplicates.isRunning)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Use Homebrew's copy of \(group.name)?"
+        var text = "\(group.name) in \(others.map(Duplicates.folder(of:)).joined(separator: " and ")) moves to the Trash, and the copy in \(Duplicates.folder(of: brew)), which Homebrew keeps, is the one you use from now on. Settings and data are shared and stay put."
+        if open {
+            text += " \(group.name) is open: it quits now and Homebrew's copy opens in its place. If \(group.name) opens at login, turn that on again in \(group.name) once it's open."
+        }
+        alert.informativeText = text
+        alert.addButton(withTitle: "Use Homebrew's Copy")
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        if alert.runModal() == .alertFirstButtonReturn {
+            controller.useHomebrewCopy(group, brewPath: brew)
+        }
+    }
+}
+
+private struct DuplicateCopyRow: View {
+    @EnvironmentObject var controller: UpdateController
+    let group: DuplicateGroup
+    let path: String
+    @State private var size: Int64?
+    @State private var use: (count: Int, last: Date?) = (0, nil)
+    @State private var running = false
+
+    private var suggested: Bool { path == group.keep }
+    /// The copy kept if this one goes: the suggestion, or the next copy.
+    private var kept: String { suggested ? (group.extras.first ?? group.keep) : group.keep }
+    private var source: String? {
+        controller.installed.first { $0.appPath?.lowercased() == path.lowercased() }.map {
+            $0.sourceID == "unmanaged" ? "Not managed" : UpdatesPage.title(of: $0.sourceID)
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(Duplicates.folder(of: path)).font(.callout.weight(.semibold)).lineLimit(1).fixedSize()
+                    if running { StatusPill(text: "Open now", color: .blue) }
+                    if suggested { StatusPill(text: "Suggested to keep", color: .secondary) }
+                }
+                Text(facts).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                if let message = controller.duplicateMoves[path], message != "Moving…" {
+                    Text(message).font(.caption).foregroundStyle(Color.red.readable)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            if controller.duplicateMoves[path] == "Moving…" {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Move to Trash") { confirm() }
+                    .glassDestructive().controlSize(.small).fixedSize()
+                    .disabled(running)
+                    .help(running ? "Quit this copy first" : "Moves only this copy to the Trash")
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .task(id: path) {
+            running = Duplicates.isRunning(path)
+            use = Duplicates.usage(path)
+            let path = path
+            size = await Task.detached(priority: .utility) { InstalledMetrics.size(at: path) }.value
+        }
+    }
+
+    private var facts: String {
+        var parts = [versionLine(Adoption.facts(at: path)?.version ?? "")]
+        if let size { parts.append(size.formatted(.byteCount(style: .file))) }
+        parts.append(use.count == 0 ? "No opens recorded"
+                     : "Opened \(use.count) time\(use.count == 1 ? "" : "s")"
+                       + (use.last.map { ", last \($0.formatted(date: .abbreviated, time: .omitted))" } ?? ""))
+        if let source { parts.append(source) }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private func confirm() {
+        // Checked again when the button is pressed, and again in the move.
+        if let why = Duplicates.refusal(moving: path, keeping: kept) {
+            controller.duplicateMoves[path] = why
+            return
+        }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Move \(group.name) in \(Duplicates.folder(of: path)) to the Trash?"
+        var text = "You keep the copy in \(Duplicates.folder(of: kept)). Settings and data are shared by both copies and aren't touched."
+        if let cask = controller.cask(at: path) {
+            text += " Homebrew installed this copy (cask \(cask)), so Homebrew stops tracking \(group.name) too; it won't put it back."
+        }
+        alert.informativeText = text + " You can put it back from the Trash."
+        let go = alert.addButton(withTitle: "Move to Trash")
+        go.hasDestructiveAction = true
+        go.keyEquivalent = ""
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        if alert.runModal() == .alertFirstButtonReturn {
+            controller.moveDuplicateCopy(path, keeping: kept, name: group.name)
+        }
     }
 }
 

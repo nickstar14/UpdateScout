@@ -110,3 +110,71 @@ struct SourceParsingTests {
         #expect(AppFolders.isNested("\(root)/Utilities/Tool.app", roots: [root]))
     }
 }
+
+/// App Store apps matched by their bundle's name among receipted apps.
+struct AppStoreMatchTests {
+    @Test func matchesTheBundleNameWhenTheFileNameDiffers() {
+        let apps: [(path: String, names: [String])] = [
+            ("/Applications/Pages Creator Studio.app", ["Pages"]),
+            ("/Applications/Keynote Creator Studio.app", ["Keynote Creator Studio", "Keynote"]),
+        ]
+        #expect(Inventory.masMatch("Pages", among: apps) == "/Applications/Pages Creator Studio.app")
+        #expect(Inventory.masMatch("keynote", among: apps) == "/Applications/Keynote Creator Studio.app")
+        #expect(Inventory.masMatch("Numbers", among: apps) == nil)
+    }
+
+    @Test func twoMatchesCountAsNone() {
+        let apps: [(path: String, names: [String])] = [("/Applications/A.app", ["Pages"]), ("/Applications/B.app", ["Pages"])]
+        #expect(Inventory.masMatch("Pages", among: apps) == nil)
+    }
+}
+
+/// Which of two copies is suggested to keep (Nick, 2 Nov 2026).
+struct DuplicateChoiceTests {
+    private func copy(_ path: String, _ version: String = "1.0", running: Bool = false, opened: Int = 0) -> Duplicates.Candidate {
+        .init(path: path, version: version, running: running, opened: opened)
+    }
+
+    @Test func theOpenCopyWins() {
+        #expect(Duplicates.preferred([copy("/Applications/Flux.app", "2.0", opened: 50),
+                                      copy("/Users/x/Applications/Flux.app", running: true)]) == "/Users/x/Applications/Flux.app")
+    }
+
+    @Test func thenTheOneOpenedMost() {
+        #expect(Duplicates.preferred([copy("/Applications/Flux.app", opened: 6),
+                                      copy("/Users/x/Applications/Flux.app", opened: 31)]) == "/Users/x/Applications/Flux.app")
+    }
+
+    @Test func thenNewerThenApplications() {
+        #expect(Duplicates.preferred([copy("/Applications/A.app", "1.0"), copy("/Applications/B.app", "1.1")]) == "/Applications/B.app")
+        #expect(Duplicates.preferred([copy("/Users/x/Applications/A.app"), copy("/Applications/A.app")]) == "/Applications/A.app")
+    }
+}
+
+struct MacOSAppTests {
+    @Test func appleAppsWithoutAReceiptComeWithMacOS() {
+        #expect(Inventory.isMacOSApp(bundleID: "com.apple.Safari", hasReceipt: false))
+        #expect(!Inventory.isMacOSApp(bundleID: "com.apple.dt.Xcode", hasReceipt: true))
+        #expect(!Inventory.isMacOSApp(bundleID: "org.herf.Flux", hasReceipt: false))
+        #expect(!Inventory.isMacOSApp(bundleID: nil, hasReceipt: false))
+    }
+}
+
+/// When "Use Homebrew's copy" is offered (Nick, 2 Nov 2026).
+struct HomebrewCopyTests {
+    private func copy(_ path: String, brew: Bool = false, store: Bool = false) -> Duplicates.Copy {
+        .init(path: path, fromHomebrew: brew, fromAppStore: store)
+    }
+
+    @Test func offeredWhenOneCopyIsHomebrews() {
+        #expect(Duplicates.homebrewCopy([copy("/Applications/Flux.app", brew: true), copy("/Users/x/Applications/Flux.app")])
+                == "/Applications/Flux.app")
+    }
+
+    @Test func notOfferedOtherwise() {
+        #expect(Duplicates.homebrewCopy([copy("/a/A.app"), copy("/b/A.app")]) == nil)
+        #expect(Duplicates.homebrewCopy([copy("/a/A.app", brew: true), copy("/b/A.app", brew: true)]) == nil)
+        #expect(Duplicates.homebrewCopy([copy("/a/A.app", brew: true), copy("/b/A.app", store: true)]) == nil)
+        #expect(Duplicates.homebrewCopy([copy("/a/A.app", brew: true)]) == nil)
+    }
+}

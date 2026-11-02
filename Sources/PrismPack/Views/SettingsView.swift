@@ -23,35 +23,80 @@ struct SettingsView: View {
     @State private var adoptionSelfUpdating = Prefs.adoptionIncludeSelfUpdating
     @State private var customNames: [String] = []
     @State private var customBackground: Set<String> = []
+    @State private var query = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            // In-content title, same treatment as the status window header;
-            // fixed above the form so scrolling never runs into the titlebar.
-            HStack(spacing: 12) {
-                AppLogo(size: 50, trimmed: true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(AppIdentity.name)
-                        .font(.title2.weight(.semibold))
-                    Text("Version \(SelfUpdater.version)")
-                        .font(.caption).foregroundStyle(.secondary)
+        // Full width, like every other page (Nick, 2 Nov 2026).
+        settingsForm
+            // Like the other pages: the controls stay put in glass and the
+            // form scrolls under them (Nick, 2 Nov 2026).
+            .pinnedHeader {
+                PageControls {
+                    HStack(spacing: 8) {
+                        GlassSearchField(prompt: "Search settings", text: $query)
+                        Button {
+                            SelfUpdater.checkForUpdates()
+                        } label: {
+                            Label("Check for Updates", systemImage: "arrow.clockwise")
+                        }
+                        .glass()
+                    }
                 }
-                Spacer()
-                Button {
-                    SelfUpdater.checkForUpdates()
-                } label: {
-                    Label("Check for Updates", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                }
-                .glass().controlSize(.small)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 4)
-            settingsForm
-        }
-        .frame(maxWidth: 620)
-        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Search
+
+    /// What each row can be found by: its label and its explanation.
+    private static let rowWords: [String: String] = [
+        "about": "version about check for updates",
+        "setup": "dependencies everything needs is installed tools reinstall remove homebrew mas",
+        "fullDisk": "full disk access privacy data folders trash allow",
+        "concurrency": "update at once installs side by side package manager",
+        "password": "ask for my password once per batch admin administrator",
+        "auto": "install updates automatically how often wi-fi ethernet hotspot low data never automatic",
+        "adoptSuggest": "suggest apps that can move under homebrew adoption adopt",
+        "adoptSelf": "include apps that already update themselves",
+        "login": "start at login",
+        "background": "check for updates in the background check every interval minutes hours notify",
+        "theme": "theme light dark system appearance",
+        "glass": "glass clear opaque tint wash",
+        "dock": "show icon in dock",
+        "github": "github releases apps link repository",
+        "custom": "custom sources json file commands background",
+        "drivers": "drivers displaylink third-party cask oracle",
+    ]
+
+    private static let sectionRows: [String: [String]] = [
+        AppIdentity.name: ["about"],
+        "Setup": ["setup", "fullDisk"],
+        "Updating": ["concurrency", "password", "auto"],
+        "Homebrew adoption": ["adoptSuggest", "adoptSelf"],
+        "Background checking": ["login", "background"],
+        "Appearance": ["theme", "glass", "dock"],
+        "GitHub releases": ["github"],
+        "Custom sources": ["custom"],
+        "Drivers": ["drivers"],
+    ]
+
+    private var terms: [String] { query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init) }
+
+    private func matches(_ text: String) -> Bool {
+        let text = text.lowercased()
+        return terms.allSatisfy { text.contains($0) }
+    }
+
+    /// A row shows while nothing is typed, or when its section's name or its
+    /// own words match.
+    private func shows(_ section: String, _ row: String) -> Bool {
+        terms.isEmpty || matches(section) || matches(row + " " + (Self.rowWords[row] ?? ""))
+    }
+
+    private func sourceShows(_ name: String) -> Bool { terms.isEmpty || matches("Sources") || matches(name) }
+
+    private func showsSection(_ section: String) -> Bool {
+        if section == "Sources" { return UpdateController.allSources.contains { sourceShows($0.displayName) } }
+        return (Self.sectionRows[section] ?? []).contains { shows(section, $0) }
     }
 
     private func dependencyRow(_ dep: DependencyManager.Dependency) -> some View {
@@ -97,9 +142,27 @@ struct SettingsView: View {
 
     private var settingsForm: some View {
         Form {
-            if deps.anyMissing {
+            if !Self.sectionRows.keys.contains(where: showsSection) && !showsSection("Sources") {
+                Section {
+                    Text("No settings match \u{201C}\(query)\u{201D}").foregroundStyle(.secondary)
+                }
+            }
+
+            if showsSection(AppIdentity.name) {
+                Section {
+                    HStack(spacing: 12) {
+                        AppLogo(size: 50, trimmed: true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(AppIdentity.name).font(.title2.weight(.semibold))
+                            Text("Version \(SelfUpdater.version)").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            if showsSection("Setup"), deps.anyMissing {
                 Section("Setup") {
-                    ForEach(deps.dependencies.filter { !$0.installed && !$0.optional }) { dep in
+                    ForEach(deps.dependencies.filter { !$0.installed && !$0.optional && shows("Setup", "setup") }) { dep in
                         HStack {
                             VStack(alignment: .leading, spacing: 1) {
                                 Label(dep.name, systemImage: "exclamationmark.triangle")
@@ -120,12 +183,13 @@ struct SettingsView: View {
                     if let error = deps.installError {
                         Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
                     }
-                    FullDiskAccessRow()
+                    if shows("Setup", "fullDisk") { FullDiskAccessRow() }
                 }
-            } else {
+            } else if showsSection("Setup") {
                 Section("Setup") {
                     // Same size as the Full Disk Access line, and opens to
                     // each tool with Reinstall and Remove (Nick, 2 Nov 2026).
+                    if shows("Setup", "setup") {
                     Button {
                         withAnimation(.snappy(duration: 0.2)) { showDeps.toggle() }
                         if showDeps { deps.loadVersions() }
@@ -142,27 +206,34 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .help(showDeps ? "Hide the list" : "Show each dependency")
-                    if showDeps {
+                    }
+                    if showDeps && shows("Setup", "setup") {
                         ForEach(deps.dependencies) { dep in dependencyRow(dep) }
                         if let error = deps.installError {
                             Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
                         }
                     }
-                    FullDiskAccessRow()
+                    if shows("Setup", "fullDisk") { FullDiskAccessRow() }
                 }
             }
 
+            if showsSection("Updating") {
             Section("Updating") {
-                Stepper(value: $updateConcurrency, in: 1...8) {
-                    LabeledContent("Update at once", value: "\(updateConcurrency)")
+                if shows("Updating", "concurrency") {
+                LabeledContent("Update at once") {
+                    GlassStepper(value: $updateConcurrency, range: 1...8)
                 }
                 .onChange(of: updateConcurrency) { _, value in Prefs.updateConcurrency = value }
                 Text("Installs from different sources run side by side. Each package manager still updates one item at a time.")
                     .font(.caption).foregroundStyle(.secondary)
+                }
+                if shows("Updating", "password") {
                 Toggle("Ask for my password once per batch", isOn: $passwordOnce)
                     .onChange(of: passwordOnce) { _, value in Prefs.askPasswordOncePerBatch = value }
                 Text("Kept in memory for that batch only, then wiped. Never saved. When off, each installer asks for itself.")
                     .font(.caption).foregroundStyle(.secondary)
+                }
+                if shows("Updating", "auto") {
                 Toggle("Install updates automatically", isOn: $autoEnabled)
                     .onChange(of: autoEnabled) { _, value in AutoUpdate.enabled = value }
                 if autoEnabled {
@@ -177,30 +248,42 @@ struct SettingsView: View {
                 }
                 Text("Never automatic: anything that needs your password, apps that are open, macOS, custom sources, betas, major upgrades, and anything hidden or pinned. \"Only on Wi-Fi or Ethernet\" skips a phone hotspot and Low Data Mode. Each app's card can override this.")
                     .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             }
 
+            if showsSection("Homebrew adoption") {
             Section("Homebrew adoption") {
+                if shows("Homebrew adoption", "adoptSuggest") {
                 Toggle("Suggest apps that can move under Homebrew", isOn: $adoptionEnabled)
                     .onChange(of: adoptionEnabled) { _, value in
                         Prefs.adoptionEnabled = value
                         UpdateController.shared.checkNow()
                     }
+                }
+                if shows("Homebrew adoption", "adoptSelf") {
                 Toggle("Include apps that already update themselves", isOn: $adoptionSelfUpdating)
                     .disabled(!adoptionEnabled)
                     .onChange(of: adoptionSelfUpdating) { _, value in
                         Prefs.adoptionIncludeSelfUpdating = value
                         UpdateController.shared.checkNow()
                     }
+                }
                 Text("Only apps with no updater are suggested by default, and only when Homebrew's version is current. \(AppIdentity.name) never changes an app without asking, and sends at most one notification a week.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            }
 
+            if showsSection("Background checking") {
             Section("Background checking") {
+                if shows("Background checking", "login") {
                 Toggle("Start \(AppIdentity.name) at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
                         catch { agentError = error.localizedDescription }
                     }
+                }
+                if shows("Background checking", "background") {
                 Toggle("Check for updates in the background", isOn: $agentInstalled)
                     .onChange(of: agentInstalled) { _, on in
                         guard on != LaunchAgent.isInstalled else { return }
@@ -239,9 +322,13 @@ struct SettingsView: View {
                      ? "Background checks also install automatic updates while \(AppIdentity.name) isn't open; when it is, it installs them itself."
                      : "Background checks only detect and notify. Updates are installed by you, unless an app's card says Always.")
                     .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             }
 
+            if showsSection("Appearance") {
             Section("Appearance") {
+                if shows("Appearance", "theme") {
                 LabeledContent("Theme") {
                     GlassSegmented(selection: $appearance,
                                    options: Appearance.allCases.map { ($0, $0.label) })
@@ -251,6 +338,8 @@ struct SettingsView: View {
                     // Straight away: waiting for the bubble read as a hang.
                     Appearance.apply(value, animated: true)
                 }
+                }
+                if shows("Appearance", "glass") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Glass")
                     Slider(value: $glassTint, in: 0...1) {
@@ -267,16 +356,21 @@ struct SettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                }
+                if shows("Appearance", "dock") {
                 Toggle("Show icon in Dock", isOn: $showDockIcon)
                     .onChange(of: showDockIcon) { _, on in
                         Prefs.showDockIcon = on
                         NSApp.setActivationPolicy(on ? .regular : .accessory)
                         NSApp.activate(ignoringOtherApps: true)
                     }
+                }
+            }
             }
 
+            if showsSection("Sources") {
             Section("Sources") {
-                ForEach(UpdateController.allSources, id: \.id) { source in
+                ForEach(UpdateController.allSources.filter { sourceShows($0.displayName) }, id: \.id) { source in
                     Toggle(isOn: Binding(
                         get: { !disabled.contains(source.id) },
                         set: { on in
@@ -291,9 +385,11 @@ struct SettingsView: View {
                     }
                 }
             }
+            }
 
-            GitHubAppsSection()
+            if showsSection("GitHub releases") { GitHubAppsSection() }
 
+            if showsSection("Custom sources") {
             Section("Custom sources") {
                 HStack {
                     Text("Edit custom_sources.json for apps nothing else covers.")
@@ -321,10 +417,13 @@ struct SettingsView: View {
                 customNames = (CustomSource.entries() ?? []).map(\.name)
                 customBackground = CustomSource.backgroundNames
             }
+            }
 
+            if showsSection("Drivers") {
             Section {
                 Text("There is no unified API for third-party driver updates on macOS — vendors like DisplayLink ship their own installers with no auto-update. \(AppIdentity.name) uses Homebrew's cask database as a version oracle for those, and the custom-sources file for anything without a cask.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
             }
         }
         .formStyle(.grouped)

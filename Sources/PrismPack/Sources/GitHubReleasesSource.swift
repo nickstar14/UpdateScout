@@ -11,8 +11,11 @@ struct GitHubApp: Codable, Hashable, Identifiable {
     var repo: String
     var appPath: String
     var bundleID: String
-    /// The installed copy's Team ID when it was linked. Every download must match.
+    /// The installed copy's Team ID when it was linked. Every download must
+    /// match. Empty for an unsigned app linked after the warning (Nick,
+    /// 2 Nov 2026): then only its app ID is checked, and installers aren't run.
     var teamID: String
+    var isUnsigned: Bool { teamID.isEmpty }
     var id: String { appPath }
     var name: String { ((appPath as NSString).lastPathComponent as NSString).deletingPathExtension }
 }
@@ -24,6 +27,15 @@ enum GitHubApps {
     static func load() -> [GitHubApp] {
         guard let data = FileManager.default.contents(atPath: configURL.path) else { return [] }
         return (try? JSONDecoder().decode([GitHubApp].self, from: data)) ?? []
+    }
+
+    /// Adds or replaces an app's link, then checks for its updates.
+    @MainActor static func link(_ linked: GitHubApp) {
+        var apps = load()
+        apps.removeAll { $0.appPath == linked.appPath }
+        apps.append(linked)
+        save(apps)
+        UpdateController.shared.checkNow()
     }
 
     static func save(_ apps: [GitHubApp]) {
@@ -248,6 +260,28 @@ enum GitHubAPI {
         }
     }
 
+    /// One search result, for the link window's list.
+    struct Hit: Identifiable, Hashable {
+        let repo: String
+        let about: String
+        let stars: Int
+        var id: String { repo }
+    }
+
+    /// Repositories matching any words, best first, with their description.
+    static func searchHits(_ text: String) async throws -> [Hit] {
+        var parts = URLComponents(string: "https://api.github.com/search/repositories")!
+        parts.queryItems = [URLQueryItem(name: "q", value: text), URLQueryItem(name: "per_page", value: "8")]
+        let (data, response) = try await Net.fetch(parts.url!)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["items"] as? [[String: Any]] else { throw Failure.http((response as? HTTPURLResponse)?.statusCode ?? 0) }
+        return items.compactMap { item in
+            guard let repo = item["full_name"] as? String else { return nil }
+            return Hit(repo: repo, about: item["description"] as? String ?? "", stars: item["stargazers_count"] as? Int ?? 0)
+        }
+    }
+
     /// Repositories whose name matches an app's, best first (for "Find it").
     static func search(_ appName: String) async throws -> [String] {
         var parts = URLComponents(string: "https://api.github.com/search/repositories")!
@@ -343,7 +377,8 @@ enum GitHubInstaller {
         progress("§step:check")
         if let pkg = unpacked.pkgURL {
             progress("Checking the installer's signature…")
-            guard await pkgTeamID(pkg) == app.teamID else {
+            // An installer runs as root: never for an app linked unsigned.
+            guard !app.isUnsigned, await pkgTeamID(pkg) == app.teamID else {
                 throw refused("The installer isn't signed by the same developer as your copy, so it wasn't run.")
             }
             progress("§step:swap")
@@ -359,8 +394,15 @@ enum GitHubInstaller {
         }
         progress("Checking the signature…")
         guard CodeSign.isValid(new.path) else { throw refused("The downloaded app's signature is broken.") }
-        guard CodeSign.teamID(new.path) == app.teamID, CodeSign.teamID(app.appPath) == app.teamID else {
-            throw refused("The downloaded app isn't signed by the same developer as your copy.")
+        if app.isUnsigned {
+            // Linked after the warning: the download must be the same app.
+            guard Adoption.facts(at: new.path)?.bundleID == app.bundleID else {
+                throw refused("The download isn't \(app.name) (its app ID is different).")
+            }
+        } else {
+            guard CodeSign.teamID(new.path) == app.teamID, CodeSign.teamID(app.appPath) == app.teamID else {
+                throw refused("The downloaded app isn't signed by the same developer as your copy.")
+            }
         }
         progress("§step:swap")
         try await swap(app, with: new, progress: progress)
@@ -399,10 +441,16 @@ enum GitHubInstaller {
 
     /// Linking: the latest release's app must be signed by the installed
     /// copy's developer. Returns that Team ID, or throws why not.
-    static func verifyLink(repo: String, appPath: String) async throws -> GitHubApp {
+    /// `allowUnsigned`: the user accepted the warning for an app with no
+    /// developer signature; the download must then be an app (not an
+    /// installer) with the same app ID.
+    static func verifyLink(repo: String, appPath: String, allowUnsigned: Bool = false) async throws -> GitHubApp {
         guard let facts = Adoption.facts(at: appPath) else { throw refused("\(appPath) isn't an app.") }
         guard let team = CodeSign.teamID(appPath) else {
-            throw refused("\(facts.name) isn't signed by a developer, so \(AppIdentity.name) can't check that an update comes from the same place.")
+            guard allowUnsigned else {
+                throw refused("\(facts.name) isn't signed by a developer, so \(AppIdentity.name) can't check that an update comes from the same place.")
+            }
+            return try await verifyUnsigned(repo: repo, facts: facts)
         }
         guard let release = try await GitHubAPI.latestRelease(repo) else {
             throw refused("\(repo) publishes no releases.")
@@ -420,6 +468,19 @@ enum GitHubInstaller {
             throw refused("\(repo)'s download is signed by a different developer than your copy of \(facts.name).")
         }
         return GitHubApp(repo: repo, appPath: appPath, bundleID: facts.bundleID, teamID: team)
+    }
+
+    private static func verifyUnsigned(repo: String, facts: AppFacts) async throws -> GitHubApp {
+        guard let release = try await GitHubAPI.latestRelease(repo) else { throw refused("\(repo) publishes no releases.") }
+        guard let asset = GitHubAPI.pickAsset(release) else {
+            throw refused("\(repo)'s latest release (\(release.tag)) has no macOS download.")
+        }
+        let unpacked = try await fetch(asset, bundleID: facts.bundleID) { _ in }
+        defer { try? FileManager.default.removeItem(at: unpacked.folder) }
+        guard let new = unpacked.appURL, Adoption.facts(at: new.path)?.bundleID == facts.bundleID else {
+            throw refused("\(repo)'s download isn't \(facts.name) (no app with its ID \(facts.bundleID)).")
+        }
+        return GitHubApp(repo: repo, appPath: facts.path, bundleID: facts.bundleID, teamID: "")
     }
 }
 
