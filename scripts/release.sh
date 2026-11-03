@@ -43,8 +43,10 @@ scripts/build-app.sh
 
 ZIP="build/$ZIP_NAME"
 rm -f "$ZIP"
-if [[ "$VERSION" == 2.0.0* ]]; then
-    # Bridge release: Sparkle in an installed 1.x looks for the new app by the
+if [[ "$VERSION" == "2.0.0" ]]; then
+    # Bridge release (the final 2.0.0 only; betas never reach a 1.x updater and
+    # are downloaded by hand, so they hold PrismPack.app): Sparkle in an
+    # installed 1.x looks for the new app by the
     # old file name (UpdateScout.app) and only then by bundle ID, and the bundle
     # ID changed in 2.0. So the zip holds the app under the old name; PrismPack
     # renames itself to PrismPack.app on first launch (Migration). From 2.0.1
