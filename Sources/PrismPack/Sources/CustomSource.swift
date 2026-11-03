@@ -12,7 +12,7 @@ struct CustomSource: UpdateSource {
     /// calls sudo, the batch password (or the usual dialog) answers it.
     func needsAdmin(_ item: UpdateItem) -> Bool { false }
 
-    struct Entry: Codable {
+    struct Entry: Codable, Equatable {
         var name: String
         /// Skip this entry without error if the app isn't installed.
         var enabled: Bool? = true
@@ -111,7 +111,7 @@ struct CustomSource: UpdateSource {
         return items
     }
 
-    private func installedVersion(of entry: Entry) async -> String? {
+    func installedVersion(of entry: Entry) async -> String? {
         if let plistPath = entry.installedPlist {
             guard let data = FileManager.default.contents(atPath: plistPath),
                   let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
@@ -126,12 +126,15 @@ struct CustomSource: UpdateSource {
         return nil
     }
 
-    private func remoteVersion(of entry: Entry) async -> String? {
+    func remoteVersion(of entry: Entry) async -> String? {
         guard let url = URL(string: entry.remoteURL),
               let (data, response) = try? await Net.fetch(url),
               (response as? HTTPURLResponse)?.statusCode == 200
         else { return nil }
+        return Self.parseRemote(data, entry)
+    }
 
+    static func parseRemote(_ data: Data, _ entry: Entry) -> String? {
         if let path = entry.remoteJSONPath {
             var node = try? JSONSerialization.jsonObject(with: data)
             for key in path.split(separator: ".") {
@@ -150,6 +153,58 @@ struct CustomSource: UpdateSource {
             return String(body[range])
         }
         return nil
+    }
+
+    // MARK: - Adding and removing entries (Settings' Add a Source sheet)
+
+    /// How to read the version from a page, when the user didn't say: a
+    /// well-known JSON key, else the first version-like number.
+    static func guessRemote(_ data: Data) -> (jsonPath: String?, regex: String?) {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let keys = ["version", "tag_name", "latest_version", "latest", "name"]
+            for key in keys where json[key] is String || json[key] is NSNumber { return (key, nil) }
+            for (outer, value) in json.sorted(by: { $0.key < $1.key }) {
+                if let inner = value as? [String: Any] {
+                    for key in keys where inner[key] is String || inner[key] is NSNumber { return ("\(outer).\(key)", nil) }
+                }
+            }
+        }
+        return (nil, #"(\d+(?:\.\d+)+)"#)
+    }
+
+    /// Adds an entry to the file, keeping everything already in it (hand
+    /// edits included). Throws if the name is taken or the file can't be
+    /// read. New entries start off for the background check.
+    static func add(_ entry: Entry, to url: URL = configURL) throws {
+        var all: [Entry] = []
+        if let data = FileManager.default.contents(atPath: url.path) {
+            all = try JSONDecoder().decode([Entry].self, from: data)
+        }
+        guard !all.contains(where: { $0.name.caseInsensitiveCompare(entry.name) == .orderedSame }) else {
+            throw PrismPackError.parseFailure("a source named \(entry.name) already exists")
+        }
+        if url == configURL { _ = backgroundNames }   // first look: existing entries stay allowed, this one doesn't
+        all.append(entry)
+        try write(all, to: url)
+    }
+
+    /// Removes the entry with this name, and its background switch.
+    static func remove(named name: String, from url: URL = configURL) throws {
+        guard let data = FileManager.default.contents(atPath: url.path) else { return }
+        var all = try JSONDecoder().decode([Entry].self, from: data)
+        all.removeAll { $0.name == name }
+        try write(all, to: url)
+        if url == configURL, var names = Prefs.customBackgroundNames {
+            names.remove(name)
+            Prefs.customBackgroundNames = names
+        }
+    }
+
+    private static func write(_ entries: [Entry], to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(entries).write(to: url, options: .atomic)
     }
 
     /// Identifies an entry by name plus a fingerprint of its install command.

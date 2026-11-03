@@ -1,42 +1,86 @@
 import SwiftUI
 import AppKit
 
-/// Settings' "GitHub releases" group: the linked apps, and Add an app.
-struct GitHubAppsSection: View {
+/// Settings' "Other sources": apps linked to GitHub releases and custom
+/// sources in one list, with Add a Source… (Phase 10 step 10).
+struct OtherSourcesSection: View {
     @State private var apps = GitHubApps.load()
+    @State private var custom = CustomSource.entries() ?? []
+    @State private var background = CustomSource.backgroundNames
     @State private var adding = false
 
     var body: some View {
-        Section("GitHub releases") {
+        Section("Other sources") {
             ForEach(apps) { app in
-                HStack(spacing: 8) {
-                    RowIcon(name: app.name, appPath: app.appPath, sectionID: "github", size: 22)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(app.name)
-                        Text("github.com/\(app.repo)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Remove") {
-                        apps.removeAll { $0 == app }
-                        GitHubApps.save(apps)
-                        UpdateController.shared.checkNow()
-                    }
-                    .glassDestructive().controlSize(.small)
+                row(icon: RowIcon(name: app.name, appPath: app.appPath, sectionID: "github", size: 22),
+                    name: app.name, detail: "github.com/\(app.repo)", tag: "GitHub") {
+                    apps.removeAll { $0 == app }
+                    GitHubApps.save(apps)
+                    UpdateController.shared.checkNow()
+                }
+            }
+            ForEach(custom, id: \.name) { entry in
+                row(icon: RowIcon(name: entry.name, appPath: entry.installedPlist.flatMap { plist in
+                        plist.range(of: "/Contents/Info.plist").map { String(plist[..<$0.lowerBound]) } },
+                                  sectionID: "custom", size: 22),
+                    name: entry.name, detail: entry.remoteURL, tag: "Custom",
+                    background: Binding(
+                        get: { background.contains(entry.name) },
+                        set: { on in
+                            if on { background.insert(entry.name) } else { background.remove(entry.name) }
+                            Prefs.customBackgroundNames = background
+                        })) {
+                    try? CustomSource.remove(named: entry.name)
+                    reload()
+                    UpdateController.shared.checkNow()
                 }
             }
             HStack(alignment: .top) {
-                Text("Apps that publish their updates as GitHub releases. Only a download signed by the same developer as your copy is installed.")
+                Text("Apps nothing else covers. A GitHub link only installs a download signed by the same developer as your copy. A custom source checks a page you choose and opens its download page or runs your command; those switched off are only checked while \(AppIdentity.name) is open.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Add an App…") { adding = true }.glass().fixedSize()
+                VStack(alignment: .trailing, spacing: 6) {
+                    Button("Add a Source…") { adding = true }.glass().fixedSize()
+                    Button("Open File") {
+                        NSWorkspace.shared.activateFileViewerSelecting([CustomSource.configURL])
+                    }.glass().controlSize(.small).fixedSize()
+                }
             }
         }
+        .onAppear(perform: reload)
         .sheet(isPresented: $adding) {
-            GitHubLinkSheet { linked in
+            AddSourceSheet(onGitHub: { linked in
                 GitHubApps.link(linked)
-                apps = GitHubApps.load()
+                reload()
+            }, onCustom: {
+                reload()
+                UpdateController.shared.checkNow()
+            })
+        }
+    }
+
+    private func reload() {
+        apps = GitHubApps.load()
+        custom = CustomSource.entries() ?? []
+        background = CustomSource.backgroundNames
+    }
+
+    private func row(icon: some View, name: String, detail: String, tag: String,
+                     background: Binding<Bool>? = nil, remove: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            icon
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
+            Spacer()
+            if let background {
+                Toggle("Check in the background", isOn: background)
+                    .toggleStyle(.checkbox).font(.caption)
+            }
+            StatusPill(text: tag, color: tag == "GitHub" ? .gray : .teal)
+            Button("Remove", action: remove).glassDestructive().controlSize(.small)
         }
     }
 }
@@ -49,6 +93,8 @@ struct GitHubLinkSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// The app to start with, from a Not managed app's pop-up on Installed.
     var preselect: String? = nil
+    /// Inside Add a Source: no title, padding or close circle of its own.
+    var embedded = false
     let onLink: (GitHubApp) -> Void
 
     private struct Choice {
@@ -72,7 +118,7 @@ struct GitHubLinkSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Update an app from GitHub").font(.title3.bold())
+            if !embedded { Text("Update an app from GitHub").font(.title3.bold()) }
             // The glass menu, as everywhere (Nick, 2 Nov 2026).
             LabeledContent("App") {
                 SortMenu(selection: $appPath,
@@ -118,9 +164,7 @@ struct GitHubLinkSheet: View {
                     .disabled(choice == nil || selected == nil || working != nil || (unsigned && !trusted))
             }
         }
-        .padding(20)
-        .frame(width: 520)
-        .popupClose()
+        .modifier(SheetFrame(enabled: !embedded))
         .task {
             // Not App Store apps, and not Apple's own. Unsigned apps are
             // listed too, marked, for linking after the warning.
@@ -239,5 +283,13 @@ struct GitHubLinkSheet: View {
                 message = error.localizedDescription
             }
         }
+    }
+}
+
+/// A sheet's padding, width and close circle, unless it sits inside another.
+private struct SheetFrame: ViewModifier {
+    let enabled: Bool
+    func body(content: Content) -> some View {
+        if enabled { content.padding(20).frame(width: 520).popupClose() } else { content }
     }
 }

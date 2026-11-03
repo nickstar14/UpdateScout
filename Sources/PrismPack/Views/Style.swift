@@ -736,6 +736,19 @@ struct GlassSearchField: View {
     }
 }
 
+/// A plain text field on the same glass capsule (Add a Source's fields).
+struct GlassField: View {
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        TextField(prompt, text: $text).textFieldStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background { GlassCapsule() }
+    }
+}
+
 /// The search field's glass capsule, shared with the Sort button so both
 /// look the same closed. Material on macOS 15.
 struct GlassCapsule: View {

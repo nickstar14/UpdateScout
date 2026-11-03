@@ -390,13 +390,37 @@ strip on Updates).
 (font previews and the pop-up's style list), the install-progress work
 (commit `2d4af7a`) and step 7 (web details, `4abde8c`).
 
-**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 (other
-sources), step 11 (⌘Q prompt) and step 13 (final review). Also: Productivity's
+**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 is built and checked (uncommitted; see below), step 11 (⌘Q prompt) and step 13 (final review). Also: Productivity's
 yellow tint still looks gold-brown in dark (needs a colour decision);
 "What's new in 2.0" new wording is in the app (Nick approved it 2 Nov;
 fine-tuned in step 13, [whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
 step 7's larger-picture window (Nick to try; automation can't send keys to a
 panel); the Phase 9 leftovers list.
+
+**Step 10, other sources (built 2 Nov 2026, uncommitted;
+[step10-other-sources-plan.md](step10-other-sources-plan.md)):** Settings'
+GitHub releases and Custom sources are one "Other sources" list (icon, name,
+detail line, GitHub / Custom tag, background switch on custom rows, red
+Remove), with Add a Source… and Open File. The new `Views/AddSourceSheet.swift`
+has a GitHub | Custom toggle; Custom has App, Name, version page, Open the
+download page | Run a command, Advanced (installed-version command, plist key,
+JSON key, pattern) and Test; Add stays off until Test works on exactly those
+fields. A page with no JSON key or pattern gets a guess (version / tag_name /…
+or a version-like number), kept in Advanced so what was tested is what's
+saved. The sheet reads the window's height when it opens, never grows past it
+(window height minus 60) and scrolls its fields, with Test and Add pinned.
+`GlassField` is the one new control (a text field on the search field's glass
+capsule). Saved entries use the existing `custom_sources.json` format; new
+ones start off for the background check. **Checked in the test build:** list
+in light and dark; the sheet's GitHub and Custom tabs in light and dark;
+Advanced open fits inside the window; throwaway add (installed `echo 1.0`,
+displaylink cask page: "Installed 1.0, latest 17.0,2026-09. (read from the
+"version" key)"), the row appeared with background off, Remove deleted it,
+`custom_sources.json` and the background list identical to before; Theme back
+to Light. First build's sheet ran past the window with Advanced open (fixed).
+**Not checked:** the App menu (menus can't be opened in the background), Run
+a command, a GitHub link through the new sheet. Tests: `AddSourceTests`
+(temp file only), 4 pass.
 
 **Not verified live:** choosing from the Sort and Source menus (menus can't
 be opened while Claude works in the background); the Size and Date sorts

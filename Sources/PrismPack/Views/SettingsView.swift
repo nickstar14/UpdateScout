@@ -21,8 +21,6 @@ struct SettingsView: View {
     @State private var showDockIcon = Prefs.showDockIcon
     @State private var adoptionEnabled = Prefs.adoptionEnabled
     @State private var adoptionSelfUpdating = Prefs.adoptionIncludeSelfUpdating
-    @State private var customNames: [String] = []
-    @State private var customBackground: Set<String> = []
     @State private var query = ""
 
     var body: some View {
@@ -62,8 +60,7 @@ struct SettingsView: View {
         "theme": "theme light dark system appearance",
         "glass": "glass clear opaque tint wash",
         "dock": "show icon in dock",
-        "github": "github releases apps link repository",
-        "custom": "custom sources json file commands background",
+        "other": "other sources github releases apps link repository custom json file commands background add a source",
         "drivers": "drivers displaylink third-party cask oracle",
     ]
 
@@ -74,8 +71,7 @@ struct SettingsView: View {
         "Homebrew adoption": ["adoptSuggest", "adoptSelf"],
         "Background checking": ["login", "background"],
         "Appearance": ["theme", "glass", "dock"],
-        "GitHub releases": ["github"],
-        "Custom sources": ["custom"],
+        "Other sources": ["other"],
         "Drivers": ["drivers"],
     ]
 
@@ -387,37 +383,7 @@ struct SettingsView: View {
             }
             }
 
-            if showsSection("GitHub releases") { GitHubAppsSection() }
-
-            if showsSection("Custom sources") {
-            Section("Custom sources") {
-                HStack {
-                    Text("Edit custom_sources.json for apps nothing else covers.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Open File") {
-                        NSWorkspace.shared.activateFileViewerSelecting([CustomSource.configURL])
-                    }
-                    .glass()
-                }
-                ForEach(customNames, id: \.self) { name in
-                    Toggle("Check \(name) in the background", isOn: Binding(
-                        get: { customBackground.contains(name) },
-                        set: { on in
-                            if on { customBackground.insert(name) } else { customBackground.remove(name) }
-                            Prefs.customBackgroundNames = customBackground
-                        }))
-                }
-                if !customNames.isEmpty {
-                    Text("Custom sources run your own commands. Those switched off are only checked while \(AppIdentity.name) is open.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .onAppear {
-                customNames = (CustomSource.entries() ?? []).map(\.name)
-                customBackground = CustomSource.backgroundNames
-            }
-            }
+            if showsSection("Other sources") { OtherSourcesSection() }
 
             if showsSection("Drivers") {
             Section {
