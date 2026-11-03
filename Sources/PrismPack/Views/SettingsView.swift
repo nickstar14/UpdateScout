@@ -30,6 +30,12 @@ struct SettingsView: View {
         // Full width, like every other page (Nick, 2 Nov 2026).
         settingsForm
             .sheet(isPresented: $showingNotes) { ReleaseNotesSheet() }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { deps.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                        .help("Look for the tools \(AppIdentity.name) uses again")
+                }
+            }
             // Like the other pages: the controls stay put in glass and the
             // form scrolls under them (Nick, 2 Nov 2026).
             .pinnedHeader {

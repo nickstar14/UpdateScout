@@ -135,6 +135,15 @@ enum DiscoverCatalog {
     }
 
     /// Whether every list on disk is under a day old.
+    /// The refresh arrow: mark the saved lists old so the next load downloads
+    /// them again. The old files stay, so a failed download keeps what's shown.
+    static func markStale() {
+        let old = Date(timeIntervalSince1970: 0)
+        for url in [CaskIndex.cacheURL, casksURL, formulaeURL, popularityURL] {
+            try? FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+        }
+    }
+
     static var isFresh: Bool {
         [CaskIndex.cacheURL, casksURL, formulaeURL, popularityURL].allSatisfy { age(of: $0) < day }
     }

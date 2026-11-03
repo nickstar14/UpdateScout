@@ -368,3 +368,22 @@ signing identity is the other thing it has to prove (Phase 9 item 5).
 - Not checked: release notes sheet in dark, the offline message, the beta switch
   actually changing what Sparkle offers (needs a published beta), macOS 15.
 - Locked release notes saved as docs/release-notes-2.0.0.html (Sparkle) and .md (GitHub) for scripts/release.sh --channel beta <version> <html> <md>. The version string for the beta is chosen at release time; Info.plist says 2.0.0.
+
+## Fix: page toolbar items came back (3 Nov 2026, Nick)
+
+Switching to my own `NSToolbar` dropped every page's SwiftUI `.toolbar` items
+(Check Now and Update All on Updates, Refresh on Installed, Rescan on
+Orphaned App Files). Now the detail hosting view bridges `[.toolbars, .title]`
+again and `UpdatesWindow.ensureSidebarItems` adds the system's flexible space,
+sidebar toggle and tracking separator in front of SwiftUI's items, again
+whenever the page changes. A refresh arrow is now on **every page**: Updates
+(Check Now), Installed (Refresh), Discover (downloads Homebrew's lists again,
+`DiscoverCatalog.markStale`), Orphaned App Files (Rescan), Activity (reads the
+history again) and Settings (looks for the tools again). Checked: all six pages
+show the toggle and the arrow; collapse and reopen work; Discover's arrow
+rewrote the saved lists.
+- **Toggle spacing (Nick, 3 Nov 2026):** the circle was 39 pt and crossed the
+  divider by 4 pt. Now 33 pt with about 7 pt between it and the divider, kept
+  at every sidebar width. Checked at 190, 210 and 260 pt, collapsed by the
+  button and by dragging the divider shut, and reopened by the button:
+  position, click and title all follow.

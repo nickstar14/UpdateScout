@@ -201,6 +201,13 @@ final class DiscoverModel: ObservableObject {
     /// Shows the lists already on disk straight away, then refreshes them in
     /// the background when they're over a day old and swaps the new ones in.
     /// Only the very first load waits on the download.
+    /// The refresh arrow: download Homebrew's lists again now.
+    func refreshNow() {
+        guard !loadingCatalog else { return }
+        DiscoverCatalog.markStale()
+        reloadCatalog()
+    }
+
     func reloadCatalog() {
         loadingCatalog = true
         catalogError = nil

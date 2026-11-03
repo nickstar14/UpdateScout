@@ -535,6 +535,14 @@ struct ActivityPage: View {
             }
         }
         .navigationSubtitle("What was installed, checked and skipped")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { controller.reloadFromDisk() } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .help("Read the history again, including what background checks added")
+            }
+        }
         .sheet(item: $shownLog) { entry in
             VStack(alignment: .leading, spacing: 10) {
                 Text(entry.title).font(.headline)

@@ -41,6 +41,15 @@ struct DiscoverPage: View {
             }
         }
         .navigationSubtitle(model.subtitle)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { model.refreshNow() } label: {
+                    Label(model.loadingCatalog ? "Loading…" : "Refresh", systemImage: "arrow.clockwise")
+                        .symbolEffect(.rotate, options: .repeat(.continuous), isActive: model.loadingCatalog)
+                }
+                .help(model.loadingCatalog ? "Loading Homebrew's lists…" : "Download Homebrew's lists again")
+            }
+        }
         .onAppear {
             model.start()
             if controller.installed.isEmpty { controller.loadInstalled() }

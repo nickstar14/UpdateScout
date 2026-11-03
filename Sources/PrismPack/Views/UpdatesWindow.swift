@@ -42,20 +42,81 @@ enum Page: String, CaseIterable, Identifiable {
 
 }
 
-/// The toolbar's items are the system's own: the sidebar toggle and the
-/// separator that follows the split view's divider, so the toggle belongs to
-/// the sidebar's section. Returning nil for them lets AppKit supply both.
-final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        // The space first, so the toggle sits at the right end of the sidebar's
-        // section, against the divider (Nick, 3 Nov 2026).
-        [.flexibleSpace, .toggleSidebar, .sidebarTrackingSeparator]
+/// The sidebar toggle as a titlebar accessory: a glass circle at the right end
+/// of the sidebar section, which follows the divider as the sidebar is resized
+/// and sits beside the traffic lights when the sidebar is collapsed.
+@MainActor
+final class SidebarToggleAccessory: NSTitlebarAccessoryViewController {
+    private weak var split: NSSplitViewController?
+    private weak var sidebarItem: NSSplitViewItem?
+    private let model = Model()
+    private var observers: [NSObjectProtocol] = []
+    /// Where the accessory starts (after the traffic lights) plus the gap kept
+    /// between the circle and the divider.
+    private static let lightsWidth: CGFloat = 96
+    private static let height: CGFloat = 52
+
+    final class Model: ObservableObject { @Published var open = true }
+
+    init(split: NSSplitViewController, sidebarItem: NSSplitViewItem) {
+        self.split = split
+        self.sidebarItem = sidebarItem
+        super.init(nibName: nil, bundle: nil)
+        layoutAttribute = .leading
+        let host = NSHostingView(rootView: ToggleButton(model: model) { [weak split] in split?.toggleSidebar(nil) })
+        host.frame = NSRect(x: 0, y: 0, width: 140, height: Self.height)
+        view = host
+        // The sidebar's width changes by dragging the divider or collapsing.
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSSplitView.didResizeSubviewsNotification, object: split.splitView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.follow() }
+        })
+        DispatchQueue.main.async { [weak self] in self?.follow() }
     }
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .toggleSidebar, .sidebarTrackingSeparator]
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    deinit { observers.forEach(NotificationCenter.default.removeObserver) }
+
+    private func follow() {
+        guard let split, let sidebarItem else { return }
+        let open = !sidebarItem.isCollapsed
+        model.open = open
+        let sidebarWidth = split.splitView.arrangedSubviews.first?.frame.width ?? 210
+        let width = open ? max(sidebarWidth - Self.lightsWidth, 40) : 48
+        if abs(view.frame.width - width) > 0.5 { view.frame.size.width = width }
     }
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
-                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? { nil }
+
+    private struct ToggleButton: View {
+        @ObservedObject var model: Model
+        let action: () -> Void
+
+        var body: some View {
+            HStack {
+                Spacer(minLength: 0)
+                Button(action: action) {
+                    Image(systemName: "sidebar.leading")
+                        .font(.system(size: 13, weight: .regular))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Circle())
+                }
+                .modifier(CircleGlass())
+                .help("Show or hide the sidebar")
+                .accessibilityLabel("Sidebar")
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private struct CircleGlass: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(macOS 26.0, *) {
+                content.buttonStyle(.glass).buttonBorderShape(.circle)
+            } else {
+                content.buttonStyle(.bordered).buttonBorderShape(.circle)
+            }
+        }
+    }
 }
 
 /// The main window: an edge-to-edge sidebar and one unified toolbar.
@@ -63,8 +124,8 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
 final class UpdatesWindow {
     static let shared = UpdatesWindow()
     private var window: NSWindow?
-    private let toolbarDelegate = MainToolbarDelegate()
     private var titleWatch: AnyCancellable?
+    private var sidebarToggle: SidebarToggleAccessory?
 
     /// Frame of the window when it's on screen — other windows centre on it
     /// rather than on the display.
@@ -90,7 +151,7 @@ final class UpdatesWindow {
                 rootView: MainView().environmentObject(UpdateController.shared))
             // SwiftUI's .navigationTitle and .navigationSubtitle drive the
             // window's title.
-            detailHost.sceneBridgingOptions = [.title]
+            detailHost.sceneBridgingOptions = [.toolbars, .title]
             // Pages never size the window; a long page scrolls. Even
             // `.minSize` let Orphaned App Files stretch it to 2,367 pt
             // (31 Oct 2026): wrapping text measured at its narrowest made the
@@ -107,10 +168,14 @@ final class UpdatesWindow {
             w.title = UpdateController.shared.page.title
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.toolbarStyle = .unified
-            let toolbar = NSToolbar(identifier: "MainToolbar")
-            toolbar.delegate = toolbarDelegate
-            toolbar.displayMode = .iconOnly
-            w.toolbar = toolbar
+            // The sidebar toggle: SwiftUI owns the toolbar (each page's refresh and
+            // Update All), and its toolbar has no room for the system's toggle in
+            // the sidebar's section. So a titlebar accessory holds it: at the right
+            // end of the sidebar, against the divider, and beside the traffic
+            // lights when the sidebar is collapsed (Nick, 3 Nov 2026).
+            let toggle = SidebarToggleAccessory(split: split, sidebarItem: sidebarItem)
+            w.addTitlebarAccessoryViewController(toggle)
+            sidebarToggle = toggle
             titleWatch = detailHost.publisher(for: \.title).sink { [weak w] title in
                 if let title, !title.isEmpty { w?.title = title }
             }
@@ -134,6 +199,7 @@ final class UpdatesWindow {
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
                             self?.titleWatch = nil
+                            self?.sidebarToggle = nil
                             self?.window?.contentViewController = nil
                             self?.window = nil
                             // With the views gone, free what they were showing
@@ -365,3 +431,4 @@ struct GlassBackground: View {
         .ignoresSafeArea()
     }
 }
+
