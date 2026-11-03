@@ -355,6 +355,29 @@ ask Nick rather than invent a new pattern.
   before acting (not open, the kept copy whole, never the last copy),
   and puts things back if a step fails. Nick: "airtight".
 
+**More patterns, added 2 Nov 2026 (steps 12, 6, 7 and the install-progress
+work; use these too):**
+
+- **Strips:** one shape, `.strip(fill)` in `Style.swift`: the orange updates
+  strip, the rainbow rename strip, the teal Homebrew strip and the
+  duplicates strip all sit in the pinned header and share it.
+- **Row buttons** on Orphaned App Files are all small (`.controlSize(.small)`);
+  **Show in Finder is icon-only on rows and bars** (tooltip says it); pop-up
+  footers keep the text.
+- **Shared folders** look like normal rows: a `WarningBadge` (hover tooltip,
+  click popover) where the checkbox would be, a greyed trash button.
+- **Install progress:** one `InstallProgressView` everywhere (cards, rows,
+  pop-ups). A bar and a small % only where something is measured; otherwise a
+  spinner, the step word and "Can't measure progress" (plus the time after a
+  minute). Never an invented percentage. Data: `InstallProgress` (pure parser)
+  kept per item in `UpdateController.installProgress`.
+- **Network features load on demand and in memory only** (font previews and
+  styles, step 6) or are cached with a cap (web details, 50 MB). Nothing is
+  fetched for tiles; details fetch when a pop-up opens.
+- **Pop-ups need real buttons for anything clickable:** the automation can't
+  click inside a pop-up with a raw click (it lands on the page behind), only
+  press an accessibility button; a bare tap gesture isn't one. Label them.
+
 **Done in Phase 10:** steps 1 to 4; most of step 5 (one pop-up layout on
 Updates, Installed and Discover; the beta offer is still the Stable / Beta
 section where an app has one); step 8's Installed and Updates work
@@ -363,11 +386,18 @@ Settings' dependency list; the rename animation (the white ring knocks out
 "UpdateScout", the rainbow reveals "PrismPack"; replay it from the rainbow
 strip on Updates).
 
-**Left in Phase 10:** step 6 (font previews, written out above), step 7
-(web details with up to 3 pictures), step 9 ("Belongs to…"), step 10
-(other sources), step 11 (⌘Q prompt), step 12 (consistency pass across
-every tab) and step 13 (final review). Also from Nick's rounds: Productivity's
-yellow tint still looks gold-brown in dark.
+**Also done (committed 2 Nov 2026):** step 12 (consistency pass), step 6
+(font previews and the pop-up's style list), the install-progress work
+(commit `2d4af7a`) and step 7 (web details, `4abde8c`).
+
+**Left in Phase 10:** step 9 ("Belongs to…", plan written, waiting for Nick's
+OK: [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 (other
+sources), step 11 (⌘Q prompt) and step 13 (final review). Also: Productivity's
+yellow tint still looks gold-brown in dark (needs a colour decision);
+"What's new in 2.0" needs Nick's OK on new wording
+([whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
+step 7's larger-picture window (Nick to try; automation can't send keys to a
+panel); the Phase 9 leftovers list.
 
 **Not verified live:** choosing from the Sort and Source menus (menus can't
 be opened while Claude works in the background); the Size and Date sorts
@@ -613,14 +643,15 @@ only Google's file host followed). Checked in light and dark, Cards and
 List; Theme back to Light. **Not seen:** the fetch under a slow or failed
 connection (falls back to name only by design).
 
-**Planned next (Nick, 2 Nov 2026):** install progress in every tile and a richer font pop-up: **[install-progress-plan.md](install-progress-plan.md)**. Waiting for his LM Studio install to finish, then one build.
+**Records of the 2 Nov 2026 builds:** [install-progress-plan.md](install-progress-plan.md)
+(install progress and the font pop-up's styles, built and checked, including the
+Krita download that showed the bar fill) and
+[step7-web-details-plan.md](step7-web-details-plan.md) (built and checked).
+The step 9 plan is [step9-belongs-to-plan.md](step9-belongs-to-plan.md).
 
-**Step 7 plan written (2 Nov 2026), waiting for Nick's OK:** [step7-web-details-plan.md](step7-web-details-plan.md).
-
-**Step 9 plan written (2 Nov 2026), waiting for Nick's OK:** [step9-belongs-to-plan.md](step9-belongs-to-plan.md).
-
-**Next:** step 12 is built; steps 6, 7, 9, 10, 11 and 13 follow. (Old note: a new session starts with step 12's consistency pass across
-every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.
+**Next:** a new session reads the starter in [next-session.md](next-session.md):
+step 9 (after Nick's OK on its plan), then steps 10, 11 and 13, with the
+"What's new" wording approval and the leftovers above.
 
 ## Step 4 plan: Discover page
 
@@ -712,7 +743,7 @@ the next. No rebuild while Nick is mid-step.
    Discover, Installed and Updates. Helpers bottom left, Close then the main
    action bottom right, Move to Trash in red set apart; beta offer;
    web description and a row of up to 3 screenshots (step 7).
-6. **Fonts** (font previews; Nick asked for them again, 2 Nov 2026): as in
+6. **Fonts, BUILT 2 Nov 2026** (font previews; Nick asked for them again, 2 Nov 2026): as in
    the mockup, each font card draws a sample line ("The quick brown fox
    jumps over the lazy dog") in that font, previewed from Google Fonts
    without installing it. The cask's name (`font-inter`) maps to the Google
@@ -721,7 +752,7 @@ the next. No rebuild while Nick is mid-step.
    while the Fonts page is on screen, for the cards being shown, and are
    neither installed nor kept: they're released when the page closes.
    Cards and List both show the sample.
-7. **Web details** (new `Discover/DiscoverDetails.swift`): page description and
+7. **Web details, BUILT 2 Nov 2026** (new `Discover/DiscoverDetails.swift`): page description and
    **up to 3 pictures** from the app's homepage (Nick, 2 Nov 2026): the
    page's main preview image, plus up to two more large, screen-shaped
    images from the page (logos and small images skipped; one or none when
@@ -751,7 +782,7 @@ the next. No rebuild while Nick is mid-step.
    existing `custom_sources.json` format, so 1.8.0 entries keep working.
 11. **⌘Q prompt** (`AppDelegate.swift`): `applicationShouldTerminate` asks
     as above; "Don't ask again" stored in preferences.
-12. **Consistency pass:** apply button placement to Move to Trash, adoption,
+12. **Consistency pass, BUILT 2 Nov 2026:** apply button placement to Move to Trash, adoption,
     duplicates and the major-upgrade review; filters as segmented control or
     menu; then go through every tab (Updates, Installed, Discover, Orphaned
     App Files, Activity, Settings) checking cards, rows, pills, buttons and

@@ -133,6 +133,20 @@ Phase 9 (leftover cleanup) has its own record in
   setting is `unmanaged`: put it back). Installed takes about 20 s to load
   (it calls `brew info`). An `NSAlert` opens as its own window: find it with
   `app_list_windows`.
+- **Driving pop-ups from the background:** a raw click inside an arrow
+  pop-up lands on the page behind it. Anything clickable in a pop-up must be a
+  real `Button` with an accessibility label (a tap gesture on an image can't be
+  pressed). Pop-ups past the window's edge can't be captured; scroll the row
+  near the top or bottom so the pop-up opens inside the window. A window left
+  on another Space can't be driven; ask Nick to bring it.
+- **Network features:** Google Fonts (font tiles and styles) and apps' own
+  websites (descriptions, pictures) are fetched only when something is on
+  screen or a pop-up opens, and held in memory (fonts) or capped on disk
+  (`discover-details/`, 50 MB). Hosts like GitHub are skipped for web details.
+- **Installing real apps to watch progress:** Homebrew caches downloads in
+  `~/Library/Caches/Homebrew/downloads`, so a cask downloaded before shows a
+  full bar at once. Use an uncached throwaway (Krita, 374 MB, worked), remove
+  it with `brew uninstall`, and leave Homebrew's cache alone unless Nick says.
 - **Liquid Glass:** `build-app.sh` patches the linked-SDK version so AppKit
   uses the new UI. Use the `.glass()` and `.glassProminent(_:)` helpers and
   `GlassBackground` from `Views/Style.swift`.
