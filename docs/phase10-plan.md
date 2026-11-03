@@ -390,12 +390,10 @@ strip on Updates).
 (font previews and the pop-up's style list), the install-progress work
 (commit `2d4af7a`) and step 7 (web details, `4abde8c`).
 
-**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 is built and checked (uncommitted; see below), step 11 (⌘Q prompt) is built and checked (uncommitted) and step 13 (final review). Also: Productivity's
-yellow tint still looks gold-brown in dark (needs a colour decision);
-"What's new in 2.0" new wording is in the app (Nick approved it 2 Nov;
-fine-tuned in step 13, [whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
-step 7's larger-picture window (Nick to try; automation can't send keys to a
-panel); the Phase 9 leftovers list.
+**Left in Phase 10 (3 Nov 2026):** steps 9, 10, 11, 12b and the pictures work are built, checked and committed (step 11 `ad7d6af`, 12b `f7af3af`, pictures `cbc6e88`; nothing pushed). Left, in this order:
+1. **Memory with the window closed** (approved 3 Nov; [memory-plan.md](memory-plan.md)): 152 MB closed after use vs 15 MB fresh; give freed memory back, free Discover's catalogue on close, re-measure.
+2. **Step 13, the final review**, which now also holds: Productivity's yellow tint (gold-brown in dark, needs Nick's colour decision); the "What's new in 2.0" fine-tune ([whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the Phase 9 leftovers list; dark-mode check of the new pop-up picture view and a try of the ← → / Esc keys inside it (automation can't send keys there; Nick tried them in the window, which work); the pop-up that hangs past the window's bottom edge (Nick: leave); the Lightness before/after table.
+Done by Nick on 3 Nov: the ← → keys in the larger-picture window work.
 
 **Step 10, other sources (built 2 Nov 2026, uncommitted;
 [step10-other-sources-plan.md](step10-other-sources-plan.md)):** Settings'

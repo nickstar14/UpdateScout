@@ -147,6 +147,14 @@ Phase 9 (leftover cleanup) has its own record in
   `~/Library/Caches/Homebrew/downloads`, so a cask downloaded before shows a
   full bar at once. Use an uncached throwaway (Krita, 374 MB, worked), remove
   it with `brew uninstall`, and leave Homebrew's cache alone unless Nick says.
+- **Memory is measured with `footprint <pid>`** (not RSS) and `heap <pid> -s`
+  on the test build (3 Nov 2026): 15 MB on a fresh launch with no window,
+  about 150 MB after browsing Installed and Discover, and closing the window
+  alone doesn't lower it (see `docs/memory-plan.md`). Closing the main window
+  drops its views (`UpdatesWindow`); pages must not hold big data past that.
+- **Pictures** (web details) are kept 1280 px wide (`DetailsCache.version`
+  2); change the width or the format and bump the version, or old cache
+  folders keep the old size.
 - **Liquid Glass:** `build-app.sh` patches the linked-SDK version so AppKit
   uses the new UI. Use the `.glass()` and `.glassProminent(_:)` helpers and
   `GlassBackground` from `Views/Style.swift`.
