@@ -24,6 +24,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    /// Set by quits that must not ask: the menu bar's Quit, the rename
+    /// migration, Full Disk Access's relaunch.
+    nonisolated(unsafe) static var skipQuitPrompt = false
+
+    /// Quit without the "Quit PrismPack?" prompt.
+    static func quitWithoutAsking() {
+        skipQuitPrompt = true
+        NSApp.terminate(nil)
+    }
+
+    /// ⌘Q and the Dock's Quit ask first (Nick, step 11). Close Window is the
+    /// default, so Return keeps the menu bar prism and notifications.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if Self.skipQuitPrompt || !Prefs.askBeforeQuit || Self.isSystemQuit { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "Quit \(AppIdentity.name)?"
+        alert.informativeText = Self.quitPromptText(backgroundOn: LaunchAgent.isInstalled)
+        alert.icon = NSApp.applicationIconImage
+        let close = alert.addButton(withTitle: "Close Window (\u{2318}W)")
+        close.keyEquivalent = "\r"
+        alert.addButton(withTitle: "Quit").keyEquivalent = ""
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Don't ask again"
+        NSApp.activate(ignoringOtherApps: true)
+        let reply = alert.runModal()
+        if alert.suppressionButton?.state == .on { Prefs.askBeforeQuit = false }
+        if reply == .alertSecondButtonReturn { return .terminateNow }
+        NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.performClose(nil)
+        return .terminateCancel
+    }
+
+    static func quitPromptText(backgroundOn: Bool) -> String {
+        let first = backgroundOn
+            ? "Checks and automatic updates keep running in the background either way."
+            : "Checks and automatic updates stop until you open \(AppIdentity.name) again."
+        return first + " Closing the window keeps the menu bar prism and update notifications in \(AppIdentity.name)."
+    }
+
+    /// Log out, restart and shut down also ask apps to quit; never hold those up.
+    private static var isSystemQuit: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) else { return false }
+        return [kAELogOut, kAEReallyLogOut, kAERestart, kAEShowRestartDialog, kAEShutDown, kAEShowShutdownDialog]
+            .contains(reason.enumCodeValue)
+    }
+
     /// Opening the app again (Finder, Spotlight, `open`) while it's running
     /// shows the window, as other Mac apps do.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

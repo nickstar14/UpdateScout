@@ -390,7 +390,7 @@ strip on Updates).
 (font previews and the pop-up's style list), the install-progress work
 (commit `2d4af7a`) and step 7 (web details, `4abde8c`).
 
-**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 is built and checked (uncommitted; see below), step 11 (⌘Q prompt) and step 13 (final review). Also: Productivity's
+**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 is built and checked (uncommitted; see below), step 11 (⌘Q prompt) is built and checked (uncommitted) and step 13 (final review). Also: Productivity's
 yellow tint still looks gold-brown in dark (needs a colour decision);
 "What's new in 2.0" new wording is in the app (Nick approved it 2 Nov;
 fine-tuned in step 13, [whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
@@ -803,7 +803,7 @@ the next. No rebuild while Nick is mid-step.
    link, or app + version page + "open download page / run a command", Test
    button, Advanced for pattern / JSON key / version command). Saves to the
    existing `custom_sources.json` format, so 1.8.0 entries keep working.
-11. **⌘Q prompt** (`AppDelegate.swift`): `applicationShouldTerminate` asks
+11. **⌘Q prompt, BUILT 2 Nov 2026** ([step11-quit-prompt-plan.md](step11-quit-prompt-plan.md); uncommitted) (`AppDelegate.swift`): `applicationShouldTerminate` asks
     as above; "Don't ask again" stored in preferences.
 12. **Consistency pass, BUILT 2 Nov 2026:** apply button placement to Move to Trash, adoption,
     duplicates and the major-upgrade review; filters as segmented control or
@@ -851,3 +851,18 @@ the next. No rebuild while Nick is mid-step.
 The Sparkle signing test (before the first certificate-signed release), the
 three Phase 9 polish items, and the Full Disk Access helper's in-app drag stay
 on their own lists.
+
+## Step 11 results (2 Nov 2026, test build)
+
+Built as in [step11-quit-prompt-plan.md](step11-quit-prompt-plan.md), plus the
+"Ask before quitting (⌘Q)" switch under Settings > Background checking.
+
+Checked in the test build: the prompt in light and dark (Theme set back to
+Light); Close Window (Return default) closes the window and the app stays
+running; the Quit menu item shows the prompt; ticking "Don't ask again" then
+Quit quit the app and saved `askBeforeQuit = false` (key then deleted, so
+Nick's setting is back to "ask"); the switch shows in Settings (search
+"quit"). Not driven: the real menu bar prism's Quit (it uses the
+no-prompt path by code), the "background checking off" wording (pure text
+function, not toggled so the real launchd agent is untouched), log out
+and shutdown (skipped by the Apple event quit reason).

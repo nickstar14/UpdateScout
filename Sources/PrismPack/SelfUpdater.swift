@@ -30,6 +30,7 @@ final class SelfUpdaterDelegate: NSObject, SPUUpdaterDelegate {
     /// window on the way back up, rather than only the menu bar icon.
     func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
         UserDefaults.standard.set(true, forKey: SelfUpdater.reopenWindowKey)
+        AppDelegate.skipQuitPrompt = true
     }
 
     static func channels(forVersion version: String) -> Set<String> {

@@ -120,5 +120,5 @@ final class StatusItemController: NSObject {
     @objc private func openWindow() { UpdatesWindow.shared.show() }
     @objc private func checkNow() { UpdateController.shared.checkNow() }
     @objc private func openSettings() { SettingsWindow.show() }
-    @objc private func quit() { NSApp.terminate(nil) }
+    @objc private func quit() { AppDelegate.quitWithoutAsking() }
 }

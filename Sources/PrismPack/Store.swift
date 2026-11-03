@@ -184,6 +184,12 @@ enum Prefs {
         set { UserDefaults.standard.set(newValue.map(Array.init), forKey: "customBackgroundNames") }
     }
 
+    /// ⌘Q asks "Quit PrismPack?" first; "Don't ask again" turns it off.
+    static var askBeforeQuit: Bool {
+        get { UserDefaults.standard.object(forKey: "askBeforeQuit") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "askBeforeQuit") }
+    }
+
     /// Ask for the admin password once per batch instead of once per sudo call.
     static var askPasswordOncePerBatch: Bool {
         get { UserDefaults.standard.object(forKey: "askPasswordOncePerBatch") as? Bool ?? true }

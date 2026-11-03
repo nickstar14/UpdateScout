@@ -65,7 +65,7 @@ enum Migration {
         config.arguments = Array(CommandLine.arguments.dropFirst())
         NSWorkspace.shared.openApplication(at: target, configuration: config) { _, error in
             if let error { NSLog("Rename: relaunch failed: %@", error.localizedDescription) }
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+            DispatchQueue.main.async { AppDelegate.quitWithoutAsking() }
         }
         return true
     }

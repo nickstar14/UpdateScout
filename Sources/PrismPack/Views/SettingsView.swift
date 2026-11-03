@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var agentInstalled = LaunchAgent.isInstalled
     @State private var agentStalled = LaunchAgent.isStalled
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var askBeforeQuit = Prefs.askBeforeQuit
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
     @State private var updateConcurrency = Prefs.updateConcurrency
@@ -56,6 +57,7 @@ struct SettingsView: View {
         "adoptSuggest": "suggest apps that can move under homebrew adoption adopt",
         "adoptSelf": "include apps that already update themselves",
         "login": "start at login",
+        "quit": "ask before quitting quit command q prompt don't ask again",
         "background": "check for updates in the background check every interval minutes hours notify",
         "theme": "theme light dark system appearance",
         "glass": "glass clear opaque tint wash",
@@ -69,7 +71,7 @@ struct SettingsView: View {
         "Setup": ["setup", "fullDisk"],
         "Updating": ["concurrency", "password", "auto"],
         "Homebrew adoption": ["adoptSuggest", "adoptSelf"],
-        "Background checking": ["login", "background"],
+        "Background checking": ["login", "quit", "background"],
         "Appearance": ["theme", "glass", "dock"],
         "Other sources": ["other"],
         "Drivers": ["drivers"],
@@ -278,6 +280,10 @@ struct SettingsView: View {
                         do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
                         catch { agentError = error.localizedDescription }
                     }
+                }
+                if shows("Background checking", "quit") {
+                Toggle("Ask before quitting (\u{2318}Q)", isOn: $askBeforeQuit)
+                    .onChange(of: askBeforeQuit) { _, on in Prefs.askBeforeQuit = on }
                 }
                 if shows("Background checking", "background") {
                 Toggle("Check for updates in the background", isOn: $agentInstalled)

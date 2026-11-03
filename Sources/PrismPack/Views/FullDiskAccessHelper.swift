@@ -57,7 +57,7 @@ enum FullDiskAccess {
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", path]
         try? task.run()
-        NSApp.terminate(nil)
+        AppDelegate.quitWithoutAsking()
     }
 }
 
