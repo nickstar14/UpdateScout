@@ -18,33 +18,28 @@ Read first, in this order:
 3. In `docs/phase10-plan.md`: "Status at handoff" (the UI patterns every page
    must follow, including the ones added on 2 Nov) and "Left in Phase 10".
 
-Done and committed since the last starter: step 12 (consistency pass), step 6
-(font previews and style list), install progress everywhere (a bar and % only
-where measured), step 7 (web descriptions and pictures in pop-ups). The
-records are `docs/install-progress-plan.md` and `docs/step7-web-details-plan.md`.
+Done and committed: steps 12, 6, 7 and 9, install progress everywhere, and the
+approved "What's new in 2.0" list (in `RenameWelcome.changes`). Records:
+`docs/install-progress-plan.md`, `docs/step7-web-details-plan.md`,
+`docs/step9-belongs-to-plan.md`, `docs/whats-new-2.0-proposal.md`.
 
 Tasks, in this order:
 
-1. **Step 9, Orphaned App Files "Belongs to…".** The plan is written:
-   `docs/step9-belongs-to-plan.md`. Put its three questions to me in plain
-   words first (where to store it, button placement, ticked by default), then
-   build it in one build and check it live with a throwaway dummy app and fake
-   leftovers (never my real apps or orphans), in light and dark (Theme back to
-   Light). Record the results in `docs/phase10-plan.md` and ask before
-   committing.
-2. **"What's new in 2.0"** is in the app with the wording I approved on
-   2 Nov (`RenameWelcome.changes`; record in
-   `docs/whats-new-2.0-proposal.md`). Add step 9's line once built; I fine-tune
-   the whole list in step 13.
-3. **Steps 10 (other sources) and 11 (⌘Q prompt),** each planned and shown
-   before building, as always.
-4. **Step 13, the final review** (visual, operations and wording
-   consistency, the "What's new" fine-tune, the arrow keys, lightness
-   measurements, a written list of what was checked).
+1. **Step 10, other sources** (Settings list, "Add a Source…" sheet for GitHub
+   links or custom sources; see step 10 in the build order of
+   `docs/phase10-plan.md`). Plan it first (research the existing
+   `Views/SettingsView.swift`, `Views/GitHubLinkViews.swift` and
+   `CustomSource`), show me the plan with any questions in plain words, and
+   wait for my OK before building.
+2. **Step 11, the ⌘Q prompt** (`AppDelegate.applicationShouldTerminate`; see
+   "Nick's decisions" in the Phase 10 plan). Same: plan, show, OK, build.
+3. **Step 13, the final review** (visual, operations and wording
+   consistency, the "What's new" fine-tune with me, the ← → arrow keys in the
+   larger-picture window, lightness measurements, a written list of what was
+   checked).
 
-The ← → arrow keys in the larger-picture window wait for step 13 (the
-automation can't send keys to that panel). Productivity's yellow tint still looks gold-brown in dark
-and needs a colour decision from me.
+Productivity's yellow tint looks gold-brown in dark (the tint over dark glass
+muddies it) and needs a colour decision from me, probably at step 13.
 
 Testing notes:
 - The installed 1.8.0's background agent rewrites `state.json` every 5 minutes
