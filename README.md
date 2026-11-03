@@ -77,6 +77,11 @@ software, each in its own colour.
 2. Unzip it and drag **PrismPack** to your Applications folder.
 3. Open it. A prism appears in the menu bar; click it to open the window.
 
+> **First launch.** PrismPack isn't notarized by Apple yet, so macOS may say it
+> can't verify the developer. Open **System Settings → Privacy & Security**,
+> scroll to the message about PrismPack and choose **Open Anyway**. You only do
+> this once; updates that PrismPack installs itself don't ask again.
+
 Requires **macOS 15 or later** on a Mac with **Apple silicon**. The Liquid
 Glass look needs macOS 26; earlier versions get a simpler look. Homebrew is
 expected, and `mas` is optional (the App Store row in Settings tells you how to

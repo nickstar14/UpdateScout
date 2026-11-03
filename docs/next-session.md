@@ -5,52 +5,34 @@ Paste this as the first message of a new Claude Code session in
 
 ---
 
-Continue PrismPack 2.0 on the `release/2.0.0` branch (last commit `cbc6e88`,
-everything committed, nothing pushed).
+Continue PrismPack on branch `release/2.0.0` (same as `main` at `a273c0a`,
+2.0.0-beta.1 is published as a GitHub pre-release).
 
 Read first, in this order:
-1. `CLAUDE.md` (my working rules: plan before building, batch feedback into
-   one build, go easy on usage, consistency is the first rule, never
-   push/tag/release, commit only when I ask, ask before leaving the project
-   folder, test only on throwaway apps, and "Things that bite").
-2. The Status line in `docs/2.0.0-build-guide.md`.
-3. In `docs/phase10-plan.md`: "Status at handoff" (the UI patterns every page
-   must follow) and "Left in Phase 10".
+1. `CLAUDE.md` (my rules: plan before building, batch feedback into one build,
+   go easy on usage, consistency first, never push/tag/release unless I ask,
+   commit only when I ask, ask before leaving the project folder, test only on
+   throwaway apps).
+2. `docs/step13-final-review-plan.md`: "Published: 2.0.0-beta.1" and "Where to
+   go from here". The status of everything else is in `docs/2.0.0-build-guide.md`
+   (top of the status block) and `docs/phase10-plan.md`.
 
-Done and committed: Phase 10 steps 1 to 12, install progress, the a-z check
-fixes (step 12b), the pictures work and the ⌘Q prompt. Records:
-`docs/step11-quit-prompt-plan.md`, `docs/step12b-fixes-plan.md`,
-`docs/step15-pictures-plan.md`, and the results sections at the end of
-`docs/phase10-plan.md`.
+State: the beta is installed on my Mac at `/Applications/PrismPack.app`. Nothing
+is waiting to be committed unless `git status` says so.
 
-Tasks, in this order:
-
-1. **Memory with the window closed** (I approved the plan on 3 Nov:
-   `docs/memory-plan.md`). Build it as written: give freed memory back
-   (`malloc_zone_pressure_relief`) after the window closes and after the heavy
-   loads; free Discover's catalogue, caches and icons when the main window
-   closes (the `willClose` hook in `UpdatesWindow` already drops the window
-   and views); check the leftover SwiftUI state. Measure with `footprint <pid>`
-   (and `heap <pid> -s`) before and after at the same five moments and put the
-   table in `docs/phase10-plan.md`. Check light and dark, ask before
-   committing.
-2. **Step 13, the final review** (see its list in `docs/phase10-plan.md`).
-   Plan it first, show me the plan, wait for my OK.
-
-Productivity's yellow tint looks gold-brown in dark and needs a colour
-decision from me, at step 13.
+Likely tasks, in this order (ask me which):
+1. Fix what I find in the beta, then release `2.0.0-beta.2` the same way.
+2. The Sparkle rehearsal with throwaway apps (plan in the step 13 doc), then
+   the final 2.0.0 for UpdateScout 1.8.0 users.
+3. 2.0.1 / 2.1.0: switch the feed URL, rename the repo, notarization question.
 
 Testing notes:
-- The installed 1.8.0's background agent rewrites `state.json` every 5 minutes
-  without 2.0's fields, so Activity empties in test builds; ask me before
-  pausing it. Never toggle "Check for updates in the background" or change
-  "Check every" in a test build. Never touch the keychain or System Settings.
-- Quit the installed copy before running a test build; both share the bundle
-  ID and data folder. `open build/PrismPack.app` twice if its window doesn't
-  appear. Kill the old test copy with `kill <pid>` before rebuilding.
-- Driving the window from the background: use `app_click` with an
-  `element_index` (Theme, Cards / List and other segmented controls ignore
-  raw clicks); ⌘W via `app_key` with a `coordinate`; Installed takes about
-  25 s to load; Orphaned App Files about 40 s. Put Theme back to Light and
-  Installed back to List afterwards.
-- Don't read `~/Library` (not even the details cache) without asking me.
+- Don't touch the keychain or System Settings; use the app's own Theme setting
+  and put it back to Light; Installed takes 25-40 s to load; Orphaned App
+  Files about 40 s.
+- Drive the window from the background with `app_click` and `element_index` (or
+  coordinates from a fresh screenshot); the green traffic light goes full
+  screen, not zoom. Close the window with Window > Close.
+- Measure memory with `footprint <pid>` on the GUI process only.
+- Release only when I say so: `gh auth switch --user nickstar14`, run
+  `scripts/release.sh` on `main`, then `gh auth switch --user IHMS-IT`.

@@ -401,3 +401,73 @@ rewrote the saved lists.
   to…, Show in Finder, Keep and Move to Trash, shared-folder badges and notes.
   Nothing was clicked.
 - **Memory table:** in `phase10-plan.md`, "Lightness: before and after".
+
+
+## Published: 2.0.0-beta.1 (3 Nov 2026)
+
+- **Commits** (all on `release/2.0.0`, then `main` fast-forwarded to it):
+  `6845bc3` step 13 (rename Part 2, split-view window, Release Notes, Beta
+  switch, wording, README), `5efc7d7` sidebar toggle accessory and refresh
+  arrows, `735f3e0` release.sh bridge rule, `7860d54` polish and memory table,
+  `a273c0a` "Release 2.0.0-beta.1" (made by `scripts/release.sh`, Info.plist
+  now 2.0.0-beta.1, build 26, appcast item added).
+- **Command run:** `scripts/release.sh --channel beta 2.0.0-beta.1
+  docs/release-notes-2.0.0.html docs/release-notes-2.0.0.md` on `main`, with
+  `gh` switched to `nickstar14` and back to `IHMS-IT` afterwards.
+- **Checked after:** the live appcast lists Version 2.0.0-beta.1 with
+  `sparkle:channel` beta, macOS 15, arm64; the release is a Pre-release; the zip
+  (6,115,390 bytes, `PrismPack.app` inside, signature valid, bundle ID
+  `com.nickszun.prismpack`) downloads with HTTP 200.
+- **Who gets it:** nobody on UpdateScout 1.8.0 stable (it has no Beta choice and
+  sees only untagged items). Testers download the zip. A running beta follows
+  betas and the final release by itself; **Settings → Beta versions** lets a
+  stable install follow betas (it shows on by itself while a beta is running).
+- **Nick's Mac, cleaned and installed:** the installed copy is now
+  `/Applications/PrismPack.app` 2.0.0-beta.1, downloaded from the published
+  release and checked (the old 1.8.0 `UpdateScout.app` was replaced; a copy is
+  in `~/Desktop/PrismPack-backup`). The background agent
+  (`com.nickszun.prismpack.check`) was re-pointed to the installed path by the
+  app itself. Full Disk Access stayed on. Test leftovers removed: `com.rehearsal.*`
+  preferences, caches and HTTP storage, and the stale `channelChoices` test entry.
+  **Not removable from a shell** (macOS: Operation not permitted): the Phase 9
+  test folder `~/Library/Group Containers/group.com.nickszun.leftovertest2`
+  (Nick can remove it in Finder) and anything left in the Trash.
+
+## Where to go from here
+
+1. **Live with the beta.** Use it a few days; collect what's wrong. Each fix
+   goes out as the next beta: `scripts/release.sh --channel beta
+   2.0.0-beta.2 <html> <md>` from `main` (ask first, `gh auth switch --user
+   nickstar14`, back to `IHMS-IT`, check `git push --dry-run origin main`).
+   Beta.1 → beta.2 is the first real Sparkle test: "Check for Updates" in a
+   running beta should offer it.
+2. **Sparkle rehearsal before the final 2.0.0** (`phase9-leftovers-plan.md`
+   item 5 and 6): throwaway Sparkle apps, local feed, throwaway EdDSA key. Prove
+   that a host named `UpdateScout.app` with the old bundle ID updates to a
+   `PrismPack` build with the new bundle ID and a changed signing identity
+   (ad hoc or old cert → "PrismPack Signing"); that Sparkle finds the app inside
+   a zip that holds `UpdateScout.app`; and that a bad EdDSA signature is refused.
+   Never against Nick's real apps.
+3. **Final 2.0.0:** `scripts/release.sh 2.0.0 <html> <md>` (no `--channel`), so
+   the item reaches 1.8.0. The zip holds `UpdateScout.app` (the bridge in
+   `release.sh`). Notes need Nick's OK first; the in-app rename banner
+   (`Migration.showsRenameBanner`) stays for all of 2.0.
+4. **2.0.1 or 2.1.0, the repo rename:** ship a build whose `Info.plist`
+   `SUFeedURL` uses the new repo name (still published through the old feed),
+   then rename the repo on GitHub, then change `AppIdentity.repo` and `REPO` in
+   `release.sh`. Never create a new repo called UpdateScout. Test the redirect
+   for raw files and release downloads with a throwaway repo first.
+5. **Gatekeeper:** the app is self-signed, not notarized. A downloaded zip is
+   quarantined, so a tester sees "can't verify the developer" and must use
+   **System Settings → Privacy & Security → Open Anyway** (README says so).
+   Notarization needs a Developer ID certificate; that changes the signing
+   identity, so it needs its own Sparkle test and plan.
+6. **Not verified and worth a look:** macOS 15 and 26 (this Mac is on 27); the
+   Release Notes offline message; the beta channel switch changing what Sparkle
+   offers; the memory numbers vary a lot run to run (95 to 114 MB after a heavy
+   session, 15 MB fresh; see `phase10-plan.md`); a second memory-release pass
+   after closing the window was not tried.
+7. **Housekeeping for Nick:** `~/Desktop/PrismPack-backup` (1.8.0 app, data,
+   prefs, agent plist) can go once the beta is trusted. The 1.x preference domain
+   `com.nickszun.updatescout` is still there (copied, not moved). The old
+   migration code in `Migration.swift` should stay for several releases.

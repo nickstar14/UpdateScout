@@ -99,6 +99,10 @@ Phase 9 (leftover cleanup) has its own record in
   - It bumps `CFBundleVersion`, builds, zips and EdDSA-signs the app.
   - It updates `appcast.xml`, commits, tags `v<version>` and pushes `main`.
   - It creates the GitHub release.
+  - **Betas:** `scripts/release.sh --channel beta 2.0.0-beta.N <html> <md>`: the
+    appcast item is tagged beta (only running betas see it), the GitHub release is
+    a Pre-release, and the zip holds `PrismPack.app`. 2.0.0-beta.1 was released
+    this way on 3 Nov 2026 (`docs/step13-final-review-plan.md`).
   - Afterwards, check that the appcast on `raw.githubusercontent.com` lists the
     new version and that the zip downloads.
 
