@@ -524,3 +524,26 @@ next build: its position collapsed and open, light and dark. Fallback if it
 lands wrong: AppKit `NSToolbarToggleSidebarItemIdentifier` plus
 `NSToolbarSidebarTrackingSeparatorItemIdentifier`. Reusable notes:
 [liquid-glass-guide.md](liquid-glass-guide.md).
+
+## Lightness: before and after (3 Nov 2026, step 13)
+
+`footprint <pid>` on the test build, GUI process only, same five moments as
+[memory-plan.md](memory-plan.md). "Before" is the table there (before the memory
+work, commit `1df9945`); "After" is a fresh run of the final build.
+
+| Moment | Before | After |
+|---|---|---|
+| Fresh launch, window never opened, 20 s idle | 15 MB | **15 MB** |
+| Updates page open | 60 MB | 69 MB |
+| After Installed has loaded | 109 MB | 115 MB |
+| After Discover has loaded | 151 MB | 127 MB |
+| **Window closed**, 10 s later | 152 MB | **114 MB** |
+| Window closed, about 2 minutes later | n/a | 114 MB |
+| Window closed, about 5 minutes later | n/a | 95 MB |
+
+Live heap objects with the window closed: 19.5 MB (nothing big is held). The rest
+is fragmented malloc pages that macOS compresses slowly. The first run after
+`1df9945` read 89 MB right after closing and 73 MB a few minutes later, so this run
+is higher than that one; run-to-run variation (Installed's `brew info` and
+icon decoding) is large. No helper process (Nick's decision). Not re-checked:
+whether a second `MemoryRelief` pass a few seconds after closing returns more.

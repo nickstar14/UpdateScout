@@ -387,3 +387,17 @@ rewrote the saved lists.
   at every sidebar width. Checked at 190, 210 and 260 pt, collapsed by the
   button and by dragging the divider shut, and reopened by the button:
   position, click and title all follow.
+
+## The unfinished items (3 Nov 2026, run after Nick asked)
+
+- **Phase 9 polish, fixed:** the stale "Removed" / "In the Trash" pill clears
+  when the item is installed again (`loadInstalled`); an app found by cask token
+  shows its name as on disk (`AppLocator.realCase`, test in `PolishTests`); the
+  Activity line for an uninstall says whether Homebrew's cleanup list ran.
+- **Dark check of the Release Notes sheet:** readable, glass menu, Open on
+  GitHub and close circle fine. Offline message not seen (needs the network off,
+  which I don't do); the parsing is tested.
+- **Orphaned App Files scan:** finished, list with per-item Show files, Belongs
+  to…, Show in Finder, Keep and Move to Trash, shared-folder badges and notes.
+  Nothing was clicked.
+- **Memory table:** in `phase10-plan.md`, "Lightness: before and after".

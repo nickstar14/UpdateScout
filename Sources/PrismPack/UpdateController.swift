@@ -50,6 +50,14 @@ final class UpdateController: ObservableObject {
             duplicates = await Duplicates.scan(records: await Duplicates.caskRecords())
             installed = list
             loadingInstalled = false
+            // Something removed and then put back (outside PrismPack) offers
+            // Uninstall again, not "Removed" until the next launch.
+            for pkg in list {
+                guard let removal = Removal(pkg) else { continue }
+                for job in [removal.item, removal.zap?.item].compactMap({ $0 }) where installStates[job.id] == .done {
+                    installStates[job.id] = nil
+                }
+            }
             if separateBetas.isEmpty, installed.contains(where: { $0.detail?.hasPrefix("cask ") == true }) {
                 separateBetas = await CaskIndex.separateBetas()
             }
@@ -389,8 +397,10 @@ final class UpdateController: ObservableObject {
             // The app is in the Trash: now its leftovers, then one Activity line.
             let outcome = leftovers.isEmpty ? Leftovers.Outcome() : await Leftovers.moveToTrash(leftovers)
             if !leftovers.isEmpty { leftoverOutcomes[job.id] = outcome }
+            // Says whether Homebrew's cleanup list ran, and what else moved.
             let detail = DiscoverInstaller.sourceTitle(of: job.installToken)
-                + (outcome.moved.isEmpty ? "" : ", with " + Self.leftoverSummary(outcome.moved))
+                + (job.installToken.hasPrefix("zap:") ? ", with Homebrew's cleanup list" : "")
+                + (outcome.moved.isEmpty ? "" : (job.installToken.hasPrefix("zap:") ? " and " : ", with ") + Self.leftoverSummary(outcome.moved))
             state = Store.mutate {
                 $0.log(ActivityEntry(kind: .removed, title: job.name, detail: detail,
                                      itemID: job.id, sourceID: job.sourceID, seconds: seconds))

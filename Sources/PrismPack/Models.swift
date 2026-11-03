@@ -116,9 +116,21 @@ enum AppLocator {
                     NSHomeDirectory() + "/Applications"]
         for dir in dirs {
             let path = dir + "/" + name + ".app"
-            if FileManager.default.fileExists(atPath: path) { return path }
+            if FileManager.default.fileExists(atPath: path) { return realCase(of: path) }
         }
         return nil
+    }
+
+    /// The disk is case-insensitive, so a cask token ("itsycal") finds
+    /// "Itsycal.app"; return the name as it is on disk, so it is shown as
+    /// written ("/Applications/Itsycal.app").
+    static func realCase(of path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        let dir = url.deletingLastPathComponent().path
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir),
+              let hit = names.first(where: { $0.caseInsensitiveCompare(url.lastPathComponent) == .orderedSame })
+        else { return path }
+        return dir + "/" + hit
     }
 
     /// Last resort for pkg-based casks with no app artifact: the one app in
