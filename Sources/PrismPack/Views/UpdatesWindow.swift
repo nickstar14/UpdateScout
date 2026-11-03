@@ -156,15 +156,22 @@ struct MainView: View {
         }
         .navigationTitle(controller.page == .discover ? discover.title : controller.page.title)
         .toolbar {
-            // The system didn't add its own sidebar toggle to this window, so
-            // put the standard one where it goes, at the toolbar's leading end.
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation { columns = columns == .detailOnly ? .all : .detailOnly }
-                } label: {
-                    Label("Toggle Sidebar", systemImage: "sidebar.leading")
+            // The system didn't add its own sidebar toggle to this window. On
+            // macOS 26+ ask for the system's own: it sits in the sidebar's own
+            // toolbar section, left of the divider, and stays put when the
+            // sidebar's grey hides (Nick, 3 Nov 2026). Older macOS keeps the
+            // button in the detail toolbar.
+            if #available(macOS 26.0, *) {
+                DefaultToolbarItem(kind: .sidebarToggle, placement: .navigation)
+            } else {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        withAnimation { columns = columns == .detailOnly ? .all : .detailOnly }
+                    } label: {
+                        Label("Toggle Sidebar", systemImage: "sidebar.leading")
+                    }
+                    .help("Show or hide the sidebar")
                 }
-                .help("Show or hide the sidebar")
             }
         }
         .onAppear { controller.reloadFromDisk() }

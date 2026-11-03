@@ -512,3 +512,15 @@ few minutes later), but they still count. Clearing more state would not help;
 only not dirtying those pages in the app process would (decode the catalogue
 and parse `brew info` in a short-lived helper process, or search a
 memory-mapped compact file). Both are bigger designs and need their own plan.
+
+## Sidebar toggle fix (3 Nov 2026), built into the code, not yet run
+
+Nick: on macOS 27 the collapse button belongs in the sidebar's own toolbar
+section (left of the divider) and stays when the grey hides. The old
+`ToolbarItem(placement: .navigation)` landed in the detail toolbar. Now
+`DefaultToolbarItem(kind: .sidebarToggle, placement: .navigation)` (macOS 26+,
+confirmed in the SDK), old button kept for macOS 15. Compiles. To check in the
+next build: its position collapsed and open, light and dark. Fallback if it
+lands wrong: AppKit `NSToolbarToggleSidebarItemIdentifier` plus
+`NSToolbarSidebarTrackingSeparatorItemIdentifier`. Reusable notes:
+[liquid-glass-guide.md](liquid-glass-guide.md).
