@@ -121,6 +121,10 @@ final class DiscoverModel: ObservableObject {
     func entry(cask token: String) -> DiscoverEntry? {
         snapshot?.entries.first { $0.kind == .cask && $0.name == token }
     }
+    /// The same for a Homebrew formula (Installed's pop-up for command-line tools).
+    func entry(formula name: String) -> DiscoverEntry? {
+        snapshot?.entries.first { $0.kind == .formula && $0.name == name }
+    }
     @Published private(set) var loadingCatalog = false
     @Published private(set) var catalogError: String?
 

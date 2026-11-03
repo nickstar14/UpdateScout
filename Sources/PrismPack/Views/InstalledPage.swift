@@ -373,6 +373,13 @@ private struct InstalledDetail: View {
         pkg.detail.flatMap { $0.hasPrefix("cask ") ? String($0.dropFirst(5)) : nil }
     }
 
+    /// Homebrew's list entry, for its homepage: a cask for apps, else a
+    /// formula for command-line tools.
+    private var homebrewEntry: DiscoverEntry? {
+        if let cask { return discover.entry(cask: cask) }
+        return pkg.sourceID == "tools" ? discover.entry(formula: pkg.name) : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
@@ -383,7 +390,7 @@ private struct InstalledDetail: View {
                 }
             }
             LabeledContent("Installed", value: pkg.version)
-            if let cask, let entry = discover.entry(cask: cask) { WebDetailsSection(entry: entry) }
+            if let entry = homebrewEntry { WebDetailsSection(entry: entry) }
             if let path = pkg.appPath, ["sparkle", "github"].contains(pkg.sourceID) {
                 ChannelSection(appPath: path)
             }
@@ -431,6 +438,12 @@ private struct InstalledDetail: View {
             // As on every details pop-up: helpers left, Move to Trash in red
             // and the main action right, one size; close is the circle.
             HStack(spacing: 8) {
+                if let page = homebrewEntry?.homepage.flatMap(URL.init(string:)) {
+                    Button {
+                        NSWorkspace.shared.open(page)
+                    } label: { Label("Website", systemImage: "safari") }
+                    .glass()
+                }
                 if let path = pkg.appPath {
                     Button {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
@@ -452,7 +465,7 @@ private struct InstalledDetail: View {
         // As wide as the Updates pop-up, so the copies compare in full.
         .frame(width: 540, alignment: .leading)
         .popupClose()
-        .onAppear { if cask != nil { discover.start() } }
+        .onAppear { if cask != nil || pkg.sourceID == "tools" { discover.start() } }
     }
 }
 

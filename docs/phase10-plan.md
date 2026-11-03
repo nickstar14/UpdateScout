@@ -811,6 +811,24 @@ the next. No rebuild while Nick is mid-step.
     App Files, Activity, Settings) checking cards, rows, pills, buttons and
     pop-ups match, in light and dark, and list anything left for Nick.
 
+12b. **Fixes from the 2 Nov a-z check, BUILT 3 Nov 2026** ([step12b-fixes-plan.md](step12b-fixes-plan.md); uncommitted; Nick kept the "Tools" tag and left the pop-up edge alone). Before step 13.
+    Found by checking every page, light and dark, with the window in front
+    (nothing built yet; plan with Nick first):
+    - **Installed's pop-up** (checked on `uv`) doesn't match the shared pop-up
+      layout: just "Installed 0.13.6" and Uninstall, no Website, and the
+      subtitle says "Tools" where Updates' pop-up says "Homebrew". Use the
+      same layout and show the source. Related: Installed's row tag also
+      says "Tools" (a category) instead of the source; Nick decides which.
+    - **Orphaned App Files rescans on every visit** (30 s or more, spinner
+      each time). Keep the last result and rescan on Rescan.
+    - **Pop-ups hang past the window's bottom edge** when the row is near the
+      top of a short window (Updates). Inherent to arrow pop-ups; Nick
+      decides whether to do anything.
+    - **Not yet checked:** Cards view in dark, Installed's pop-up for a cask
+      app, a dark pass on Activity and Orphaned App Files with results.
+    - Checked fine: Updates and Discover pop-ups (light and dark), Remove
+      buttons in Settings (red when the window is active).
+
 13. **Final review** (Nick, 1 Nov 2026), before Phase 10 is called done:
     - **Arbitrary and leftover code:** anything unused, half-finished,
       experimental or debug-only (old variants, test switches, dead
@@ -866,3 +884,29 @@ Nick's setting is back to "ask"); the switch shows in Settings (search
 no-prompt path by code), the "background checking off" wording (pure text
 function, not toggled so the real launchd agent is untouched), log out
 and shutdown (skipped by the Apple event quit reason).
+
+## Step 12b results (3 Nov 2026, test build, light)
+
+Installed's pop-up for a Homebrew formula (`rust`) now shows Website,
+the description and picture. Orphaned App Files shows its last scan at once
+when you come back to it (first open still scans, about 40 s here); the
+scan is held in memory only and emptied when the main window closes
+(`OrphanCache`, `willClose` hook in `UpdatesWindow`). Not checked: Cards in
+dark, a cask app's Installed pop-up, dark pass on Activity and Orphaned with
+results, and that the cache empties on close (by code, not measured).
+
+**Remaining checks, done 3 Nov 2026:** Cards view in dark, a cask app's Installed
+pop-up (CaskHub: Website, Show in Finder, Uninstall, Open and its pictures),
+and Orphaned App Files with results and Activity in dark all look right.
+
+**Found while checking, fixed:** closing the main window freed nothing (the
+same window and its pages stayed alive, so the Orphaned list stayed too).
+`UpdatesWindow` now drops the window and its views on close and rebuilds
+them on the next show (saved frame and chosen page kept; reopening checked).
+
+**Measured, still open:** memory with the window closed is about 237 MB
+(227 MB open, after browsing Installed and Discover; the old build held
+201 MB closed), so dropping the views alone doesn't lower it. What's left
+is the Discover catalogue held in memory (the planned "free Discover's
+catalogue when the window closes, read back from the disk copy" in
+Lightness) plus memory the system hasn't taken back. Needs its own plan.

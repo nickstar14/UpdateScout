@@ -89,7 +89,18 @@ struct OrphansPage: View {
             }
         }
         .navigationSubtitle("Files left behind by apps that are gone")
-        .task { if orphans == nil { await scan() } }
+        .task {
+            guard orphans == nil else { return }
+            // Leaving the page and coming back shows the last scan; it's
+            // dropped when the main window closes. Rescan refreshes it.
+            if let last = OrphanCache.shared.orphans {
+                owners = OrphanCache.shared.owners
+                orphans = last
+            } else {
+                await scan()
+            }
+        }
+        .onChange(of: orphans) { _, now in OrphanCache.shared.orphans = now }
     }
 
     private var header: some View {
@@ -227,6 +238,7 @@ struct OrphansPage: View {
         let assigned = Prefs.assignedOrphans
         let (found, apps) = await Task.detached { (Leftovers.orphans(kept: kept, assigned: assigned), OwnerApp.installed()) }.value
         owners = apps
+        OrphanCache.shared.owners = apps
         orphans = found
         ticked = ticked.intersection(found.map(\.id))
         scanning = false
@@ -458,4 +470,16 @@ struct AssignOwnerPopup: View {
             }
         }
     }
+}
+
+/// The last Orphaned App Files scan, in memory only (a few hundred paths, well
+/// under a megabyte) so the page opens at once. Nothing is written to disk, and
+/// it's emptied when the main window closes so the menu bar app stays light.
+@MainActor
+final class OrphanCache {
+    static let shared = OrphanCache()
+    var orphans: [Leftovers.Orphan]?
+    var owners: [OwnerApp] = []
+
+    func clear() { orphans = nil; owners = [] }
 }

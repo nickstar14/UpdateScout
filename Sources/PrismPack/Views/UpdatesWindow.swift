@@ -78,6 +78,21 @@ final class UpdatesWindow {
             w.minSize = NSSize(width: 640, height: 420)
             w.setFrameAutosaveName("MainWindow")
             window = w
+            // Closing the window frees everything the pages hold (Nick: light
+            // as a menu bar app with the window closed). The window and its
+            // views are dropped and built again on the next show; the saved
+            // frame and the chosen page are kept.
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    OrphanCache.shared.clear()
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            self?.window?.contentViewController = nil
+                            self?.window = nil
+                        }
+                    }
+                }
+            }
         }
         let wasVisible = window?.isVisible ?? false
         window?.makeKeyAndOrderFront(nil)
