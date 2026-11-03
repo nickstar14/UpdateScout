@@ -6,6 +6,32 @@
         <description>PrismPack release feed</description>
         <language>en</language>
         <item>
+            <title>Version 2.0.0-beta.1</title>
+            <pubDate>Tue, 03 Nov 2026 13:09:11 -0500</pubDate>
+            <description><![CDATA[<p><b>PrismPack 2.0 beta.</b> UpdateScout is now PrismPack, and it does much more than update.</p>
+<ul>
+<li><b>New name, same app.</b> Your settings, history, hidden lists and background check carry over. The app renames itself to PrismPack.app, and because macOS sees a new app it asks again for notifications and Full Disk Access (optional).</li>
+<li><b>A new window:</b> a sidebar with Updates, Installed, Orphaned App Files, Discover, Activity and Settings, in the Liquid Glass look on macOS 26 and later (simpler on macOS 15). Cards or a list on the main pages.</li>
+<li><b>Discover:</b> find and install new apps, tools, fonts and extensions from Homebrew, npm, PyPI, crates.io, RubyGems and the editor stores, with descriptions, pictures and font previews.</li>
+<li><b>More updates:</b> Python (pipx and uv), npm, Rust, Ruby gems, VS Code, VSCodium and Cursor extensions, Apple's own apps through Software Update, and your own sources.</li>
+<li><b>Faster, clearer installs:</b> several updates at once, one password per batch, and a progress bar with a percent and a step line.</li>
+<li><b>Installed, Duplicates and Uninstall:</b> everything on your Mac in one list, two copies of an app compared side by side, and removal to the Trash with the files an app left behind.</li>
+<li><b>Orphaned App Files</b> and optional <b>Full Disk Access</b> to clear what macOS protects.</li>
+<li><b>You decide:</b> Stable or Beta per app, automatic updates (off until you turn them on), and more ways to hide updates.</li>
+<li><b>Settings:</b> search, a tool list with Install and Reinstall, and release notes for every version.</li>
+<li><b>Light on memory:</b> about 15 MB in the menu bar, and closing the window frees much of what it was using.</li>
+</ul>
+<p>This is a beta. Full details are on the GitHub release page.</p>]]></description>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v2.0.0-beta.1/PrismPack-2.0.0-beta.1.zip"
+                sparkle:version="26"
+                sparkle:shortVersionString="2.0.0-beta.1"
+                sparkle:edSignature="88x2ObOB5fq4VKNFFVxOGBiBirxjhtKnKeCE4CfjfDkq9rC8pM8lZYboa71CPKzZ2W9QQ6RlQoismnzP1h5sCA==" length="6115390"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 1.8.0</title>
             <pubDate>Wed, 28 Oct 2026 21:52:00 -0500</pubDate>
             <description><![CDATA[<h2>A menu bar that stays current</h2>
