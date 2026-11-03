@@ -126,6 +126,10 @@ enum DetailsCache {
     static let cap: Int64 = 50 * 1_048_576
     static let refetchAfter: TimeInterval = 30 * 86_400
     static let retryEmptyAfter: TimeInterval = 7 * 86_400
+    /// Pictures are kept 1280 px wide (3 Nov 2026, was 640); older folders are
+    /// fetched again the next time that app's pop-up opens.
+    static let version = 2
+    static let pictureWidth = 1280
 
     /// Oldest first, until what's left fits.
     static func evictions(_ folders: [(name: String, size: Int64, date: Date)], cap: Int64 = DetailsCache.cap) -> [String] {
@@ -147,6 +151,7 @@ actor DiscoverDetails {
         var description: String?
         var site: String
         var count: Int
+        var version: Int?
     }
 
     private var inFlight: [String: Task<WebDetails?, Never>] = [:]
@@ -180,7 +185,7 @@ actor DiscoverDetails {
     private static func load(key: String, site: URL) async -> WebDetails? {
         let folder = root.appendingPathComponent(key, isDirectory: true)
         if let data = try? Data(contentsOf: folder.appendingPathComponent("meta.json")),
-           let meta = try? JSONDecoder().decode(Meta.self, from: data) {
+           let meta = try? JSONDecoder().decode(Meta.self, from: data), meta.version == DetailsCache.version {
             let age = Date().timeIntervalSince(meta.fetched)
             let empty = meta.description == nil && meta.count == 0
             if age < (empty ? DetailsCache.retryEmptyAfter : DetailsCache.refetchAfter) {
@@ -195,7 +200,8 @@ actor DiscoverDetails {
         for (index, data) in fetched.images.enumerated() {
             try? data.write(to: folder.appendingPathComponent("\(index).jpg"), options: .atomic)
         }
-        let meta = Meta(fetched: Date(), description: fetched.description, site: fetched.site, count: fetched.images.count)
+        let meta = Meta(fetched: Date(), description: fetched.description, site: fetched.site, count: fetched.images.count,
+                    version: DetailsCache.version)
         if let data = try? JSONEncoder().encode(meta) { try? data.write(to: folder.appendingPathComponent("meta.json"), options: .atomic) }
         trim()
         return fetched.isEmpty ? nil : fetched
@@ -224,19 +230,19 @@ actor DiscoverDetails {
     }
 
     /// One candidate: kept only if it is a screen-shaped picture, shrunk to
-    /// 640 px wide.
+    /// 1280 px wide.
     private static func picture(at url: URL) async -> Data? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 8
         guard let (data, response) = try? await Net.fetch(request),
-              (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 3_000_000,
+              (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 5_000_000,
               let rep = NSBitmapImageRep(data: data),
               WebDetailsParser.isScreenShaped(width: rep.pixelsWide, height: rep.pixelsHigh) else { return nil }
         return shrunk(rep)
     }
 
     private static func shrunk(_ rep: NSBitmapImageRep) -> Data? {
-        let width = min(640, rep.pixelsWide)
+        let width = min(DetailsCache.pictureWidth, rep.pixelsWide)
         let height = max(1, Int((Double(rep.pixelsHigh) * Double(width) / Double(rep.pixelsWide)).rounded()))
         guard let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
                                          bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -272,7 +278,12 @@ actor DiscoverDetails {
 struct WebDetailsSection: View {
     let entry: DiscoverEntry
     @State private var details: WebDetails?
+    /// Decoded once when the details arrive, not on every redraw.
+    @State private var images: [NSImage] = []
+    /// The picture shown large inside the pop-up, if any.
+    @State private var viewing: Int?
     @State private var loading: Bool
+    @FocusState private var viewerFocused: Bool
 
     init(entry: DiscoverEntry) {
         self.entry = entry
@@ -292,23 +303,31 @@ struct WebDetailsSection: View {
                         Text(text).font(.callout).fixedSize(horizontal: false, vertical: true)
                         Text("From \(details.site)").font(.caption).foregroundStyle(.secondary)
                     }
-                    if !details.images.isEmpty { pictures(details) }
+                    if !images.isEmpty { pictures }
                 }
             }
         }
         .task(id: entry.id) {
             guard DiscoverDetails.site(for: entry) != nil else { loading = false; return }
             details = await DiscoverDetails.shared.details(for: entry)
+            images = details?.images.compactMap { NSImage(data: $0) } ?? []
             loading = false
         }
     }
 
-    private func pictures(_ details: WebDetails) -> some View {
-        let images = details.images.compactMap { NSImage(data: $0) }
-        return HStack(spacing: 8) {
+    @ViewBuilder private var pictures: some View {
+        if let viewing, images.indices.contains(viewing) {
+            viewer(viewing)
+        } else {
+            thumbnails
+        }
+    }
+
+    private var thumbnails: some View {
+        HStack(spacing: 8) {
             ForEach(images.indices, id: \.self) { index in
                 Button {
-                    PicturePreviewWindow.shared.show(images: images, index: index, title: entry.title)
+                    viewing = index
                 } label: {
                     Image(nsImage: images[index])
                         .resizable().scaledToFill()
@@ -324,11 +343,50 @@ struct WebDetailsSection: View {
             Spacer(minLength: 0)
         }
     }
+
+    /// The picture as wide as the pop-up, with the arrows (or the arrow keys),
+    /// Back, and the window for the biggest view.
+    private func viewer(_ index: Int) -> some View {
+        let step = { (by: Int) in viewing = (index + by + images.count) % images.count }
+        return VStack(spacing: 8) {
+            // An explicit size: the pop-ups are 540 wide with 18 of padding, and
+            // a picture left to size itself measured tiny in the pop-up.
+            let ratio = images[index].size.width / max(images[index].size.height, 1)
+            let width = min(504, 340 * ratio)
+            Image(nsImage: images[index]).resizable()
+                .frame(width: width, height: width / ratio)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
+            HStack(spacing: 8) {
+                Button { viewing = nil } label: { Label("Back", systemImage: "chevron.backward") }
+                    .glass().accessibilityLabel("Back to the details")
+                Spacer()
+                if images.count > 1 {
+                    Button { step(-1) } label: { Image(systemName: "chevron.left") }
+                        .glass().accessibilityLabel("Previous picture")
+                    Text("\(index + 1) of \(images.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Button { step(1) } label: { Image(systemName: "chevron.right") }
+                        .glass().accessibilityLabel("Next picture")
+                }
+                Spacer()
+                Button {
+                    PicturePreviewWindow.shared.show(images: images, index: index, title: entry.title)
+                } label: { Label("Open in window", systemImage: "arrow.up.left.and.arrow.down.right") }
+                    .glass().accessibilityLabel("Open the pictures in a window")
+            }
+        }
+        .focusable()
+        .focused($viewerFocused)
+        .onAppear { viewerFocused = true }
+        .onKeyPress(.leftArrow) { if images.count > 1 { step(-1) }; return .handled }
+        .onKeyPress(.rightArrow) { if images.count > 1 { step(1) }; return .handled }
+        .onKeyPress(.escape) { viewing = nil; return .handled }
+    }
 }
 
 // MARK: - Larger view
 
-/// The pictures larger, in a small window; the arrow keys flip through them.
+/// The pictures at the biggest, in a window (opened from the pop-up's picture view); the arrow keys flip through them.
 @MainActor
 final class PicturePreviewWindow {
     static let shared = PicturePreviewWindow()
@@ -337,7 +395,7 @@ final class PicturePreviewWindow {
     func show(images: [NSImage], index: Int, title: String) {
         panel?.close()
         let view = PicturePreview(images: images, start: index)
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 680, height: 460),
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 960, height: 640),
                             styleMask: [.titled, .closable, .resizable, .utilityWindow],
                             backing: .buffered, defer: false)
         panel.title = title
@@ -348,7 +406,7 @@ final class PicturePreviewWindow {
         // The window's own size, not the view's smallest (it opened 420 wide).
         host.sizingOptions = []
         panel.contentViewController = host
-        panel.setContentSize(NSSize(width: 680, height: 460))
+        panel.setContentSize(NSSize(width: 960, height: 640))
         panel.center()
         self.panel = panel
         panel.makeKeyAndOrderFront(nil)
@@ -381,7 +439,7 @@ private struct PicturePreview: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 420, idealWidth: 680, minHeight: 320, idealHeight: 460)
+        .frame(minWidth: 420, idealWidth: 960, minHeight: 320, idealHeight: 640)
         .focusable()
         .focused($focused)
         .onAppear { focused = true }

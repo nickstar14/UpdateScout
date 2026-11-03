@@ -910,3 +910,14 @@ them on the next show (saved frame and chosen page kept; reopening checked).
 is the Discover catalogue held in memory (the planned "free Discover's
 catalogue when the window closes, read back from the disk copy" in
 Lightness) plus memory the system hasn't taken back. Needs its own plan.
+
+## Pictures results (3 Nov 2026, test build, light)
+
+[step15-pictures-plan.md](step15-pictures-plan.md): pictures are kept 1280 px
+wide (cache version 2, so old 640 px ones refetch when that app's pop-up
+opens); clicking a thumbnail shows it large inside the pop-up with Back,
+‹ n of 3 › (and the arrow keys, Esc) and "Open in window" (960 x 640 now).
+Checked on CaskHub's Installed pop-up: sharp and wide, Next works, the
+window opens at the new size on the same picture. Not checked: dark, the
+Updates and Discover pop-ups (same code), the ← → keys and Esc in the
+pop-up (by code only).
