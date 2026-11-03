@@ -326,3 +326,75 @@ struct FontStyleTests {
         #expect(url?.absoluteString.contains("900i") == true)
     }
 }
+
+/// Web details: reading a page, and the cache's size rule. No network.
+struct WebDetailsTests {
+    private let base = URL(string: "https://example.com/app/")!
+
+    @Test func readsTheDescriptionEitherWay() {
+        let plain = #"<meta name="description" content="A free &amp; open-source player with native feel.">"#
+        #expect(WebDetailsParser.description(in: plain) == "A free & open-source player with native feel.")
+        let og = #"<meta property='og:description' content='It&#39;s the easiest way to run models locally.'>"#
+        #expect(WebDetailsParser.description(in: og) == "It's the easiest way to run models locally.")
+        #expect(WebDetailsParser.description(in: "<html></html>") == nil)
+        #expect(WebDetailsParser.description(in: #"<meta name="description" content="Too short">"#) == nil)
+    }
+
+    @Test func cutsALongDescriptionAtAWord() {
+        let long = String(repeating: "word ", count: 200)
+        let cut = WebDetailsParser.cut(long, to: 400)
+        #expect(cut.count <= 401)
+        #expect(cut.hasSuffix("…"))
+        #expect(WebDetailsParser.cut("short", to: 400) == "short")
+    }
+
+    @Test func previewImagesComeFirstThenLargeImgTags() {
+        let html = """
+        <meta property="og:image" content="/img/screenshot.png">
+        <img src="/img/small.png" width="64">
+        <img src="/img/big.png" width="900">
+        <img src="/img/logo-large.png" width="900">
+        <img src="/img/shot.png" srcset="/img/shot-1x.png 480w, /img/shot-2x.png 1200w">
+        <img src="data:image/png;base64,AAAA" width="900">
+        <img src="http://example.com/insecure.png" width="900">
+        """
+        let urls = WebDetailsParser.imageCandidates(in: html, base: base).map(\.absoluteString)
+        #expect(urls.first == "https://example.com/img/screenshot.png")
+        #expect(urls.contains("https://example.com/img/big.png"))
+        #expect(urls.contains("https://example.com/img/shot-2x.png"))
+        #expect(!urls.contains { $0.contains("small") || $0.contains("logo") || $0.contains("insecure") || $0.hasPrefix("data") })
+    }
+
+    @Test func vectorAndAnimatedFormatsAreSkipped() {
+        #expect(WebDetailsParser.looksLikeLogo(URL(string: "https://example.com/a.svg")!))
+        #expect(WebDetailsParser.looksLikeLogo(URL(string: "https://example.com/a.gif")!))
+        #expect(!WebDetailsParser.looksLikeLogo(URL(string: "https://example.com/banner.png")!))
+    }
+
+    @Test func onlyScreenShapedPicturesCount() {
+        #expect(WebDetailsParser.isScreenShaped(width: 1200, height: 630))
+        #expect(WebDetailsParser.isScreenShaped(width: 1600, height: 1000))
+        #expect(!WebDetailsParser.isScreenShaped(width: 300, height: 200))
+        #expect(!WebDetailsParser.isScreenShaped(width: 800, height: 800))
+        #expect(!WebDetailsParser.isScreenShaped(width: 2000, height: 400))
+    }
+
+    @Test func gitHostsAreNotTheAppsOwnSite() {
+        func entry(_ homepage: String) -> DiscoverEntry {
+            DiscoverEntry(kind: .cask, name: "x", title: "X", summary: nil, version: "1", homepage: homepage)
+        }
+        #expect(DiscoverDetails.site(for: entry("https://github.com/foo/bar")) == nil)
+        #expect(DiscoverDetails.site(for: entry("http://example.com")) == nil)
+        #expect(DiscoverDetails.site(for: entry("https://obsidian.md"))?.host == "obsidian.md")
+    }
+
+    @Test func theOldestFoldersGoWhenOverTheCap() {
+        let now = Date()
+        let folders = [("old", Int64(30), now.addingTimeInterval(-300)),
+                       ("mid", Int64(30), now.addingTimeInterval(-200)),
+                       ("new", Int64(30), now.addingTimeInterval(-100))]
+        #expect(DetailsCache.evictions(folders, cap: 100).isEmpty)
+        #expect(DetailsCache.evictions(folders, cap: 70) == ["old"])
+        #expect(DetailsCache.evictions(folders, cap: 40) == ["old", "mid"])
+    }
+}

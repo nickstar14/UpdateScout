@@ -503,6 +503,7 @@ private struct DiscoverCard: View {
                 }
             }
             if let summary = entry.summary { Text(summary).fixedSize(horizontal: false, vertical: true) }
+            if !entry.isFont { WebDetailsSection(entry: entry) }
             if !entry.version.isEmpty { LabeledContent("Version", value: entry.shortVersion) }
             if let note { Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
             if entry.isFont, let family = FontPreviewName.family(forCask: entry.name, title: entry.title) {

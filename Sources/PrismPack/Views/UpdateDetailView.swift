@@ -7,6 +7,8 @@ struct UpdateDetailView: View {
     @EnvironmentObject var controller: UpdateController
     let item: UpdateItem
     @Environment(\.dismiss) private var dismiss
+    /// Its homepage comes from Homebrew's list, which loads here if it hasn't yet.
+    @ObservedObject private var discover = DiscoverModel.shared
 
     private var style: SourceStyle { SourceStyle.forSource(item.sectionID) }
     private var sourceName: String {
@@ -18,6 +20,10 @@ struct UpdateDetailView: View {
             header
             Divider()
             versions
+            if item.installToken.hasPrefix("cask:"),
+               let entry = discover.entry(cask: String(item.installToken.dropFirst(5))) {
+                WebDetailsSection(entry: entry)
+            }
             if item.isMajorUpgrade || item.caveat != nil || selfUpdatingCask != nil || behindVendor != nil { notices }
             if let path = item.appPath, ["sparkle", "github"].contains(item.sourceID) {
                 ChannelSection(appPath: path)
@@ -43,7 +49,10 @@ struct UpdateDetailView: View {
         .frame(width: 540)
         .popupClose()
         // Uninstall needs the Installed list to know how the item got here.
-        .onAppear { if controller.installed.isEmpty, !controller.loadingInstalled { controller.loadInstalled() } }
+        .onAppear {
+            if controller.installed.isEmpty, !controller.loadingInstalled { controller.loadInstalled() }
+            if item.installToken.hasPrefix("cask:") { discover.start() }
+        }
     }
 
     private var header: some View {

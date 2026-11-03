@@ -115,6 +115,12 @@ final class DiscoverModel: ObservableObject {
     private var categoryOf: [String: DiscoverCategories.Category] = [:]
 
     @Published private(set) var snapshot: DiscoverCatalog.Snapshot? { didSet { indexCategories() } }
+
+    /// The Homebrew list's entry for a cask, once the list has loaded, for
+    /// Installed's and Updates' pop-ups (their web details need its homepage).
+    func entry(cask token: String) -> DiscoverEntry? {
+        snapshot?.entries.first { $0.kind == .cask && $0.name == token }
+    }
     @Published private(set) var loadingCatalog = false
     @Published private(set) var catalogError: String?
 

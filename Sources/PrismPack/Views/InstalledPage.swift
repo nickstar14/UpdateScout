@@ -356,6 +356,8 @@ private struct InstalledItem: View {
 private struct InstalledDetail: View {
     @EnvironmentObject var controller: UpdateController
     @Environment(\.dismiss) private var dismiss
+    /// Its homepage comes from Homebrew's list, which loads here if it hasn't yet.
+    @ObservedObject private var discover = DiscoverModel.shared
     let pkg: InstalledPackage
     let sectionTitle: String
     var linkGitHub: () -> Void = {}
@@ -381,6 +383,7 @@ private struct InstalledDetail: View {
                 }
             }
             LabeledContent("Installed", value: pkg.version)
+            if let cask, let entry = discover.entry(cask: cask) { WebDetailsSection(entry: entry) }
             if let path = pkg.appPath, ["sparkle", "github"].contains(pkg.sourceID) {
                 ChannelSection(appPath: path)
             }
@@ -449,6 +452,7 @@ private struct InstalledDetail: View {
         // As wide as the Updates pop-up, so the copies compare in full.
         .frame(width: 540, alignment: .leading)
         .popupClose()
+        .onAppear { if cask != nil { discover.start() } }
     }
 }
 

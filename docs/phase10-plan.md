@@ -615,6 +615,10 @@ connection (falls back to name only by design).
 
 **Planned next (Nick, 2 Nov 2026):** install progress in every tile and a richer font pop-up: **[install-progress-plan.md](install-progress-plan.md)**. Waiting for his LM Studio install to finish, then one build.
 
+**Step 7 plan written (2 Nov 2026), waiting for Nick's OK:** [step7-web-details-plan.md](step7-web-details-plan.md).
+
+**Step 9 plan written (2 Nov 2026), waiting for Nick's OK:** [step9-belongs-to-plan.md](step9-belongs-to-plan.md).
+
 **Next:** step 12 is built; steps 6, 7, 9, 10, 11 and 13 follow. (Old note: a new session starts with step 12's consistency pass across
 every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.
 
