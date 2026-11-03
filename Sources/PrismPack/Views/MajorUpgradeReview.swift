@@ -79,7 +79,7 @@ struct MajorUpgradeReview: View {
                 }
                 Spacer()
                 Button {
-                    withAnimation(.smooth(duration: 0.25)) {
+                    withAnimation(.easeInOut(duration: 0.14)) {
                         if isOpen { expanded.remove(item.id) } else { expanded.insert(item.id) }
                     }
                 } label: {

@@ -462,7 +462,7 @@ struct ActivityPage: View {
     @AppStorage("activityOldestFirst") private var oldestFirst = false
 
     private var shows: [(value: String, title: String)] {
-        [("all", "All")] + ActivityEntry.Kind.allCases.map { ($0.rawValue, $0.title) }
+        [("all", "All activity")] + ActivityEntry.Kind.allCases.map { ($0.rawValue, $0.title) }
     }
 
     private var shown: [ActivityEntry] {
@@ -497,7 +497,7 @@ struct ActivityPage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .pinnedHeader {
             PageControls {
-                GlassSearchField(prompt: "Search activity", text: $query)
+                GlassSearchField(prompt: "Filter activity", text: $query)
                 HStack(spacing: 8) {
                     SortMenu(selection: $show, options: shows, help: "Show one kind")
                     SortDirectionButton(reversed: $oldestFirst, order: oldestFirst ? "Oldest first" : "Newest first")

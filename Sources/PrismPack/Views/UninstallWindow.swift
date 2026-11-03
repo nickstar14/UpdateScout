@@ -120,7 +120,7 @@ private struct UninstallPanel: View {
                             Toggle("", isOn: binding(item.path)).toggleStyle(.checkbox).labelsHidden()
                         } else {
                             Button { Leftovers.showInFinder(item) } label: { Image(systemName: "folder").accessibilityLabel("Show in Finder") }
-                                .buttonStyle(.borderless)
+                                .glass()
                                 .help("Show in Finder")
                         }
                     }
@@ -148,7 +148,7 @@ private struct UninstallPanel: View {
         HStack {
             Text(totalText(look)).font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("Cancel", action: onClose).keyboardShortcut(.cancelAction)
+            Button("Cancel", action: onClose).glass().keyboardShortcut(.cancelAction)
             Button(role: .destructive) { Task { await go(look) } } label: {
                 Label(removal.actionTitle, systemImage: "trash")
             }
@@ -216,7 +216,7 @@ private struct UninstallPanel: View {
                 }
             } else if let error = state?.errorMessage {
                 Text("\(removal.name) couldn't be removed: \(error). Nothing else was touched.")
-                    .foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(Color.red.readable).fixedSize(horizontal: false, vertical: true)
             } else if state == .done {
                 Label(removal.kind == "app" ? "\(removal.name) is in the Trash." : "Homebrew removed \(removal.name).",
                       systemImage: "checkmark.circle.fill")
@@ -233,7 +233,7 @@ private struct UninstallPanel: View {
             }
             HStack {
                 Spacer()
-                Button("Done", action: onClose).keyboardShortcut(.defaultAction)
+                Button("Done", action: onClose).prismProminent().keyboardShortcut(.defaultAction)
                     .disabled(state?.isActive == true)
             }
         }
@@ -244,7 +244,7 @@ private struct UninstallPanel: View {
             Label("Moved \(UpdateController.leftoverSummary(outcome.moved)) to the Trash.", systemImage: "checkmark.circle.fill")
         }
         ForEach(outcome.failed, id: \.item.path) { failure in
-            Text("\(Self.shortPath(failure.item.path)): \(failure.reason)").font(.caption).foregroundStyle(.red)
+            Text("\(Self.shortPath(failure.item.path)): \(failure.reason)").font(.caption).foregroundStyle(Color.red.readable)
                 .fixedSize(horizontal: false, vertical: true)
         }
         let blocked = outcome.failed.filter(\.needsFullDiskAccess).map(\.item)

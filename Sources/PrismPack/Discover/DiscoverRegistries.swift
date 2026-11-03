@@ -220,7 +220,9 @@ struct DiscoverInstaller: UpdateSource {
             guard let brew = HomebrewSource.brewPath else {
                 throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
             }
-            try await run(brew, kind == "cask" ? ["install", "--cask", name] : ["install", name], progress)
+            try await HomebrewSource.watched(kind: kind, name: name, brew: brew, progress: progress) {
+                try await self.run(brew, kind == "cask" ? ["install", "--cask", name] : ["install", name], progress)
+            }
         case "npm":
             guard let npm = Shell.which("npm") else {
                 throw PrismPackError.toolMissing("npm", hint: "Install Node from Homebrew (the node formula).")

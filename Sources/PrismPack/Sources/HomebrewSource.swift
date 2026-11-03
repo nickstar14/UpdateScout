@@ -161,6 +161,23 @@ struct HomebrewSource: UpdateSource {
         return map
     }
 
+    /// Runs a brew install or upgrade while reporting how much of its download
+    /// is on disk (Homebrew says nothing about it when it isn't in a terminal).
+    /// A cask's total comes from its URL; a formula's bottle has none to ask,
+    /// so it shows bytes only.
+    static func watched<T: Sendable>(kind: String, name: String, brew: String,
+                                     progress: @escaping @Sendable (String) -> Void,
+                                     _ body: @escaping @Sendable () async throws -> T) async throws -> T {
+        let isCask = kind == "cask"
+        progress("§step:prepare")
+        let url = isCask ? (try? await Adopter.liveCask(name, brew: brew))?.url : nil
+        let box = ResultBox<T>()
+        try await Adopter.watchingDownload(cask: name, url: url, brew: brew, formula: !isCask, progress: progress) {
+            await box.set(try await body())
+        }
+        return await box.value!
+    }
+
     func install(_ item: UpdateItem, progress: @escaping @Sendable (String) -> Void) async throws {
         guard let brew = Self.brewPath else {
             throw PrismPackError.toolMissing("Homebrew", hint: "Install it from https://brew.sh")
@@ -177,7 +194,9 @@ struct HomebrewSource: UpdateSource {
         } else {
             args = ["upgrade", name]
         }
-        let result = try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
+        let result = try await Self.watched(kind: kind, name: name, brew: brew, progress: progress) {
+            try await Shell.run(brew, args, tag: Shell.installTag, lineHandler: progress)
+        }
         guard result.status == 0 else {
             if kind == "cask", let folder = BrewRepair.staleUpgradeFolder(in: result.combined, token: name) {
                 throw PrismPackError.staleCaskUpgrade(token: name, folder: folder)
@@ -185,4 +204,10 @@ struct HomebrewSource: UpdateSource {
             throw PrismPackError.commandFailed("brew \(args.joined(separator: " "))", output: result.combined)
         }
     }
+}
+
+/// Carries a value out of a closure that can't return one.
+actor ResultBox<T: Sendable> {
+    private(set) var value: T?
+    func set(_ new: T) { value = new }
 }

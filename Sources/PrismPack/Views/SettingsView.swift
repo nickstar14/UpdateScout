@@ -191,7 +191,7 @@ struct SettingsView: View {
                     // each tool with Reinstall and Remove (Nick, 2 Nov 2026).
                     if shows("Setup", "setup") {
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) { showDeps.toggle() }
+                        withAnimation(.easeInOut(duration: 0.14)) { showDeps.toggle() }
                         if showDeps { deps.loadVersions() }
                     } label: {
                         HStack {

@@ -16,6 +16,9 @@ struct DiscoverPage: View {
                 if let error = model.catalogError, usesHomebrew {
                     errorLine(error) { model.reloadCatalog() }
                 }
+                if model.chip == .fonts {
+                    hint("Previews come from Google Fonts and aren't installed. Fonts that aren't there show their name only.")
+                }
                 if searchingText { results } else { home }
             }
             .padding([.horizontal, .bottom], 16)
@@ -42,7 +45,13 @@ struct DiscoverPage: View {
             model.start()
             if controller.installed.isEmpty { controller.loadInstalled() }
         }
-        .onChange(of: model.chip) { _, chip in if chip == .python { model.loadPythonVersions() } }
+        .onChange(of: model.chip) { _, chip in
+            if chip == .python { model.loadPythonVersions() }
+            if chip != .fonts { FontPreviews.shared.releaseAll() }
+        }
+        // Only when the page is really left: moving between Discover's parts
+        // builds the page again, and its old copy disappears after the new one.
+        .onDisappear { if controller.page != .discover { FontPreviews.shared.releaseAll() } }
     }
 
     private var usesHomebrew: Bool { [.all, .apps, .cli, .runtimes, .fonts].contains(model.chip) }
@@ -203,7 +212,7 @@ struct DiscoverPage: View {
 
     private func errorLine(_ text: String, retry: (() -> Void)?) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Color.orange.readable)
             Text(text).font(.callout).fixedSize(horizontal: false, vertical: true)
             if let retry { Button("Try Again", action: retry).glass().controlSize(.small) }
         }
@@ -239,6 +248,15 @@ private struct DiscoverItem: View {
         return controller.installStates[item.id]
     }
 
+    /// The same, for the progress line.
+    private var progress: InstallProgress? {
+        if entry.kind == .ext {
+            return EditorExtensionsSource.editors().lazy
+                .compactMap { controller.installProgress[DiscoverInstaller.item(for: entry, editorKey: $0.key).id] }.first
+        }
+        return controller.installProgress[item.id]
+    }
+
     private var installed: Bool { pkg != nil || state == .done }
 
     /// A waiting update for the installed copy, unless it's hidden.
@@ -267,8 +285,13 @@ private struct DiscoverItem: View {
                 VStack(alignment: .trailing, spacing: 4) { tags }
             }
             // Always two lines tall, so every card and its buttons line up.
-            Text(entry.summary ?? "").font(.callout).foregroundStyle(.secondary)
-                .lineLimit(2, reservesSpace: true)
+            Group {
+                if entry.isFont { FontSample(entry: entry, size: 17).lineLimit(2, reservesSpace: true) }
+                else {
+                    Text(entry.summary ?? "").font(.callout).foregroundStyle(.secondary)
+                        .lineLimit(2, reservesSpace: true)
+                }
+            }
             Text(versionLine(entry.shortVersion)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             HStack {
                 Spacer()
@@ -288,7 +311,8 @@ private struct DiscoverItem: View {
                     Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
                     Text(label.text).font(.caption).foregroundStyle(label.color.readable).lineLimit(1)
                 }
-                Text(entry.summary ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if entry.isFont { FontSample(entry: entry, size: 13).lineLimit(1) }
+                else { Text(entry.summary ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             Spacer(minLength: 8)
             // Fixed columns, so tags, versions and buttons line up row to row.
@@ -333,7 +357,7 @@ private struct DiscoverItem: View {
                 // Move to Trash lives in the details pop-up (Nick, 2 Nov 2026).
             }
         } else {
-            DiscoverAction(entry: entry, installed: false, state: state)
+            DiscoverAction(entry: entry, installed: false, state: state, progress: progress)
         }
     }
 }
@@ -380,13 +404,16 @@ private struct DiscoverAction: View {
     let entry: DiscoverEntry
     let installed: Bool
     let state: InstallState?
+    var progress: InstallProgress? = nil
     /// Small on cards; regular in the pop-up, beside its other buttons.
     var size: ControlSize = .small
 
     private var style: SourceStyle { SourceStyle.forSource(entry.sectionID) }
 
     var body: some View {
-        if let state, state.isActive {
+        if let state, state.isActive, state != .queued, state != .needsAdmin, state != .cancelling, let progress {
+            InstallProgressView(progress: progress, barWidth: 70)
+        } else if let state, state.isActive {
             HStack(spacing: 6) {
                 if case .downloading(let percent?, _) = state {
                     ProgressView(value: Double(percent), total: 100).frame(width: 70)
@@ -478,6 +505,9 @@ private struct DiscoverCard: View {
             if let summary = entry.summary { Text(summary).fixedSize(horizontal: false, vertical: true) }
             if !entry.version.isEmpty { LabeledContent("Version", value: entry.shortVersion) }
             if let note { Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
+            if entry.isFont, let family = FontPreviewName.family(forCask: entry.name, title: entry.title) {
+                FontStylesSection(family: family)
+            }
             // As on every details pop-up: helpers left, Move to Trash in red
             // and the main action right, one size; close is the circle.
             HStack(spacing: 8) {
@@ -493,32 +523,14 @@ private struct DiscoverCard: View {
                     Button("Open") { dismiss(); NSWorkspace.shared.open(URL(fileURLWithPath: appPath)) }
                         .glassProminent(SourceStyle.forSource(entry.sectionID).color)
                 } else {
-                    DiscoverAction(entry: entry, installed: installed, state: state, size: .regular)
+                    DiscoverAction(entry: entry, installed: installed, state: state,
+                                   progress: controller.installProgress[DiscoverInstaller.item(for: entry).id], size: .regular)
                 }
             }
         }
         .padding(18)
-        .frame(width: 400)
+        .frame(width: 540)
         .popupClose()
-    }
-}
-
-/// A filter chip: filled when selected. A bordered button's tint doesn't
-/// show on macOS 27, so selection switches the style instead.
-struct ChipButton: View {
-    let title: String
-    let selected: Bool
-    let size: ControlSize
-    let action: () -> Void
-
-    var body: some View {
-        if selected {
-            Button(title, action: action).buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule).controlSize(size)
-        } else {
-            Button(title, action: action).buttonStyle(.bordered)
-                .buttonBorderShape(.capsule).controlSize(size)
-        }
     }
 }
 

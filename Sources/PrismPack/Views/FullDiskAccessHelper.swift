@@ -87,8 +87,9 @@ private struct FullDiskAccessHelper: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .lineLimit(2).truncationMode(.middle)
             HStack {
-                Button("Close", action: onClose)
+                Button("Close", action: onClose).glass()
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([appURL]) }
+                    .glass()
                     .help("Drag it from Finder into the list instead")
                 Spacer()
                 Button("Quit and Reopen") { FullDiskAccess.relaunch() }.glass()

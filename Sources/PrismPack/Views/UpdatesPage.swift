@@ -88,9 +88,9 @@ struct UpdatesPage: View {
                         LayoutSwitch(layout: $layout)
                     }
                     if Migration.showsRenameBanner { renameBanner }
+                    AdoptionBanner()
+                    DuplicatesNote()
                 }
-                AdoptionBanner()
-                DuplicatesNote()
             }
         }
         .pinnedHeader(edge: .bottom) { errorSummary }
@@ -257,11 +257,8 @@ struct UpdatesPage: View {
                 Spacer(minLength: 0)
             }
             .font(.callout)
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(LinearGradient(colors: PrismBlur.spectrum.map { $0.opacity(0.22) },
-                                       startPoint: .leading, endPoint: .trailing),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .strip(LinearGradient(colors: PrismBlur.spectrum.map { $0.opacity(0.22) },
+                                  startPoint: .leading, endPoint: .trailing))
         }
         .buttonStyle(.plain)
         .help("Why the new name")

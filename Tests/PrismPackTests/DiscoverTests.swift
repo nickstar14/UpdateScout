@@ -178,3 +178,151 @@ struct DiscoverTests {
         #expect(UpdateDetailView.preview("## What's new") == nil)
     }
 }
+
+/// Font previews: cask names to Google Fonts families, and the CSS answer.
+struct FontPreviewTests {
+    @Test func caskTitlesBecomeFamilies() {
+        #expect(FontPreviewName.family(forCask: "font-inter", title: "Inter") == "Inter")
+        // Google wants the family's own capitals.
+        #expect(FontPreviewName.family(forCask: "font-jetbrains-mono", title: "JetBrains Mono") == "JetBrains Mono")
+        #expect(FontPreviewName.family(forCask: "font-ibm-plex-sans", title: "IBM Plex Sans (IBM)") == "IBM Plex Sans")
+        // No title worth using: the token, word by word.
+        #expect(FontPreviewName.family(forCask: "font-open-sans", title: "font-open-sans") == "Open Sans")
+    }
+
+    @Test func fontsGoogleLacksShowTheirNameOnly() {
+        #expect(FontPreviewName.family(forCask: "font-fira-code-nerd-font", title: "FiraCode Nerd Font (Fira Code)") == nil)
+        #expect(FontPreviewName.family(forCask: "font-maple-mono-nf", title: "Maple Mono NF") == nil)
+        #expect(FontPreviewName.family(forCask: "firefox", title: "Firefox") == nil)
+    }
+
+    @Test func readsTheFontFileFromGoogleCSS() {
+        let css = "@font-face { font-family: 'Inter'; src: url(https://fonts.gstatic.com/l/font?kit=abc) format('truetype'); }"
+        #expect(FontPreviewName.fontURL(inCSS: css)?.host == "fonts.gstatic.com")
+        // Only Google's own file host is followed.
+        #expect(FontPreviewName.fontURL(inCSS: "src: url(https://example.com/x.ttf)") == nil)
+        #expect(FontPreviewName.fontURL(inCSS: "no url here") == nil)
+    }
+
+    @Test func asksForOnlyTheSampleLetters() {
+        let url = FontPreviewName.cssURL(family: "Open Sans")
+        #expect(url?.host == "fonts.googleapis.com")
+        #expect(url?.query?.contains("family=Open%20Sans") == true || url?.query?.contains("family=Open+Sans") == true)
+    }
+}
+
+/// Install progress: phases from the lines a source reports, and a percentage
+/// only where one was really measured.
+struct InstallProgressTests {
+    private func run(_ lines: [String]) -> InstallProgress {
+        var p = InstallProgress()
+        lines.forEach { p.take($0) }
+        return p
+    }
+
+    @Test func downloadBytesGiveARealPercent() {
+        let p = run(["§step:download", "§download:300/1200"])
+        #expect(p.phase == .download)
+        #expect(p.percentText == 25)
+        #expect(p.bytesText?.contains(" of ") == true)
+    }
+
+    @Test func aCompleteDownloadIsBeingVerified() {
+        let p = run(["§step:prepare", "§download:1200/1200"])
+        #expect(p.phase == .verify)
+        #expect(p.fraction == nil)
+        // The watcher keeps reporting; the phase stays put.
+        var q = p
+        q.take("§download:1200/1200")
+        #expect(q.phase == .verify)
+    }
+
+    @Test func bytesWithoutATotalGiveNoPercent() {
+        let p = run(["§download:5000/0"])
+        #expect(p.phase == .download)
+        #expect(p.fraction == nil)
+        #expect(p.bytesText != nil)
+    }
+
+    @Test func brewHeadingsMoveThroughThePhases() {
+        #expect(run(["==> Downloading https://example.com/a.dmg"]).phase == .download)
+        #expect(run(["==> Downloading x", "==> Installing Cask x"]).phase == .install)
+        #expect(run(["==> Installing Cask x", "==> Moving App 'X.app' to '/Applications/X.app'"]).phase == .move)
+        #expect(run(["==> Running installer for x"]).phase == .vendor)
+        #expect(run(["==> Purging files for version 1 of Cask x"]).phase == .cleanup)
+        #expect(run(["Unzipping the archive"]).phase == .unpack)
+    }
+
+    @Test func aFormulaInstallsThroughItsOwnHeadings() {
+        #expect(run(["==> Fetching downloads for: hello"]).phase == .download)
+        #expect(run(["==> Fetching downloads for: hello", "==> Reinstalling hello"]).phase == .install)
+        #expect(run(["==> Pouring hello--2.12.3.arm64_golden_gate.bottle.1.tar.gz"]).phase == .install)
+        #expect(run(["§step:prepare"]).phase == .prepare)
+        #expect(run(["§step:prepare", "§download:10/100"]).phase == .download)
+    }
+
+    @Test func noPercentWhereNothingIsMeasured() {
+        let p = run(["==> Installing Cask x", "==> Moving App 'X.app' to '/Applications/X.app'"])
+        #expect(p.fraction == nil)
+    }
+
+    @Test func theMacOSInstallersOwnPercentIsUsed() {
+        let p = run(["installer: Percent complete: 45"])
+        #expect(p.phase == .vendor)
+        #expect(p.percentText == 45)
+    }
+
+    @Test func aPhaseChangeDropsTheOldPercent() {
+        let p = run(["installer: Percent complete: 90", "==> Purging files for version 1 of Cask x"])
+        #expect(p.phase == .cleanup)
+        #expect(p.fraction == nil)
+    }
+
+    @Test func sparklesDownloadLineCarriesItsPercent() {
+        let p = run(["Downloading… 12 MB / 50 MB (24%)"])
+        #expect(p.phase == .download)
+        #expect(p.percentText == 24)
+    }
+
+    @Test func theLineSaysTheTimeOnlyAfterAMinuteWhenUnmeasured() {
+        var p = run(["==> Installing Cask x"])
+        p.startedAt = Date(timeIntervalSinceNow: -161)
+        #expect(p.line(now: .now).contains("2:41"))
+        p.startedAt = Date(timeIntervalSinceNow: -20)
+        #expect(!p.line(now: .now).contains(":"))
+    }
+}
+
+/// The font pop-up's style list.
+struct FontStyleTests {
+    @Test func weightsHaveTheirUsualNames() {
+        #expect(FontStyleName.name(weight: 400, italic: false) == "Regular")
+        #expect(FontStyleName.name(weight: 400, italic: true) == "Italic")
+        #expect(FontStyleName.name(weight: 600, italic: false) == "SemiBold")
+        #expect(FontStyleName.name(weight: 700, italic: true) == "Bold Italic")
+        #expect(FontStyleName.name(weight: 100, italic: false) == "Thin")
+        #expect(FontStyleName.name(weight: 900, italic: false) == "Black")
+    }
+
+    @Test func readsTheStylesFromGoogleCSS() {
+        let css = """
+        @font-face { font-style: italic; font-weight: 700; src: url(https://fonts.gstatic.com/l/font?kit=b) format('truetype'); }
+        @font-face { font-style: normal; font-weight: 400; src: url(https://fonts.gstatic.com/l/font?kit=a) format('truetype'); }
+        @font-face { font-style: normal; font-weight: 700; src: url(https://fonts.gstatic.com/l/font?kit=c) format('truetype'); }
+        """
+        let faces = FontStyleName.faces(inCSS: css)
+        #expect(faces.map(\.name) == ["Regular", "Bold", "Bold Italic"])
+        #expect(FontStyleName.summary(faces) == "3 styles (2 upright, 1 italic)")
+    }
+
+    @Test func aFamilyWithoutItalicsSaysJustTheCount() {
+        let css = "@font-face { font-style: normal; font-weight: 400; src: url(https://fonts.gstatic.com/l/font?kit=a) format('truetype'); }"
+        #expect(FontStyleName.summary(FontStyleName.faces(inCSS: css)) == "1 style")
+    }
+
+    @Test func asksForEveryStyleButOnlyTheSampleLetters() {
+        let url = FontStyleName.cssURL(family: "Inter", text: "Aa")
+        #expect(url?.host == "fonts.googleapis.com")
+        #expect(url?.absoluteString.contains("900i") == true)
+    }
+}

@@ -68,6 +68,13 @@ struct GlassDestructiveButton: ViewModifier {
 }
 
 extension View {
+    /// The one shape every strip shares: the orange updates strip, the
+    /// rainbow rename strip, the teal Homebrew strip and the duplicates strip.
+    func strip<S: ShapeStyle>(_ fill: S) -> some View {
+        padding(.horizontal, 10).padding(.vertical, 6)
+            .background(fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
     func glassProminent(_ tint: Color) -> some View { modifier(GlassProminentButton(tint: tint)) }
     func glass() -> some View { modifier(GlassButton()) }
     func glassDestructive() -> some View { modifier(GlassDestructiveButton()) }

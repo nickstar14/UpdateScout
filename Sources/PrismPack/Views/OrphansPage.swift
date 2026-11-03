@@ -82,12 +82,13 @@ struct OrphansPage: View {
                 .help(scanning ? "Scanning…" : "Scan again")
             }
         }
+        .navigationSubtitle("Files left behind by apps that are gone")
         .task { if orphans == nil { await scan() } }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Files named for apps that are no longer on this Mac. Nothing is ticked: some may belong to a command-line tool or a background service, so tick only what you recognise. Everything goes to the Trash.")
+            Text("Nothing is ticked: some may belong to a command-line tool or a background service, so tick only what you recognise. Everything goes to the Trash.")
                 .font(.caption).foregroundStyle(.secondary)
                 // A line limit, not fixedSize: measured at zero width, fixedSize
                 // text made the page thousands of points tall, which pushed the
@@ -107,8 +108,9 @@ struct OrphansPage: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 // Bulk actions for the ticked ones (Nick, 2 Nov 2026).
-                Button { showInFinder(items) } label: { Label("Show in Finder", systemImage: "folder") }
+                Button { showInFinder(items) } label: { Image(systemName: "folder") }
                     .glass().disabled(items.isEmpty)
+                    .help("Show in Finder").accessibilityLabel("Show in Finder")
                 Button("Keep") { tickedOrphans.forEach(keep) }
                     .glass().disabled(items.isEmpty)
                     .help("Stop listing the ticked apps. Their files stay where they are.")
@@ -124,10 +126,10 @@ struct OrphansPage: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
                 if orphan.isGroup {
-                    // Shared folders are never moved (see Found.movable).
-                    Button { orphan.items.forEach(Leftovers.showInFinder) } label: { Image(systemName: "folder").accessibilityLabel("Show in Finder") }
-                        .buttonStyle(.borderless)
-                        .help("Show in Finder")
+                    // Shared folders are never moved (see Found.movable): the
+                    // badge stands where the checkbox would be.
+                    WarningBadge(title: "Shared folder",
+                                 message: "It may be used by other apps from this developer, so \(AppIdentity.name) doesn't move it. Use Show in Finder to move it yourself.")
                 } else {
                     Toggle("", isOn: Binding(get: { ticked.contains(orphan.id) },
                                              set: { if $0 { ticked.insert(orphan.id) } else { ticked.remove(orphan.id) } }))
@@ -136,10 +138,7 @@ struct OrphansPage: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(orphan.id).font(.body.weight(.semibold)).lineLimit(1).truncationMode(.middle)
                     Text(subtitle(orphan)).font(.caption).foregroundStyle(.secondary)
-                    if orphan.isGroup {
-                        Text("Shared folder: may be used by other apps from this developer. Not moved by \(AppIdentity.name); check it in Finder")
-                            .font(.caption).foregroundStyle(Color.orange.readable)
-                    } else if orphan.sameDeveloper {
+                    if !orphan.isGroup, orphan.sameDeveloper {
                         Text("Another app from this developer is installed: these may be its shared files")
                             .font(.caption).foregroundStyle(Color.orange.readable)
                     }
@@ -153,21 +152,19 @@ struct OrphansPage: View {
                 Button(expanded.contains(orphan.id) ? "Hide files" : "Show files") {
                     if expanded.contains(orphan.id) { expanded.remove(orphan.id) } else { expanded.insert(orphan.id) }
                 }
-                .buttonStyle(.link).font(.caption)
-                if !orphan.isGroup {
-                    Button { showInFinder(orphan.items) } label: { Image(systemName: "folder") }
-                        .glass().help("Show in Finder").accessibilityLabel("Show in Finder")
-                }
-                Button("Keep") { keep(orphan) }.glass()
+                .glass().controlSize(.small)
+                Button { showInFinder(orphan.items) } label: { Image(systemName: "folder") }
+                    .glass().controlSize(.small).help("Show in Finder").accessibilityLabel("Show in Finder")
+                Button("Keep") { keep(orphan) }.glass().controlSize(.small)
                     .help("Stop listing these. They stay where they are.")
-                if !orphan.isGroup {
-                    // Red, like every Move to Trash (Nick, 2 Nov 2026).
-                    Button(role: .destructive) { confirmMove(orphan.items.filter(\.movable), names: [orphan.id]) } label: {
-                        Image(systemName: "trash")
-                    }
-                    .glassDestructive().disabled(moving)
-                    .help("Move to Trash").accessibilityLabel("Move to Trash")
+                // Red, like every Move to Trash (Nick, 2 Nov 2026). Shared
+                // folders show it greyed out: they're never moved from here.
+                Button(role: .destructive) { confirmMove(orphan.items.filter(\.movable), names: [orphan.id]) } label: {
+                    Image(systemName: "trash")
                 }
+                .glassDestructive().controlSize(.small).disabled(moving || orphan.isGroup)
+                .help(orphan.isGroup ? "Shared folders can't be moved from here" : "Move to Trash")
+                .accessibilityLabel("Move to Trash")
             }
             if expanded.contains(orphan.id) {
                 ForEach(orphan.items) { item in
@@ -198,7 +195,7 @@ struct OrphansPage: View {
                 .font(.callout)
         }
         ForEach(outcome.failed, id: \.item.path) { failure in
-            Text("\(UninstallPanelText.shortPath(failure.item.path)): \(failure.reason)").font(.caption).foregroundStyle(.red)
+            Text("\(UninstallPanelText.shortPath(failure.item.path)): \(failure.reason)").font(.caption).foregroundStyle(Color.red.readable)
                 .lineLimit(2)
         }
         let blocked = outcome.failed.filter(\.needsFullDiskAccess).map(\.item)

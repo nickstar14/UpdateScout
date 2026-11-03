@@ -308,10 +308,10 @@ struct Adopter: UpdateSource {
     /// on disk: Homebrew prints nothing while it downloads when not in a
     /// terminal, so PrismPack watches its download file (`brew --cache`, with
     /// `.incomplete` while it's still arriving) against the size the server gives.
-    static func watchingDownload(cask: String, url: String?, brew: String,
+    static func watchingDownload(cask: String, url: String?, brew: String, formula: Bool = false,
                                  progress: @escaping @Sendable (String) -> Void,
                                  _ body: @escaping () async throws -> Void) async throws {
-        let cached = (try? await Shell.run(brew, ["--cache", "--cask", cask]))?.stdout
+        let cached = (try? await Shell.run(brew, ["--cache", formula ? "--formula" : "--cask", cask]))?.stdout
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let total = await url.asyncFlatMap { await Adoption.downloadSize($0) } ?? 0
         let watcher = Task {

@@ -559,7 +559,63 @@ copy; the put-back path of Use Homebrew's copy; the list-order fix in
 RoTools is ad-hoc signed: it can be linked after the warning once he
 pastes its project link.
 
-**Next:** a new session starts with step 12's consistency pass across
+**Step 12, the consistency pass (2 Nov 2026), built, not committed.** Nick
+approved the list; one build. Changes: one shared strip shape (`.strip(_)`
+in `Style.swift`) for the orange updates strip, the rainbow rename strip,
+the teal Homebrew strip and the duplicates strip, the last two now inside
+the pinned header instead of flat full-width bands; "Not now" and
+Adoption's Show / Hide are glass; Discover's pop-up is 540 wide like
+Updates and Installed; unused `ChipButton` removed; Orphaned App Files has
+a top-bar subtitle, its "Show files / Hide files" and folder buttons are
+glass; Uninstall's Cancel (glass), Done (main action) and the Full Disk
+Access helper's Close and Show in Finder are glass; error and warning text
+and the move-progress icons use the readable red, orange and green (dark
+mode); Activity's search says "Filter activity" and its menu "All
+activity"; Adoption's, Settings' dependency list and Major-upgrade Notes'
+animations are 0.14 s fades. Checked in the test build, light and dark
+(Theme back to Light): Updates strips, Activity controls, Orphaned App
+Files header, Discover pop-up width, Installed → Duplicates (not blank).
+**Not changed:** the other pop-up widths (340 to 560 are windows with
+different jobs); Productivity's gold-brown tint in dark (needs a colour
+decision); the "1.8.0" version label (bumped at release).
+**Not seen:** Activity rows and colours (agent rewrites `state.json`), the
+Uninstall and Full Disk Access helper windows (real apps / settings), the
+teal Homebrew strip (no candidates right now), and the exact "Use Homebrew's
+copy" race (Flux is already switched; Installed and Duplicates load with
+no "Nothing matches").
+
+**Step 12 follow-up (2 Nov 2026, Nick), built, not committed.** Orphaned
+App Files: a shared folder's row looks like a normal row. The checkbox slot
+holds a `WarningBadge` ("Shared folder", hover tooltip and click popover,
+like "Requires restart"), Show in Finder and Keep are the same as on other
+rows, and the trash is there but greyed out (shared folders are never moved
+from here); the long orange sentence is gone from the row. All four row
+buttons (Show files, Show in Finder, Keep, trash) are small; Show in Finder
+is icon-only on rows and in the bulk bar (pop-up footers keep the text).
+Checked in light and dark; the popover opened. Theme back to Light.
+
+**Step 6, font previews (2 Nov 2026), built, not committed.** Discover →
+Fonts: each font card and row draws "The quick brown fox jumps over the lazy
+dog" in the font, fetched from Google Fonts (`Discover/FontPreview.swift`)
+for the cards on screen, four at a time, only the sample's letters (a few
+KB), through an ephemeral session. The font is held in memory as a
+descriptor and drawn with `Font(CTFont)`: never installed, registered or
+written to disk; everything is dropped when the page is left or Fonts is
+left. The family comes from the cask's title ("JetBrains Mono"; Google
+wants the family's own capitals), Nerd Font and NF builds and anything
+Google lacks show the description slot empty (name only). A note at the top
+of the page says so. Cards and List both show it. Found while building: a
+card's own `.task` was cancelled by the lazy grid, and the page's old copy
+released the fonts right after the new one started fetching; fetches now run
+on the store and release only when the page is really left. Tests:
+`FontPreviewTests` (title to family, Nerd Fonts skipped, Google CSS read,
+only Google's file host followed). Checked in light and dark, Cards and
+List; Theme back to Light. **Not seen:** the fetch under a slow or failed
+connection (falls back to name only by design).
+
+**Planned next (Nick, 2 Nov 2026):** install progress in every tile and a richer font pop-up: **[install-progress-plan.md](install-progress-plan.md)**. Waiting for his LM Studio install to finish, then one build.
+
+**Next:** step 12 is built; steps 6, 7, 9, 10, 11 and 13 follow. (Old note: a new session starts with step 12's consistency pass across
 every tab in light and dark, then steps 6, 7, 9, 10, 11 and 13.
 
 ## Step 4 plan: Discover page

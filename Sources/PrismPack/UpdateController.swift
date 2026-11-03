@@ -822,8 +822,13 @@ final class UpdateController: ObservableObject {
     /// Long moves in progress, by job id (MoveProgress).
     @Published var moveProgress: [String: MoveProgress] = [:]
 
+    /// What each running install is doing, in words and (when measured)
+    /// numbers, for the tiles.
+    @Published var installProgress: [String: InstallProgress] = [:]
+
     private func run(_ item: UpdateItem, with source: any UpdateSource) {
         installStates[item.id] = .installing("Starting…")
+        installProgress[item.id] = InstallProgress()
         outputTails[item.id] = []
         if let plan = MoveProgress.plan(for: item) {
             moveProgress[item.id] = plan
@@ -838,6 +843,10 @@ final class UpdateController: ObservableObject {
                 try await source.install(item) { line in
                     Task { @MainActor in
                         self.moveProgress[item.id]?.take(line)
+                        if var progress = self.installProgress[item.id] {
+                            progress.take(line)
+                            if progress != self.installProgress[item.id] { self.installProgress[item.id] = progress }
+                        }
                         // Step markers are for the progress view only.
                         if line.hasPrefix("§") { return }
                         self.outputTails[item.id, default: []].append(line)

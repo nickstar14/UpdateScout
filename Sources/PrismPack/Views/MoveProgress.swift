@@ -138,9 +138,9 @@ struct MoveProgressView: View {
     @ViewBuilder
     private func symbol(for step: MoveProgress.Step) -> some View {
         if progress.done.contains(step) || (progress.finished && progress.failure == nil) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green.readable)
         } else if progress.current == step && progress.failure != nil {
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+            Image(systemName: "xmark.circle.fill").foregroundStyle(Color.red.readable)
         } else if progress.current == step {
             ProgressView().controlSize(.mini)
         } else {

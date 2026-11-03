@@ -189,8 +189,7 @@ struct UpdatesReminder: View {
             }
             .font(.callout)
             // A light orange strip, as in the mockup (Nick).
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .strip(Color.orange.opacity(0.14))
         }
     }
 }
@@ -338,6 +337,9 @@ struct UpdateRow: View {
                         .frame(width: 170)
                         .onTapGesture { MoveProgressWindow.shared.show(jobID: item.id) }
                         .help("Click for the steps")
+                case _ where controller.installProgress[item.id] != nil && running != .queued
+                    && running != .cancelling && running != .needsAdmin:
+                    InstallProgressView(progress: controller.installProgress[item.id]!, barWidth: 90)
                 case .downloading(let percent?, _):
                     ProgressView(value: Double(percent), total: 100).frame(width: 90)
                     Text("\(percent)%").font(.caption.monospacedDigit()).foregroundStyle(.secondary)

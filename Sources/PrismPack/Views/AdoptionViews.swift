@@ -25,11 +25,10 @@ struct AdoptionBanner: View {
                 Spacer(minLength: 0)
                 Button("Review") { controller.showingAdoptionReview = true }.glass()
                 Button("Not now") { shown.forEach(controller.snoozeAdoption) }
-                    .buttonStyle(.borderless).controlSize(.small)
+                    .glass().controlSize(.small)
                     .help("Hide these suggestions for 30 days")
             }
-            .padding(.horizontal, 20).padding(.vertical, 9)
-            .background(Color.teal.opacity(0.1))
+            .strip(Color.teal.opacity(0.14))
         }
     }
 }
@@ -52,9 +51,7 @@ struct DuplicatesNote: View {
                     Spacer()
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 20).padding(.vertical, 7)
-                .background(Color.orange.opacity(0.07))
-                .contentShape(Rectangle())
+                .strip(Color.orange.opacity(0.14))
             }
             .buttonStyle(.plain)
         }
@@ -91,8 +88,8 @@ struct AdoptionReviewSheet: View {
                             Text("Hidden because Homebrew would be worse: \(notBetter.count). \(notBetter[0].name): \(notBetter[0].reasons.first ?? "")")
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
-                            Button(showNotBetter ? "Hide" : "Show") { withAnimation { showNotBetter.toggle() } }
-                                .buttonStyle(.borderless).controlSize(.small)
+                            Button(showNotBetter ? "Hide" : "Show") { withAnimation(.easeInOut(duration: 0.14)) { showNotBetter.toggle() } }
+                                .glass().controlSize(.small)
                         }
                         .padding(.horizontal, 4)
                         if showNotBetter { ForEach(notBetter) { AdoptionCard(candidate: $0) } }
