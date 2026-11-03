@@ -18,15 +18,18 @@ struct SettingsView: View {
     @State private var autoEnabled = AutoUpdate.enabled
     @State private var autoSchedule = AutoUpdate.schedule
     @State private var autoUnmetered = AutoUpdate.unmeteredOnly
-    @AppStorage(Prefs.glassTintKey) private var glassTint: Double = 0.35
     @State private var showDockIcon = Prefs.showDockIcon
     @State private var adoptionEnabled = Prefs.adoptionEnabled
     @State private var adoptionSelfUpdating = Prefs.adoptionIncludeSelfUpdating
     @State private var query = ""
+    @State private var showingNotes = false
+    @State private var selfBeta = Channels.effective(Channels.choice(for: Bundle.main.bundleIdentifier),
+                                                     installedVersion: SelfUpdater.version) == .beta
 
     var body: some View {
         // Full width, like every other page (Nick, 2 Nov 2026).
         settingsForm
+            .sheet(isPresented: $showingNotes) { ReleaseNotesSheet() }
             // Like the other pages: the controls stay put in glass and the
             // form scrolls under them (Nick, 2 Nov 2026).
             .pinnedHeader {
@@ -48,7 +51,8 @@ struct SettingsView: View {
 
     /// What each row can be found by: its label and its explanation.
     private static let rowWords: [String: String] = [
-        "about": "version about check for updates",
+        "about": "version about check for updates release notes changelog what's new history github",
+        "beta": "beta versions stable early testers prerelease channel",
         "setup": "dependencies everything needs is installed tools reinstall remove homebrew mas",
         "fullDisk": "full disk access privacy data folders trash allow",
         "concurrency": "update at once installs side by side package manager",
@@ -60,7 +64,6 @@ struct SettingsView: View {
         "quit": "ask before quitting quit command q prompt don't ask again",
         "background": "check for updates in the background check every interval minutes hours notify",
         "theme": "theme light dark system appearance",
-        "glass": "glass clear opaque tint wash",
         "dock": "show icon in dock",
         "other": "other sources github releases apps link repository custom json file commands background add a source",
         "drivers": "drivers displaylink third-party cask oracle",
@@ -69,10 +72,10 @@ struct SettingsView: View {
     private static let sectionRows: [String: [String]] = [
         AppIdentity.name: ["about"],
         "Setup": ["setup", "fullDisk"],
-        "Updating": ["concurrency", "password", "auto"],
+        "Updating": ["concurrency", "password", "auto", "beta"],
         "Homebrew adoption": ["adoptSuggest", "adoptSelf"],
         "Background checking": ["login", "quit", "background"],
-        "Appearance": ["theme", "glass", "dock"],
+        "Appearance": ["theme", "dock"],
         "Other sources": ["other"],
         "Drivers": ["drivers"],
     ]
@@ -154,6 +157,8 @@ struct SettingsView: View {
                             Text(AppIdentity.name).font(.title2.weight(.semibold))
                             Text("Version \(SelfUpdater.version)").font(.caption).foregroundStyle(.secondary)
                         }
+                        Spacer()
+                        Button("Release Notes…") { showingNotes = true }.glass()
                     }
                 }
             }
@@ -245,6 +250,14 @@ struct SettingsView: View {
                         .onChange(of: autoUnmetered) { _, value in AutoUpdate.unmeteredOnly = value }
                 }
                 Text("Never automatic: anything that needs your password, apps that are open, macOS, custom sources, betas, major upgrades, and anything hidden or pinned. \"Only on Wi-Fi or Ethernet\" skips a phone hotspot and Low Data Mode. Each app's card can override this.")
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                if shows("Updating", "beta") {
+                Toggle("Beta versions", isOn: $selfBeta)
+                    .onChange(of: selfBeta) { _, on in
+                        if let id = Bundle.main.bundleIdentifier { Channels.set(on ? .beta : .stable, for: id) }
+                    }
+                Text("Beta gets new versions of \(AppIdentity.name) early, so you can try them and report problems. If you go back to Stable, you stay on the beta you have until the next full release.")
                     .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -341,24 +354,6 @@ struct SettingsView: View {
                     Appearance.apply(value, animated: true)
                 }
                 }
-                if shows("Appearance", "glass") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Glass")
-                    Slider(value: $glassTint, in: 0...1) {
-                        EmptyView()
-                    } minimumValueLabel: {
-                        Text("Clear").font(.caption).foregroundStyle(.secondary)
-                    } maximumValueLabel: {
-                        Text("Opaque").font(.caption).foregroundStyle(.secondary)
-                    }
-                    // Otherwise the grouped Form reserves a label column and the
-                    // slider gets squeezed into the right half of the row.
-                    .labelsHidden()
-                    Text("Clear is the system's Liquid Glass with no tint; toward Opaque adds a light or dark wash to match the theme.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                }
                 if shows("Appearance", "dock") {
                 Toggle("Show icon in Dock", isOn: $showDockIcon)
                     .onChange(of: showDockIcon) { _, on in
@@ -410,7 +405,7 @@ struct SettingsView: View {
 
 /// Manages the periodic-check launchd agent in ~/Library/LaunchAgents.
 enum LaunchAgent {
-    static let label = "com.nickszun.updatescout.check"
+    static let label = "com.nickszun.prismpack.check"
 
     static var plistURL: URL {
         FileManager.default.homeDirectoryForCurrentUser

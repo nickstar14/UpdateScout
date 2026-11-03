@@ -153,9 +153,9 @@ button that expands into a menu.
 ## 3. Window background wash **[built]**
 A `ZStack` of `Color(nsColor: .windowBackgroundColor)` with a tinted wash at
 low opacity (silver in light, midnight in dark) behind the detail column;
-glass cards pick it up. A user "Glass" slider scaled the wash opacity. On
-macOS 27 the system has its own Liquid Glass slider (Settings, Appearance),
-so two sliders overlap; PrismPack keeps its wash and notes the choice.
+glass cards pick it up. PrismPack's own "Glass" slider that scaled this wash
+was **removed** (3 Nov 2026): it never changed the buttons, and macOS 27 has
+its own Liquid Glass setting. The window background is now the plain system one.
 
 ## 4. Special effects (not defaults)
 - **Rainbow primary button (Update All) [built]:** `.buttonStyle(.glass)` plus

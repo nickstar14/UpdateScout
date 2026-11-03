@@ -20,7 +20,7 @@ NOTES_MD="${3:-}"     # shown on the GitHub release page
 
 # The repo keeps its name until 2.0 has rolled out (rename plan, section 6);
 # the app, zip and release title follow CFBundleName.
-REPO="nickstar14/UpdateScout"
+REPO="nickstar14/UpdateScout"   # keep in step with AppIdentity.repo
 APP_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" Resources/Info.plist)
 APP="build/$APP_NAME.app"
 ZIP_NAME="$APP_NAME-$VERSION.zip"
@@ -43,7 +43,19 @@ scripts/build-app.sh
 
 ZIP="build/$ZIP_NAME"
 rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
+if [[ "$VERSION" == 2.0.0* ]]; then
+    # Bridge release: Sparkle in an installed 1.x looks for the new app by the
+    # old file name (UpdateScout.app) and only then by bundle ID, and the bundle
+    # ID changed in 2.0. So the zip holds the app under the old name; PrismPack
+    # renames itself to PrismPack.app on first launch (Migration). From 2.0.1
+    # on, hosts are PrismPack and the zip holds PrismPack.app as usual.
+    STAGE=$(mktemp -d)
+    ditto "$APP" "$STAGE/UpdateScout.app"
+    ditto -c -k --keepParent "$STAGE/UpdateScout.app" "$ZIP"
+    rm -rf "$STAGE"
+else
+    ditto -c -k --keepParent "$APP" "$ZIP"
+fi
 
 SIGN_UPDATE=$(find .build/artifacts/sparkle -name sign_update -not -path "*old_dsa*" | head -1)
 # sign_update's output already includes BOTH attributes: edSignature and length.
@@ -85,10 +97,13 @@ git add Resources/Info.plist appcast.xml
 git commit -m "Release $VERSION"
 git tag "v$VERSION"
 git push origin main --tags
+# A beta is marked as a pre-release, so GitHub doesn't show it as the latest.
+PRERELEASE=()
+[[ -n "$CHANNEL" ]] && PRERELEASE=(--prerelease)
 if [[ -n "$NOTES_MD" ]]; then
-    gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "$APP_NAME $VERSION" --notes-file "$NOTES_MD"
+    gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "$APP_NAME $VERSION" --notes-file "$NOTES_MD" ${PRERELEASE[@]+"${PRERELEASE[@]}"}
 else
-    gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "$APP_NAME $VERSION" --generate-notes
+    gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "$APP_NAME $VERSION" --generate-notes ${PRERELEASE[@]+"${PRERELEASE[@]}"}
 fi
 
 echo "Released $VERSION — appcast updated, zip uploaded."

@@ -4,6 +4,8 @@ import AppKit
 @main
 struct Main {
     static func main() {
+        // Before anything reads preferences or the data folder.
+        EarlyMigration.run()
         if CommandLine.arguments.contains("--askpass") {
             AskpassDialog.run()
         } else if CommandLine.arguments.contains("--background-check") {
@@ -57,7 +59,6 @@ struct PrismPackApp: App {
         _ = CustomSource.backgroundNames   // before the seed, so a fresh seed starts off
         CustomSource.seedIfMissing()
         DispatchQueue.main.async {
-            Prefs.migrateGlassTint()
             Appearance.apply(Prefs.appearance)
             if Prefs.showDockIcon { NSApp.setActivationPolicy(.regular) }
             // `open PrismPack.app --args --open-window` shows the status
@@ -84,7 +85,10 @@ struct PrismPackApp: App {
         Migration.prepareNotice()
         // First launch with missing dependencies or no Full Disk Access →
         // open Settings so the Setup section can offer them.
-        if !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {
+        // After the 2.0 rename macOS starts Full Disk Access over, so look again once.
+        let recheck = UserDefaults.standard.bool(forKey: EarlyMigration.recheckPermissionsKey)
+        UserDefaults.standard.removeObject(forKey: EarlyMigration.recheckPermissionsKey)
+        if recheck || !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {
             UserDefaults.standard.set(true, forKey: "didFirstRunSetup")
             if Shell.which("brew") == nil || Shell.which("mas") == nil || !FullDiskAccess.isGranted {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

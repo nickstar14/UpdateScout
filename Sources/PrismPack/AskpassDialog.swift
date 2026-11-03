@@ -3,10 +3,10 @@ import AppKit
 
 extension Notification.Name {
     /// Posted by the --askpass process when its dialog closes.
-    static let prismPackRefront = Notification.Name("com.nickszun.updatescout.refront")
+    static let prismPackRefront = Notification.Name("com.nickszun.prismpack.refront")
 }
 
-/// `UpdateScout --askpass` (the executable keeps its name): sudo runs this (via askpass.sh) when an install
+/// `PrismPack --askpass`: sudo runs this (via askpass.sh) when an install
 /// needs elevation and there is no terminal. Shows a native-styled auth
 /// dialog and prints the entry to stdout for sudo. Nothing is stored.
 enum AskpassDialog {

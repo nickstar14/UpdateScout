@@ -25,7 +25,7 @@ enum DiscoverCategories {
             case .developer: .indigo
             case .games: .red
             case .menuBar: .gray
-            case .productivity: .yellow
+            case .productivity: Theme.lemon
             case .utilities: .teal
             case .video: .brown
             }

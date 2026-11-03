@@ -231,9 +231,9 @@ private struct DiscoverItem: View {
     @State private var showingCard = false
     @Environment(\.colorScheme) private var scheme
 
-    /// The card's tint. Yellow is fainter in dark, where it turned olive.
+    /// The card's tint. Productivity's lemon is fainter in dark.
     private var tint: Color {
-        label.color.opacity(scheme == .dark && label.color == .yellow ? 0.15 : 0.35)
+        label.color.opacity(scheme == .dark && label.color == Theme.lemon ? 0.18 : 0.35)
     }
 
     private var item: UpdateItem { DiscoverInstaller.item(for: entry) }

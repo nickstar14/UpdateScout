@@ -52,12 +52,23 @@ Phase 9 (leftover cleanup) has its own record in
 ## Build, test, release
 
 - **Build:** `scripts/build-app.sh` writes `build/PrismPack.app` (named from
-  `CFBundleName`; the executable inside is still `UpdateScout`). With
+  `CFBundleName`; the executable inside is `PrismPack` too). With
   `--install`, it also copies the app to `/Applications/PrismPack.app` and
   removes `/Applications/UpdateScout.app`.
-- **Rename, Part 1 (2.0):** only the display and bundle name changed. The bundle
-  ID `com.nickszun.updatescout`, executable `UpdateScout`, launchd label, data
-  folder `Application Support/UpdateScout/` and preference keys stay until Part 2.
+- **Rename (2.0.0, done):** everything is PrismPack: bundle ID
+  `com.nickszun.prismpack`, executable `PrismPack`, launchd label
+  `com.nickszun.prismpack.check`, data folder `Application Support/PrismPack/`,
+  menu bar item `PrismPackStatusItem`. `Migration.swift` (`Legacy`,
+  `EarlyMigration`, the launch agent switch) carries 1.x over; Full Disk Access
+  and notifications start over on purpose. **Kept because the updater needs
+  them:** `SUPublicEDKey`, `SUFeedURL` and `REPO` (old repo name
+  `nickstar14/UpdateScout`; one constant, `AppIdentity.repo`, plus `REPO` in
+  `release.sh`), `appcast.xml`. The **2.0.0 release zip holds the app as
+  `UpdateScout.app`** (release.sh does it): Sparkle in 1.x finds the new app by
+  the old file name, then by bundle ID, and the ID changed. The next release
+  (2.0.1 / 2.1.0) switches `SUFeedURL` to the new repo name; only then rename the
+  repo on GitHub, and never create a new repo called UpdateScout (the redirect
+  would die). Plan: `docs/step13-final-review-plan.md`.
 - **Signing:** `build-app.sh` signs with the self-signed "PrismPack Signing"
   certificate in Nick's login keychain (made once with
   `scripts/make-signing-cert.sh`), so Full Disk Access survives updates. If it
@@ -66,9 +77,12 @@ Phase 9 (leftover cleanup) has its own record in
 - **Compile check:** `swift build`.
 - **Running a test build:**
   - Quit the installed copy first. Both copies share the bundle ID and
-    `~/Library/Application Support/UpdateScout/`.
+    `~/Library/Application Support/PrismPack/`. **The first launch of any 2.0
+    build on a Mac that still has 1.x data moves the real data folder, copies
+    the real preferences and replaces the real launch agent** (`EarlyMigration`):
+    back up first and ask Nick.
   - Don't toggle "Check for updates in the background" in a test build. It
-    points the real launchd agent (`com.nickszun.updatescout.check`) at that
+    points the real launchd agent (`com.nickszun.prismpack.check`) at that
     build.
   - Open the running test build's window with `open build/PrismPack.app`.
     Opening the running app again shows its window. Add
@@ -79,7 +93,7 @@ Phase 9 (leftover cleanup) has its own record in
   - Adding or removing an app in Full Disk Access is Nick's click, never
     Claude's.
 - **Trigger a background check by hand:**
-  `/Applications/PrismPack.app/Contents/MacOS/UpdateScout --background-check`
+  `/Applications/PrismPack.app/Contents/MacOS/PrismPack --background-check`
 - **Release:**
   `scripts/release.sh <version> <notes.html> <notes.md>`
   - It bumps `CFBundleVersion`, builds, zips and EdDSA-signs the app.
@@ -108,7 +122,7 @@ Phase 9 (leftover cleanup) has its own record in
 - **Probes and tests touch the real data folder.** `Store.supportDirectory`
   comes from FileManager, which ignores a `HOME` override, so a test or probe
   that loads Discover or the stores reads and writes
-  `~/Library/Application Support/UpdateScout/`. Ask Nick before running one.
+  `~/Library/Application Support/PrismPack/`. Ask Nick before running one.
 - **Item IDs include the install token.** Changing the ID format resets
   users' ignored and notified lists.
 - **Page headers:** never put `fixedSize(horizontal: false, vertical: true)`
@@ -129,7 +143,7 @@ Phase 9 (leftover cleanup) has its own record in
   `~/Applications`), never on Nick's apps without his go-ahead.
 - **Testing Installed from the background:** menus can't be opened, so the
   Source filter can only be changed with
-  `defaults write com.nickszun.updatescout installedSource ""` (Nick's own
+  `defaults write com.nickszun.prismpack installedSource ""` (Nick's own
   setting is `unmanaged`: put it back). Installed takes about 20 s to load
   (it calls `brew info`). An `NSAlert` opens as its own window: find it with
   `app_list_windows`.

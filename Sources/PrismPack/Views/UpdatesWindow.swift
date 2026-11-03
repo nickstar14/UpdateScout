@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 extension NSWindow {
     /// AppKit's center() sits windows above the vertical midpoint; this puts
@@ -41,11 +42,29 @@ enum Page: String, CaseIterable, Identifiable {
 
 }
 
+/// The toolbar's items are the system's own: the sidebar toggle and the
+/// separator that follows the split view's divider, so the toggle belongs to
+/// the sidebar's section. Returning nil for them lets AppKit supply both.
+final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        // The space first, so the toggle sits at the right end of the sidebar's
+        // section, against the divider (Nick, 3 Nov 2026).
+        [.flexibleSpace, .toggleSidebar, .sidebarTrackingSeparator]
+    }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, .toggleSidebar, .sidebarTrackingSeparator]
+    }
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? { nil }
+}
+
 /// The main window: an edge-to-edge sidebar and one unified toolbar.
 @MainActor
 final class UpdatesWindow {
     static let shared = UpdatesWindow()
     private var window: NSWindow?
+    private let toolbarDelegate = MainToolbarDelegate()
+    private var titleWatch: AnyCancellable?
 
     /// Frame of the window when it's on screen — other windows centre on it
     /// rather than on the display.
@@ -58,25 +77,52 @@ final class UpdatesWindow {
         if let page { UpdateController.shared.page = page }
         NSApp.activate(ignoringOtherApps: true)
         if window == nil {
-            let hosting = NSHostingController(
+            // A native split view, so the system's sidebar toggle and the
+            // sidebar tracking separator work: the toggle sits in the sidebar's
+            // own toolbar section, left of the divider, and stays put when
+            // the sidebar's grey hides (Nick, 3 Nov 2026). Two hosting views,
+            // one per column. (A single hosting view around a SwiftUI
+            // NavigationSplitView gave a dead toggle.)
+            let sidebarHost = NSHostingController(
+                rootView: Sidebar().environmentObject(UpdateController.shared))
+            sidebarHost.sizingOptions = []
+            let detailHost = NSHostingController(
                 rootView: MainView().environmentObject(UpdateController.shared))
-            // SwiftUI's .toolbar and .navigationTitle drive the window's own
-            // unified toolbar and title.
-            hosting.sceneBridgingOptions = [.toolbars, .title]
+            // SwiftUI's .navigationTitle and .navigationSubtitle drive the
+            // window's title.
+            detailHost.sceneBridgingOptions = [.title]
             // Pages never size the window; a long page scrolls. Even
             // `.minSize` let Orphaned App Files stretch it to 2,367 pt
             // (31 Oct 2026): wrapping text measured at its narrowest made the
             // minimum height huge. The window's own minSize below is enough.
-            hosting.sizingOptions = []
-            let w = NSWindow(contentViewController: hosting)
+            detailHost.sizingOptions = []
+            let split = NSSplitViewController()
+            let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarHost)
+            sidebarItem.minimumThickness = 190
+            sidebarItem.maximumThickness = 260
+            sidebarItem.canCollapse = true
+            split.addSplitViewItem(sidebarItem)
+            split.addSplitViewItem(NSSplitViewItem(viewController: detailHost))
+            let w = NSWindow(contentViewController: split)
             w.title = UpdateController.shared.page.title
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.toolbarStyle = .unified
+            let toolbar = NSToolbar(identifier: "MainToolbar")
+            toolbar.delegate = toolbarDelegate
+            toolbar.displayMode = .iconOnly
+            w.toolbar = toolbar
+            titleWatch = detailHost.publisher(for: \.title).sink { [weak w] title in
+                if let title, !title.isEmpty { w?.title = title }
+            }
             w.isReleasedWhenClosed = false
             // Nick's chosen opening size (31 Oct 2026); the saved frame wins after.
             w.setContentSize(NSSize(width: 914, height: 706))
             w.minSize = NSSize(width: 640, height: 420)
             w.setFrameAutosaveName("MainWindow")
+            // The split view opens the sidebar at its minimum; give it the
+            // ideal width so Discover's category names fit.
+            split.view.layoutSubtreeIfNeeded()
+            split.splitView.setPosition(210, ofDividerAt: 0)
             window = w
             // Closing the window frees everything the pages hold (Nick: light
             // as a menu bar app with the window closed). The window and its
@@ -87,6 +133,7 @@ final class UpdatesWindow {
                     OrphanCache.shared.clear()
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
+                            self?.titleWatch = nil
                             self?.window?.contentViewController = nil
                             self?.window = nil
                             // With the views gone, free what they were showing
@@ -115,9 +162,10 @@ final class UpdatesWindow {
     }
 }
 
+/// The page column of the main window (the sidebar is its own hosting view,
+/// see `UpdatesWindow`).
 struct MainView: View {
     @EnvironmentObject var controller: UpdateController
-    @State private var columns = NavigationSplitViewVisibility.all
     @AppStorage(Migration.noticeKey) private var showRenameNotice = false
     @ObservedObject private var discover = DiscoverModel.shared
 
@@ -128,52 +176,28 @@ struct MainView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
-            Sidebar()
-                .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
-        } detail: {
-            // A very quick cross-fade between pages: each page is its own
-            // identity, so changing page removes one and inserts the other,
-            // and the container animates both.
-            ZStack {
-                Group {
-                    switch controller.page {
-                    case .updates: UpdatesPage()
-                    case .discover: DiscoverPage()
-                    case .installed: InstalledPage()
-                    case .orphans: OrphansPage()
-                    case .activity: ActivityPage()
-                    case .settings: SettingsView()
-                    }
+        // A very quick cross-fade between pages: each page is its own
+        // identity, so changing page removes one and inserts the other,
+        // and the container animates both.
+        ZStack {
+            Group {
+                switch controller.page {
+                case .updates: UpdatesPage()
+                case .discover: DiscoverPage()
+                case .installed: InstalledPage()
+                case .orphans: OrphansPage()
+                case .activity: ActivityPage()
+                case .settings: SettingsView()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(shown)
-                .transition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.14), value: shown)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(GlassBackground())
+            .id(shown)
+            .transition(.opacity)
         }
+        .animation(.easeInOut(duration: 0.14), value: shown)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(GlassBackground())
         .navigationTitle(controller.page == .discover ? discover.title : controller.page.title)
-        .toolbar {
-            // The system didn't add its own sidebar toggle to this window. On
-            // macOS 26+ ask for the system's own: it sits in the sidebar's own
-            // toolbar section, left of the divider, and stays put when the
-            // sidebar's grey hides (Nick, 3 Nov 2026). Older macOS keeps the
-            // button in the detail toolbar.
-            if #available(macOS 26.0, *) {
-                DefaultToolbarItem(kind: .sidebarToggle, placement: .navigation)
-            } else {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        withAnimation { columns = columns == .detailOnly ? .all : .detailOnly }
-                    } label: {
-                        Label("Toggle Sidebar", systemImage: "sidebar.leading")
-                    }
-                    .help("Show or hide the sidebar")
-                }
-            }
-        }
         .onAppear { controller.reloadFromDisk() }
         .sheet(item: $controller.review) { request in
             MajorUpgradeReview(request: request).environmentObject(controller)
@@ -194,7 +218,7 @@ struct MainView: View {
 /// App icon, name and version at the top, then the Library group and
 /// Discover last (its parts open under it while it's the page); Activity and
 /// Settings are pinned at the bottom (Phase 10). Standard rows, so the system's sidebar icon size applies.
-private struct Sidebar: View {
+struct Sidebar: View {
     @EnvironmentObject var controller: UpdateController
     @ObservedObject private var discover = DiscoverModel.shared
 
@@ -330,16 +354,13 @@ private struct Sidebar: View {
 
 }
 
-/// The window background: the plain system background, with the Glass
-/// slider's wash (silver in light, midnight in dark) over it. The slider
-/// changes only this wash, never the section panels.
+/// The window background: the plain system background. (A Glass slider that
+/// laid a wash over it was removed: it changed nothing about the buttons and
+/// panels, Nick, 3 Nov 2026.)
 struct GlassBackground: View {
-    @AppStorage(Prefs.glassTintKey) private var tint: Double = 0.35
-
     var body: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
-            Theme.wash.opacity(tint * 0.9)
         }
         .ignoresSafeArea()
     }

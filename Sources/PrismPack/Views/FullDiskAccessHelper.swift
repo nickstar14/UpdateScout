@@ -19,18 +19,28 @@ enum FullDiskAccess {
         return true
     }
 
+    /// Opens System Settings on the page with the list. The address macOS 13
+    /// and later use first, the older one (macOS 12) if that fails.
+    static func openSystemSettingsPage() {
+        let current = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles")!
+        let older = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+        NSWorkspace.shared.open(current, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if error != nil { NSWorkspace.shared.open(older) }
+        }
+    }
+
     static func openSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+        openSystemSettingsPage()
         showHelper()
     }
 
     static func showHelper() {
         if let panel { panel.orderFrontRegardless(); return }
-        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 400),
+        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 360),
                         styleMask: [.titled, .closable, .fullSizeContentView, .utilityWindow],
                         backing: .buffered, defer: false)
         p.titlebarAppearsTransparent = true
-        p.title = "Full Disk Access"
+        p.title = "Allow \(AppIdentity.name)"
         // Above System Settings, so the icon stays reachable while dragging.
         p.isFloatingPanel = true
         p.level = .floating
@@ -48,17 +58,6 @@ enum FullDiskAccess {
         panel?.close()
         panel = nil
     }
-
-    /// Quit and open this same copy again, so the new grant applies. Asking
-    /// System Settings to do it reopened the installed copy instead.
-    static func relaunch() {
-        let path = Bundle.main.bundlePath
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", path]
-        try? task.run()
-        AppDelegate.quitWithoutAsking()
-    }
 }
 
 private struct FullDiskAccessHelper: View {
@@ -72,27 +71,21 @@ private struct FullDiskAccessHelper: View {
                 // A plain file URL. `NSItemProvider(contentsOf:)` offered a file
                 // copy, which System Settings' list ignored (31 Oct 2026).
                 .onDrag { NSItemProvider(object: appURL as NSURL) }
-                .help("Drag into the Full Disk Access list")
+                .help("Drag into the list in System Settings")
             Text("Drag this icon into the list").font(.headline)
-            Text("macOS guards each app's data folders. Only apps with Full Disk Access may move them to the Trash for you.")
+            Text("macOS guards each app's data folders. Only apps you allow in System Settings may move them to the Trash for you.")
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 // Safe here: the panel has a fixed width, unlike the pages.
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
-                step(1, "In System Settings, select any old \(AppIdentity.name) or UpdateScout entry and click −.")
-                step(2, "Drag the icon above into the list (or drag it from Show in Finder), and make sure its switch is on.")
-                step(3, "Quit and reopen \(AppIdentity.name).")
+                step(1, "Open System Settings. It goes straight to Privacy & Security, Full Disk Access. (In Settings' own search it is listed as \"Allow applications to access all user files\".)")
+                step(2, "Drag the icon above into the list, or click + and choose \(AppIdentity.name), and make sure its switch is on.")
+                step(3, "If macOS asks, choose Quit & Reopen. \(AppIdentity.name) restarts in the menu bar: click the prism to open the window again.")
             }
-            Text("This copy: \(UninstallPanelText.shortPath(appURL.path))")
-                .font(.caption).foregroundStyle(.secondary)
-                .lineLimit(2).truncationMode(.middle)
             HStack {
                 Button("Close", action: onClose).glass()
-                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([appURL]) }
-                    .glass()
-                    .help("Drag it from Finder into the list instead")
                 Spacer()
-                Button("Quit and Reopen") { FullDiskAccess.relaunch() }.glass()
+                Button("Open System Settings") { FullDiskAccess.openSystemSettingsPage() }.glassProminent(.blue)
             }
         }
         .padding(20)

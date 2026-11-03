@@ -5,19 +5,19 @@
 	<key>CFBundleDisplayName</key>
 	<string>PrismPack</string>
 	<key>CFBundleExecutable</key>
-	<string>UpdateScout</string>
+	<string>PrismPack</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.nickszun.updatescout</string>
+	<string>com.nickszun.prismpack</string>
 	<key>CFBundleName</key>
 	<string>PrismPack</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8.0</string>
+	<string>2.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>25</string>
 	<key>LSMinimumSystemVersion</key>

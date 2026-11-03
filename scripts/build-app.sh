@@ -1,8 +1,8 @@
 #!/bin/bash
 # Build PrismPack.app from the SwiftPM package.
 # Usage: scripts/build-app.sh [--install]   (--install copies it to /Applications)
-# The bundle is named after CFBundleName; the executable inside keeps its own
-# name (CFBundleExecutable, still UpdateScout under rename Plan A).
+# The bundle is named after CFBundleName; the executable inside is
+# CFBundleExecutable (both PrismPack since 2.0.0).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -70,8 +70,9 @@ fi
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
-    # The pre-rename copy is the same app (same bundle ID): replace it rather
-    # than leave two. The launch agent repairs its path on the next launch.
+    # Replace the pre-rename copy rather than leave two (its bundle ID differs
+    # now, but it is the same app). The first launch moves its data and launch
+    # agent over (Migration).
     rm -rf /Applications/UpdateScout.app "/Applications/$APP_NAME.app"
     cp -R "$APP" "/Applications/$APP_NAME.app"
     echo "Installed to /Applications/$APP_NAME.app"

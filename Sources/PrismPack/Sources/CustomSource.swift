@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// User-editable fallback: ~/Library/Application Support/UpdateScout/custom_sources.json
+/// User-editable fallback: ~/Library/Application Support/PrismPack/custom_sources.json
 /// Each entry defines where to read the installed version, where to fetch the
 /// latest version, and either a shell command to update or a download page to open.
 struct CustomSource: UpdateSource {

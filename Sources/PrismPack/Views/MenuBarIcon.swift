@@ -67,7 +67,7 @@ final class StatusItemController: NSObject {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         // A stable name, so menu bar managers (Thaw, Ice, Bartender) and
         // macOS keep the position the user chose.
-        item.autosaveName = "UpdateScoutStatusItem"
+        item.autosaveName = "PrismPackStatusItem"
         if let button = item.button {
             button.target = self
             button.action = #selector(clicked)

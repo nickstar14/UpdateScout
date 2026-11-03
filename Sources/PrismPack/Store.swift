@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import QuartzCore
 
-/// Local JSON persistence under ~/Library/Application Support/UpdateScout/.
+/// Local JSON persistence under ~/Library/Application Support/PrismPack/.
 struct Store {
     struct State: Codable, Equatable {
         var lastCheck: Date?
@@ -98,7 +98,7 @@ struct Store {
 
     static var supportDirectory: URL {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("UpdateScout", isDirectory: true)
+            .appendingPathComponent("PrismPack", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -243,16 +243,6 @@ enum Prefs {
         set { UserDefaults.standard.set(newValue, forKey: "showDockIcon") }
     }
 
-    /// How much light/dark tint sits under the glass: 0 is untinted Liquid
-    /// Glass, 1 fully opaque. Seeded from the old Clear/Regular/Tinted choice.
-    static let glassTintKey = "glassTint"
-    static func migrateGlassTint() {
-        let d = UserDefaults.standard
-        guard d.object(forKey: glassTintKey) == nil else { return }
-        let old = GlassStyle.from(d.string(forKey: "glassStyle") ?? "regular")
-        d.set(old.washOpacity, forKey: glassTintKey)
-    }
-
     static var appearance: Appearance {
         get { Appearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "") ?? .system }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: "appearance") }
@@ -340,26 +330,6 @@ enum Appearance: String, CaseIterable, Identifiable {
         var color = NSColor.windowBackgroundColor.cgColor
         appearance.performAsCurrentDrawingAppearance { color = NSColor.windowBackgroundColor.cgColor }
         return color
-    }
-}
-
-/// How opaque the window's Liquid Glass reads — Apple's own tier names.
-enum GlassStyle: String, CaseIterable, Identifiable {
-    case clear, regular, tinted
-    var id: String { rawValue }
-    var label: String { rawValue.capitalized }
-    /// Opacity of the window-background wash layered under the glass.
-    var washOpacity: Double {
-        switch self {
-        case .clear: 0.12
-        case .regular: 0.35
-        case .tinted: 0.65
-        }
-    }
-    /// Accepts the pre-rename stored values ("middle"/"frosted") too.
-    static func from(_ raw: String) -> GlassStyle {
-        GlassStyle(rawValue: raw)
-            ?? (raw == "middle" ? .regular : raw == "frosted" ? .tinted : .regular)
     }
 }
 

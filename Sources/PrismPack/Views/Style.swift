@@ -160,20 +160,20 @@ struct WarningKind {
 /// mode and near-white in light; both make the glass look flat and harsh, so
 /// these sit closer to mid-grey while still reading as light or dark.
 enum Theme {
-    /// The Glass slider's wash leans toward the app icon's backgrounds:
-    /// silver in light, midnight in dark.
-    static let wash = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(displayP3Red: 0x14 / 255, green: 0x1a / 255, blue: 0x2e / 255, alpha: 1)
-            : NSColor(displayP3Red: 0xee / 255, green: 0xf1 / 255, blue: 0xf8 / 255, alpha: 1)
-    })
-
     /// npm's red, a shade deeper than the system red so it stands apart
     /// from Leftover drivers' pink.
     static let npmRed = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(displayP3Red: 0.86, green: 0.24, blue: 0.22, alpha: 1)
             : NSColor(displayP3Red: 0.72, green: 0.13, blue: 0.12, alpha: 1)
+    })
+
+    /// Productivity: the system yellow in light; in dark a paler lemon, since
+    /// the saturated yellow at a low opacity over dark grey turned gold-brown.
+    static let lemon = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(displayP3Red: 1.00, green: 0.93, blue: 0.55, alpha: 1)
+            : NSColor.systemYellow
     })
 
     /// Leftover drivers: a clear pink, well away from npm's red.
@@ -314,7 +314,7 @@ struct SectionPanel: ViewModifier {
         content
             .background {
                 if #available(macOS 26.0, *) {
-                    // Fixed tint: the Glass slider changes only the window wash.
+                    // A fixed tint.
                     Color.clear.glassEffect(.regular.tint(color.opacity(0.32)), in: shape)
                 } else {
                     shape.fill(.regularMaterial)

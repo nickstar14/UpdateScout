@@ -68,40 +68,35 @@ struct RenameWelcome: View {
     private var story: some View {
         let name = AppIdentity.name
         return VStack(alignment: .leading, spacing: 10) {
-            Text("UpdateScout is now \(name).").font(.headline)
-            Text("Version 2.0 is much more than an updater. Alongside updates, \(name) now helps you find and install new apps, and look after everything you already have. The old name no longer covered all of that.")
-            Text("Finding a name that fit, and that nobody else was using, took a while. We chose \(name) because a prism takes a single beam of white light and reveals every colour inside it. \(name) does the same for your Mac: one window that shows all your software, from Homebrew, the App Store and Sparkle apps to Python, npm, Rust and more, each in its own colour.")
-            Text("Your settings and history carried over.").foregroundStyle(.primary)
+            Text("UpdateScout is now \(name)").font(.headline)
+            Text("Version 2.0 is much more than an updater. Alongside updates, \(name) now helps you find and install new apps, and look after the software you already have.")
+            Text("With that much scope, the name UpdateScout no longer fit, so the app grew into \(name). We chose \(name) because a prism takes a single beam of white light and reveals every colour inside it. \(name) does the same for your Mac: one window that shows all your software, the files deleted apps leave behind, and a place to discover and install new software, each in its own colour.")
+            Text("Your settings and history carried over. Because macOS treats \(name) as a new app, it asks again for notifications and Full Disk Access (optional).").foregroundStyle(.primary)
         }
         .font(.callout).foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// What's new in 2.0, checked against the 1.8.0 code (30 Oct 2026). Draft
-    /// for Nick to approve before a beta. Only what's built: through Phase 9's
+    /// What's new in 2.0. Wording locked by Nick in the wording editor on
+    /// 3 Nov 2026 (docs/wording-editor.html). Before that it was checked against
+    /// the 1.8.0 code (30 Oct 2026); only what's built: through Phase 9's
     /// leftover cleanup, Orphaned App Files and Full Disk Access (31 Oct 2026).
     static let changes: [(symbol: String, title: String, detail: String)] = [
-        ("macwindow", "A new window", "A sidebar with Updates, Installed, Orphaned App Files, Discover, Activity and Settings, in the macOS 27 Liquid Glass look."),
-        ("triangle", "A new menu bar prism", "Click the prism and the window opens straight away: there is no small pop-up menu any more. Right-click it for Check Now, Settings and Quit."),
-        ("magnifyingglass", "Discover", "Find and install new apps and tools from Homebrew, npm, PyPI, crates.io, RubyGems and the editor extension stores. Browse what's popular this month, what's new, and apps by category. Each app's page shows its own description and pictures, and fonts show a preview and every style."),
-        ("square.stack.3d.up.fill", "More kinds of updates", "New sections for Python (pipx and uv), npm, Rust, Ruby gems, and extensions for VS Code, VSCodium and Cursor, plus a Tools section for the package managers themselves."),
-        ("arrow.down.circle", "Several updates at once", "Updates run side by side, each with its own progress and Cancel, while each package manager still does one thing at a time. Choose how many in Settings."),
-        ("key.fill", "One password per batch", "Enter it once for a whole batch. It's kept in memory for that batch only and never saved."),
-        ("checkmark.circle", "Installed", "Everything on your Mac in one list, showing where each item came from and whether it's up to date. Filter by source and sort by name, size or date."),
-        ("trash", "Uninstall", "Remove an app or package from its card, the right way for wherever it came from. Before anything moves, one window shows the app, the files it left in your Library, and Homebrew's cleanup list. You choose what goes, and it goes to the Trash so you can put it back."),
-        ("questionmark.folder", "Orphaned App Files", "Files left behind by apps you've already removed, with their size and when they last changed. Nothing is ticked: keep them, move what you choose to the Trash, or tell \(AppIdentity.name) which app a file belongs to and it's offered when you move that app to the Trash."),
-        ("lock.shield", "Full Disk Access", "Optional. Lets \(AppIdentity.name) clear the app data folders macOS protects. Settings → Setup explains why and helps you turn it on, and it stays on through updates."),
+        ("macwindow", "A new window", "One window with a sidebar: Updates, Installed, Orphaned App Files, Discover, Activity and Settings, in the Liquid Glass look on macOS 26 and later, with a simpler look on earlier versions. Settings is a page, not a separate window, and an app's details open as a pop-up. Updates, Installed and Discover can be cards or a list, remembered for each page, and you can choose a Light, Dark or System theme."),
+        ("triangle", "A new menu bar prism", "Click the prism and the window opens straight away: the small pop-up has been removed. Right-click the prism for Check Now, Settings and Quit. ⌘Q asks first, and Close Window keeps \(AppIdentity.name) running in the menu bar."),
+        ("magnifyingglass", "Discover", "Find and install new apps and tools from Homebrew, npm, PyPI, crates.io, RubyGems and the editor extension stores. Fonts can even be installed right from Discover! Browse what's popular this month, what's new, and apps by category. Each app's page shows its own description and pictures, and fonts show a preview and every style."),
+        ("square.stack.3d.up.fill", "More kinds of updates", "New sections for Python (pipx and uv), npm, Rust, Ruby gems, and extensions for VS Code, VSCodium and Cursor, plus a Tools section for the package managers themselves. Apple's own apps show up as macOS updates, handled by Software Update. Update cards preview the release notes and warn about major upgrades and restarts."),
+        ("arrow.down.circle", "Faster, clearer updates", "Updates run simultaneously, each with its own progress and Cancel, while each package manager still does one thing at a time. Choose how many can update at a time in Settings. Enter the system password once for a whole batch; it's kept in memory for that batch only and never saved to the app or your device. Installs and updates show a bar and a percent while a download can be measured, and the step they're on (verifying, installing…). When nothing can be measured, it says so."),
+        ("checkmark.circle", "Installed and Duplicates", "Everything on your Mac in one list, showing where each item came from and whether it's up to date. Filter by source and sort by name, size, date or type. Find an unneeded or outdated app? Update it, or move it to the Trash, from its details. Two copies of one app, or an App Store app Homebrew also tracks, are shown side by side with their versions, sizes and how often you open each. Keep Homebrew's copy in one click. Nothing is removed without asking, and copies go to the Trash."),
         ("mug.fill", "Move apps under Homebrew", "\(AppIdentity.name) spots apps nothing keeps up to date that Homebrew could, checks that Homebrew is really better for each one, and moves it only when you click. You can undo it later."),
-        ("square.on.square", "Duplicates", "Two copies of one app, or an App Store app Homebrew also tracks, are shown side by side with their versions, sizes and how often you open each. Keep Homebrew's copy in one click. Nothing is removed without asking, and copies go to the Trash."),
+        ("trash", "Uninstall and clean-up", "Remove an app or package from its details, the right way for wherever it came from. Before anything moves, one window shows the app, the files it left in your Library, and Homebrew's cleanup list. You choose what goes, and it goes to the Trash so you can put it back. Orphaned App Files lists what apps you already removed left behind, with their size and when they last changed. Nothing is ticked: keep them, move what you choose to the Trash, or tell \(AppIdentity.name) which app a file belongs to. Optional Full Disk Access lets \(AppIdentity.name) clear the app data folders macOS protects; Settings → Setup helps you turn it on."),
+        ("slider.horizontal.3", "You decide what updates", "Choose which release track each app follows, Stable or Beta, on its details. Automatic updates are off until you turn them on: updates install on their own after a check, optionally only on Wi-Fi or Ethernet, and never for anything that needs your password, apps that are open, macOS, betas or major upgrades. Hide one version, every update from an app, or only its major upgrades. Hidden updates don't appear in the list, don't send notifications, and Update All skips them."),
+        ("arrow.triangle.2.circlepath", "Apps on GitHub, and your own sources", "Link an app that publishes its releases on GitHub, from Settings or the app's page. Only a download signed by the same developer is installed; apps that aren't signed need a clear OK first. You can also add your own source: a web page with a version number, or a command \(AppIdentity.name) runs. It's tested before it's saved."),
         ("clock.arrow.circlepath", "Activity", "A history of checks, updates, installs and removals, with search and filters. It stays until you delete it. Failures keep their log, and you can retry them."),
-        ("arrow.triangle.branch", "Stable or Beta, per app", "Choose which release track each app follows, on its card."),
-        ("bolt.circle", "Automatic updates", "Off until you turn them on. Updates install on their own after a check, optionally only on Wi-Fi or Ethernet. Never for anything that needs your password, apps that are open, macOS, betas or major upgrades."),
-        ("eye.slash", "More ways to hide updates", "Hide one version as before, or now every update from an app, or only its major upgrades. Unhide them any time."),
-        ("chart.bar", "Progress you can see", "Installs and updates show a bar and a percent while a download can be measured, and the step they're on (verifying, installing…). When nothing can be measured, it says so."),
-        ("arrow.triangle.2.circlepath", "Apps on GitHub", "Link an app that publishes its releases on GitHub, from Settings or the app's page. Only a download signed by the same developer is installed; apps that aren't signed need a clear OK first."),
-        ("rectangle.3.group", "A calmer window", "Everything lives in the one window: Settings is a page, not a separate window, and an app's details open as a pop-up. Updates, Installed and Discover can be cards or a list, remembered for each page, and Settings has a search field."),
-        ("flask", "Betas for testers", "A beta of \(AppIdentity.name) is offered the next beta. Everyone else only gets full releases."),
+        ("gearshape", "Settings you can search", "Settings has a search field. Setup lists the tools \(AppIdentity.name) uses, such as Homebrew, mas, pipx, Node and Rust, and can install or reinstall them. Release notes for this version and earlier ones are one click away, pulled from GitHub."),
+        ("memorychip", "Light on memory", "\(AppIdentity.name) idles at about 15 MB in the menu bar. Closing the window frees much of what it was using, such as Discover's catalogue and pictures."),
+        ("flask", "Betas for testers", "Turn on Beta versions in Settings to try new versions of \(AppIdentity.name) early. Everyone else only gets full releases."),
     ]
 
     private var changelog: some View {

@@ -175,14 +175,14 @@ final class OutputBuffer: @unchecked Sendable {
 enum Askpass {
     /// Environment variable carrying the prompt's headline from
     /// runPrivileged, through sudo, to the askpass process.
-    static let reasonKey = "UPDATESCOUT_ASKPASS_REASON"
+    static let reasonKey = "PRISMPACK_ASKPASS_REASON"
 
     static var path: String {
         let url = Store.supportDirectory.appendingPathComponent("askpass.sh")
         // Re-invoke our own binary in --askpass mode, which shows a
         // native-styled auth dialog (AskpassDialog). Rewritten every time so
         // the path tracks wherever the app currently lives.
-        let exe = Bundle.main.executablePath ?? "/Applications/PrismPack.app/Contents/MacOS/UpdateScout"
+        let exe = Bundle.main.executablePath ?? "/Applications/PrismPack.app/Contents/MacOS/PrismPack"
         let script = "#!/bin/sh\nexec \"\(exe)\" --askpass\n"
         if (try? String(contentsOf: url, encoding: .utf8)) != script {
             try? script.write(to: url, atomically: true, encoding: .utf8)
@@ -226,7 +226,7 @@ enum Net {
     static func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
         var request = request
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("\(AppIdentity.name) (github.com/nickstar14/UpdateScout)", forHTTPHeaderField: "User-Agent")
+        request.setValue("\(AppIdentity.name) (github.com/\(AppIdentity.repo))", forHTTPHeaderField: "User-Agent")
         return try await session.data(for: request)
     }
 

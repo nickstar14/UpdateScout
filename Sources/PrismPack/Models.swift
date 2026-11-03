@@ -189,11 +189,13 @@ extension UpdateItem {
     var isPinned: Bool { installToken.hasPrefix("uvpin:") }
 }
 
-/// The app's display name, from Info.plist. The bundle ID, executable, launchd
-/// label, data folder and preference keys keep the UpdateScout names (rename
-/// plan, Plan A); only what people see follows this.
+/// The app's display name, from Info.plist, and the one place the GitHub repo
+/// is named. The repo is still `UpdateScout` until a later release moves
+/// `SUFeedURL` to the new name and the repo is renamed (step 13 plan); then
+/// this is the only line (with `REPO` in scripts/release.sh) that changes.
 enum AppIdentity {
     static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "PrismPack"
+    static let repo = "nickstar14/UpdateScout"
 }
 
 enum PrismPackError: LocalizedError {
