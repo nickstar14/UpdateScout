@@ -27,6 +27,9 @@ actor DiscoverIcons {
 
     init() { memory.countLimit = 300 }
 
+    /// Drops the decoded icons (the window closed); the files stay on disk.
+    func releaseMemory() { memory.removeAllObjects() }
+
     /// The installed app's icon, found by the cask's app name. Cheap, so the
     /// tile asks this first, without waiting on the network.
     @MainActor static func installedIcon(for entry: DiscoverEntry) -> NSImage? {

@@ -9,6 +9,8 @@ final class IconCache {
     static let shared = IconCache()
     private var cache: [String: NSImage] = [:]
 
+    func clear() { cache = [:] }
+
     func icon(forApp path: String) -> NSImage? {
         if let hit = cache[path] { return hit }
         guard FileManager.default.fileExists(atPath: path) else { return nil }

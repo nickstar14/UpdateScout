@@ -53,6 +53,7 @@ final class UpdateController: ObservableObject {
             if separateBetas.isEmpty, installed.contains(where: { $0.detail?.hasPrefix("cask ") == true }) {
                 separateBetas = await CaskIndex.separateBetas()
             }
+            MemoryRelief.run()
         }
     }
 

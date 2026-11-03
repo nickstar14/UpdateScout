@@ -89,6 +89,13 @@ final class UpdatesWindow {
                         MainActor.assumeIsolated {
                             self?.window?.contentViewController = nil
                             self?.window = nil
+                            // With the views gone, free what they were showing
+                            // (Discover's catalogue, icons), then hand the
+                            // freed pages back to the system.
+                            DiscoverModel.shared.releaseMemory()
+                            IconCache.shared.clear()
+                            Task { await DiscoverIcons.shared.releaseMemory() }
+                            MemoryRelief.run(after: 0.5)
                         }
                     }
                 }

@@ -163,6 +163,25 @@ final class DiscoverModel: ObservableObject {
         }
     }
 
+    /// Counts each load, so a download still running when the window closes
+    /// doesn't put the catalogue back after it was freed.
+    private var loadGeneration = 0
+
+    /// Frees the catalogue and everything searched from it (the window just
+    /// closed). The next page or pop-up that needs it reads the compact copy
+    /// on disk again through `start()`.
+    func releaseMemory() {
+        loadGeneration += 1
+        searchTask?.cancel()
+        searchTask = nil
+        snapshot = nil
+        loadingCatalog = false
+        live = [:]; liveErrors = [:]; liveNotes = [:]; searching = []
+        cache = [:]
+        python = DiscoverRegistries.curatedPythonEntries
+        pythonLoaded = false
+    }
+
     private func indexCategories() {
         var index: [String: DiscoverCategories.Category] = [:]
         var counts: [DiscoverCategories.Category: Int] = [:]
@@ -185,15 +204,24 @@ final class DiscoverModel: ObservableObject {
     func reloadCatalog() {
         loadingCatalog = true
         catalogError = nil
+        let generation = loadGeneration
         Task {
             if snapshot == nil, let cached = await DiscoverCatalog.cached() {
+                guard generation == loadGeneration else { return }
                 snapshot = cached
+                MemoryRelief.run()
                 if DiscoverCatalog.isFresh { loadingCatalog = false; return }
             }
-            do { snapshot = try await DiscoverCatalog.load() }
+            do {
+                let fresh = try await DiscoverCatalog.load()
+                guard generation == loadGeneration else { return }
+                snapshot = fresh
+            }
             catch where snapshot != nil { /* keep showing the older lists */ }
-            catch { catalogError = "Homebrew's lists couldn't be loaded: \(error.localizedDescription)" }
+            catch { if generation == loadGeneration { catalogError = "Homebrew's lists couldn't be loaded: \(error.localizedDescription)" } }
+            guard generation == loadGeneration else { return }
             loadingCatalog = false
+            MemoryRelief.run()
         }
     }
 
@@ -392,5 +420,6 @@ final class DiscoverModel: ObservableObject {
         liveNotes[registry] = note
         liveErrors[registry] = error
         searching.remove(registry)
+        MemoryRelief.run()
     }
 }
