@@ -170,6 +170,15 @@ enum Prefs {
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "keptOrphans") }
     }
 
+    /// Orphaned App Files the user said belong to an installed app (Phase 10
+    /// step 9): owner bundle ID (lowercased) to the lowercased orphan IDs.
+    /// Kept with the settings, like `keptOrphans`: the 1.8.0 background agent
+    /// rewrites state.json without fields it doesn't know.
+    static var assignedOrphans: [String: [String]] {
+        get { UserDefaults.standard.dictionary(forKey: "assignedOrphans") as? [String: [String]] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: "assignedOrphans") }
+    }
+
     static var customBackgroundNames: Set<String>? {
         get { UserDefaults.standard.stringArray(forKey: "customBackgroundNames").map(Set.init) }
         set { UserDefaults.standard.set(newValue.map(Array.init), forKey: "customBackgroundNames") }

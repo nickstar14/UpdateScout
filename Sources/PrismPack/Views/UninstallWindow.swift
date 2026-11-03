@@ -268,7 +268,9 @@ private struct UninstallPanel: View {
             if removal.kind == "app", let path = look.appPath, let identity = Leftovers.identity(ofApp: path) {
                 look.identity = identity
                 look.otherCopy = Leftovers.otherCopy(of: identity)
-                if look.otherCopy == nil { look.found = Leftovers.scan(identity) }
+                if look.otherCopy == nil {
+                    look.found = Leftovers.scan(identity, assigned: Set(Prefs.assignedOrphans[identity.bundleID.lowercased()] ?? []))
+                }
             }
             return look
         }.value
@@ -312,10 +314,11 @@ private struct UninstallPanel: View {
     // MARK: Text
 
     private static func note(_ item: Leftovers.Found) -> String? {
+        if item.assigned { return "You said these belong to this app" }
         switch item.match {
-        case .id: nil
-        case .name: "Name match only: may belong to something else"
-        case .group: "Shared with this developer's other apps. Not moved: use the folder button if you want to check it"
+        case .id: return nil
+        case .name: return "Name match only: may belong to something else"
+        case .group: return "Shared with this developer's other apps. Not moved: use the folder button if you want to check it"
         }
     }
 

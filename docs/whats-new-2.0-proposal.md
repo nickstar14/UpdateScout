@@ -4,7 +4,7 @@ Checked 2 Nov 2026 against everything built through Phase 10 step 7 (commit
 `4abde8c`). The in-app list is `RenameWelcome.changes` in
 `Sources/PrismPack/Views/RenameWelcome.swift`. **The app text is unchanged:
 Nick approves new wording before it goes in** (his rule for what's said to
-users). Nothing below is in the app yet.
+users). **Approved by Nick 2 Nov 2026** (with "A calmer window" folding Cards or a list and Search Settings, and adding that there are no separate windows: Settings is a page, details are pop-ups; and the prism menu bar entry reworded to say clicking opens the window and there is no small pop-up menu). It went into the app that day; Nick will fine-tune the wording in step 13. Original note: nothing below was in the app yet.
 
 ## What's missing or out of date
 

@@ -32,18 +32,18 @@ Tasks, in this order:
    leftovers (never my real apps or orphans), in light and dark (Theme back to
    Light). Record the results in `docs/phase10-plan.md` and ask before
    committing.
-2. **"What's new in 2.0".** `docs/whats-new-2.0-proposal.md` lists what's
-   missing from `RenameWelcome.changes` and proposes wording. Show it to me,
-   let me edit it, and only then put it in the app (and add step 9's line once
-   built).
+2. **"What's new in 2.0"** is in the app with the wording I approved on
+   2 Nov (`RenameWelcome.changes`; record in
+   `docs/whats-new-2.0-proposal.md`). Add step 9's line once built; I fine-tune
+   the whole list in step 13.
 3. **Steps 10 (other sources) and 11 (⌘Q prompt),** each planned and shown
    before building, as always.
 4. **Step 13, the final review** (visual, operations and wording
-   consistency, lightness measurements, a written list of what was checked).
+   consistency, the "What's new" fine-tune, the arrow keys, lightness
+   measurements, a written list of what was checked).
 
-Please also remind me, at a natural pause, to try the ← → arrow keys in the
-larger-picture window (click a picture in a pop-up); the automation can't send
-keys to that panel. Productivity's yellow tint still looks gold-brown in dark
+The ← → arrow keys in the larger-picture window wait for step 13 (the
+automation can't send keys to that panel). Productivity's yellow tint still looks gold-brown in dark
 and needs a colour decision from me.
 
 Testing notes:

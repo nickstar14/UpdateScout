@@ -15,6 +15,11 @@ struct OrphansPage: View {
     @State private var moving = false
     @State private var outcome: Leftovers.Outcome?
     @State private var filter = ""
+    /// The row whose "Belongs to…" pop-up is open, and the apps it can pick.
+    @State private var assigning: Leftovers.Orphan?
+    @State private var owners: [OwnerApp] = []
+    /// Bumped when an assignment changes, so the Assigned files section redraws.
+    @State private var assignmentsVersion = 0
     @AppStorage("orphansSort") private var sort = "size"
     @AppStorage("orphansSortReversed") private var reversed = false
 
@@ -59,6 +64,7 @@ struct OrphansPage: View {
                 } else {
                     List {
                         ForEach(shown) { orphan in row(orphan) }
+                        if !assignments.isEmpty { assignedSection }
                         if !kept.isEmpty { keptSection }
                     }
                         .listStyle(.inset)
@@ -153,6 +159,15 @@ struct OrphansPage: View {
                     if expanded.contains(orphan.id) { expanded.remove(orphan.id) } else { expanded.insert(orphan.id) }
                 }
                 .glass().controlSize(.small)
+                if !orphan.isGroup {
+                    Button("Belongs to…") { assigning = orphan }
+                        .glass().controlSize(.small)
+                        .help("Say which installed app these files belong to")
+                        .popover(isPresented: Binding(get: { assigning?.id == orphan.id },
+                                                      set: { if !$0 { assigning = nil } }), arrowEdge: .bottom) {
+                            AssignOwnerPopup(orphan: orphan, owners: owners) { assign(orphan, to: $0) }
+                        }
+                }
                 Button { showInFinder(orphan.items) } label: { Image(systemName: "folder") }
                     .glass().controlSize(.small).help("Show in Finder").accessibilityLabel("Show in Finder")
                 Button("Keep") { keep(orphan) }.glass().controlSize(.small)
@@ -209,10 +224,62 @@ struct OrphansPage: View {
     private func scan() async {
         scanning = true
         let kept = Prefs.keptOrphans
-        let found = await Task.detached { Leftovers.orphans(kept: kept) }.value
+        let assigned = Prefs.assignedOrphans
+        let (found, apps) = await Task.detached { (Leftovers.orphans(kept: kept, assigned: assigned), OwnerApp.installed()) }.value
+        owners = apps
         orphans = found
         ticked = ticked.intersection(found.map(\.id))
         scanning = false
+    }
+
+    /// What "Belongs to…" took off the list: each file ID and the installed app
+    /// it was assigned to. An assignment to an app that's gone isn't shown: its
+    /// files are back in the list.
+    private var assignments: [(orphan: String, owner: OwnerApp)] {
+        _ = assignmentsVersion
+        let byID = Dictionary(owners.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return Prefs.assignedOrphans.flatMap { ownerID, ids in
+            byID[ownerID.lowercased()].map { owner in ids.map { (orphan: $0, owner: owner) } } ?? []
+        }
+        .sorted { $0.orphan < $1.orphan }
+    }
+
+    private var assignedSection: some View {
+        Section("Assigned files") {
+            ForEach(assignments, id: \.orphan) { item in
+                HStack {
+                    Text(item.orphan).font(.callout).lineLimit(1).truncationMode(.middle)
+                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
+                    Text(item.owner.name).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer()
+                    Button("Undo") { unassign(item.orphan) }
+                        .glass().controlSize(.small)
+                        .help("List these files again")
+                }
+            }
+        }
+    }
+
+    /// Nothing moves here: this only records which app the files belong to.
+    private func assign(_ orphan: Leftovers.Orphan, to owner: OwnerApp) {
+        guard Leftovers.canAssign(orphan.id) else { return }
+        var map = Prefs.assignedOrphans
+        var list = map[owner.id, default: []]
+        if !list.contains(orphan.id.lowercased()) { list.append(orphan.id.lowercased()) }
+        map[owner.id] = list
+        Prefs.assignedOrphans = map
+        ticked.remove(orphan.id)
+        orphans?.removeAll { $0.id == orphan.id }
+        assigning = nil
+        assignmentsVersion += 1
+    }
+
+    private func unassign(_ id: String) {
+        var map = Prefs.assignedOrphans
+        for key in map.keys { map[key] = map[key]?.filter { $0 != id.lowercased() } }
+        Prefs.assignedOrphans = map.filter { !$0.value.isEmpty }
+        assignmentsVersion += 1
+        Task { await scan() }
     }
 
     /// Kept apps' IDs, newest choices included, for the Kept section.
@@ -278,5 +345,117 @@ struct OrphansPage: View {
         ticked = []
         moving = false
         await scan()
+    }
+}
+
+// MARK: - Belongs to…
+
+/// An installed app a file can be said to belong to.
+struct OwnerApp: Identifiable, Hashable, Sendable {
+    /// The app's bundle ID, lowercased.
+    let id: String
+    let name: String
+    let path: String
+
+    /// Installed top-level apps with an ID that's safe to move things for
+    /// (never Apple's, never PrismPack), by name.
+    static func installed() -> [OwnerApp] {
+        var seen = Set<String>()
+        var list: [OwnerApp] = []
+        for path in AppFolders.appPaths() where !AppFolders.isNested(path) {
+            let url = URL(fileURLWithPath: path)
+            guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, Leftovers.isSafeID(id),
+                  seen.insert(id.lowercased()).inserted else { continue }
+            let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                ?? url.deletingPathExtension().lastPathComponent
+            list.append(OwnerApp(id: id.lowercased(), name: name, path: path))
+        }
+        return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// "com.microsoft" for "com.microsoft.excel", to find the same developer.
+    static func vendor(of id: String) -> String {
+        id.lowercased().split(separator: ".").prefix(2).joined(separator: ".")
+    }
+}
+
+/// Pick the app a file belongs to, then confirm. Same-developer apps first.
+/// Assigning moves nothing.
+struct AssignOwnerPopup: View {
+    let orphan: Leftovers.Orphan
+    let owners: [OwnerApp]
+    let onAssign: (OwnerApp) -> Void
+    @State private var query = ""
+    @State private var chosen: OwnerApp?
+
+    private var sameDeveloper: Set<String> {
+        Set(owners.filter { OwnerApp.vendor(of: $0.id) == OwnerApp.vendor(of: orphan.id) }.map(\.id))
+    }
+
+    private var shown: [OwnerApp] {
+        let list = owners.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
+        let same = sameDeveloper
+        return list.filter { same.contains($0.id) } + list.filter { !same.contains($0.id) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let chosen { confirmation(chosen) } else { picker }
+        }
+        .padding(18)
+        .frame(width: 540, alignment: .leading)
+        .popupClose()
+    }
+
+    private var picker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Belongs to…").font(.title3).bold()
+                Text("Files named \(orphan.id)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            GlassSearchField(prompt: "Filter apps", text: $query)
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    ForEach(shown) { app in
+                        Button { chosen = app } label: {
+                            HStack(spacing: 10) {
+                                RowIcon(name: app.name, appPath: app.path, sectionID: "unmanaged", size: 24)
+                                Text(app.name).lineLimit(1)
+                                if sameDeveloper.contains(app.id) { StatusPill(text: "Same developer", color: .teal) }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+                            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Belongs to \(app.name)")
+                    }
+                    if shown.isEmpty { Text("No app matches.").font(.callout).foregroundStyle(.secondary) }
+                }
+            }
+            .frame(height: 280)
+        }
+    }
+
+    private func confirmation(_ app: OwnerApp) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                RowIcon(name: app.name, appPath: app.path, sectionID: "unmanaged", size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Belongs to \(app.name)?").font(.title3).bold()
+                    Text("Files named \(orphan.id)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+            }
+            Text("They leave this list and are offered, ticked, when you move \(app.name) to the Trash. Nothing is moved now, and you can undo this from Assigned files.")
+                .font(.callout).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button("Back") { chosen = nil }.glass()
+                Spacer()
+                Button("Assign") { onAssign(app) }.prismProminent().keyboardShortcut(.defaultAction)
+            }
+        }
     }
 }

@@ -82,22 +82,25 @@ struct RenameWelcome: View {
     /// for Nick to approve before a beta. Only what's built: through Phase 9's
     /// leftover cleanup, Orphaned App Files and Full Disk Access (31 Oct 2026).
     static let changes: [(symbol: String, title: String, detail: String)] = [
-        ("macwindow", "A new window", "A sidebar with Updates, Discover, Installed, Activity and Settings, in the macOS 27 Liquid Glass look."),
-        ("triangle", "A new menu bar prism", "Click it to open the window. Right-click for Check Now, Settings and Quit. It replaces the old pop-up menu."),
-        ("magnifyingglass", "Discover", "Find and install new apps and tools from Homebrew, npm, PyPI, crates.io, RubyGems and the editor extension stores. Browse what's popular this month, what's new, and apps by category."),
+        ("macwindow", "A new window", "A sidebar with Updates, Installed, Orphaned App Files, Discover, Activity and Settings, in the macOS 27 Liquid Glass look."),
+        ("triangle", "A new menu bar prism", "Click the prism and the window opens straight away: there is no small pop-up menu any more. Right-click it for Check Now, Settings and Quit."),
+        ("magnifyingglass", "Discover", "Find and install new apps and tools from Homebrew, npm, PyPI, crates.io, RubyGems and the editor extension stores. Browse what's popular this month, what's new, and apps by category. Each app's page shows its own description and pictures, and fonts show a preview and every style."),
         ("square.stack.3d.up.fill", "More kinds of updates", "New sections for Python (pipx and uv), npm, Rust, Ruby gems, and extensions for VS Code, VSCodium and Cursor, plus a Tools section for the package managers themselves."),
         ("arrow.down.circle", "Several updates at once", "Updates run side by side, each with its own progress and Cancel, while each package manager still does one thing at a time. Choose how many in Settings."),
         ("key.fill", "One password per batch", "Enter it once for a whole batch. It's kept in memory for that batch only and never saved."),
-        ("checkmark.circle", "Installed", "Everything on your Mac in one list, showing where each item came from and whether it's up to date."),
+        ("checkmark.circle", "Installed", "Everything on your Mac in one list, showing where each item came from and whether it's up to date. Filter by source and sort by name, size or date."),
         ("trash", "Uninstall", "Remove an app or package from its card, the right way for wherever it came from. Before anything moves, one window shows the app, the files it left in your Library, and Homebrew's cleanup list. You choose what goes, and it goes to the Trash so you can put it back."),
-        ("questionmark.folder", "Orphaned App Files", "Files left behind by apps you've already removed, with their size and when they last changed. Nothing is ticked: keep them or move what you choose to the Trash."),
+        ("questionmark.folder", "Orphaned App Files", "Files left behind by apps you've already removed, with their size and when they last changed. Nothing is ticked: keep them, move what you choose to the Trash, or tell \(AppIdentity.name) which app a file belongs to and it's offered when you move that app to the Trash."),
         ("lock.shield", "Full Disk Access", "Optional. Lets \(AppIdentity.name) clear the app data folders macOS protects. Settings → Setup explains why and helps you turn it on, and it stays on through updates."),
         ("mug.fill", "Move apps under Homebrew", "\(AppIdentity.name) spots apps nothing keeps up to date that Homebrew could, checks that Homebrew is really better for each one, and moves it only when you click. You can undo it later."),
-        ("square.on.square", "Duplicates", "Two copies of one app, or an App Store app Homebrew also tracks, are pointed out with a one-click fix. Nothing is removed without asking, and copies go to the Trash."),
-        ("clock.arrow.circlepath", "Activity", "A history of checks, updates, installs and removals. Failures keep their log, and you can retry them."),
+        ("square.on.square", "Duplicates", "Two copies of one app, or an App Store app Homebrew also tracks, are shown side by side with their versions, sizes and how often you open each. Keep Homebrew's copy in one click. Nothing is removed without asking, and copies go to the Trash."),
+        ("clock.arrow.circlepath", "Activity", "A history of checks, updates, installs and removals, with search and filters. It stays until you delete it. Failures keep their log, and you can retry them."),
         ("arrow.triangle.branch", "Stable or Beta, per app", "Choose which release track each app follows, on its card."),
         ("bolt.circle", "Automatic updates", "Off until you turn them on. Updates install on their own after a check, optionally only on Wi-Fi or Ethernet. Never for anything that needs your password, apps that are open, macOS, betas or major upgrades."),
         ("eye.slash", "More ways to hide updates", "Hide one version as before, or now every update from an app, or only its major upgrades. Unhide them any time."),
+        ("chart.bar", "Progress you can see", "Installs and updates show a bar and a percent while a download can be measured, and the step they're on (verifying, installing…). When nothing can be measured, it says so."),
+        ("arrow.triangle.2.circlepath", "Apps on GitHub", "Link an app that publishes its releases on GitHub, from Settings or the app's page. Only a download signed by the same developer is installed; apps that aren't signed need a clear OK first."),
+        ("rectangle.3.group", "A calmer window", "Everything lives in the one window: Settings is a page, not a separate window, and an app's details open as a pop-up. Updates, Installed and Discover can be cards or a list, remembered for each page, and Settings has a search field."),
         ("flask", "Betas for testers", "A beta of \(AppIdentity.name) is offered the next beta. Everyone else only gets full releases."),
     ]
 

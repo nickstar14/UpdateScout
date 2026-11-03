@@ -239,3 +239,77 @@ struct LeftoverTests {
         #expect(sysZap.summary.contains("To the Trash:"))
     }
 }
+
+/// "Belongs to…" (Phase 10 step 9): files the user assigned to an installed
+/// app leave the orphan list and are found with that app's own. A temporary
+/// folder stands in for `~/Library`; no real data folder or settings.
+struct AssignedOrphanTests {
+    let root: URL
+    var library: URL { root.appendingPathComponent("Library") }
+
+    init() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("assigned-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for path in ["Application Support/com.example.stray", "Caches/com.example.stray",
+                     "Application Support/com.example.other", "Application Support/com.example.owner",
+                     "Application Support/com.apple.fake", "Group Containers/group.com.example.shared"] {
+            let url = library.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: url.appendingPathComponent("data"))
+        }
+    }
+
+    private func owners(_ ids: [String]) -> Leftovers.Owners {
+        var owners = Leftovers.Owners()
+        owners.appIDs = Set(ids)
+        return owners
+    }
+
+    private func identity(_ id: String) -> Leftovers.Identity {
+        Leftovers.Identity(appPath: root.appendingPathComponent("Owner.app").path, name: "Owner", bundleID: id)
+    }
+
+    @Test func assignedFilesLeaveTheOrphanList() {
+        let assigned = ["com.example.owner": ["com.example.stray"]]
+        let ids = Set(Leftovers.orphans(library: library, owners: owners(["com.example.owner"]), assigned: assigned,
+                                        knownToMacOS: { _ in false }).map(\.id))
+        #expect(!ids.contains("com.example.stray"))
+        #expect(ids.contains("com.example.other"))
+    }
+
+    @Test func anAssignmentToAnAppThatIsGoneIsIgnored() {
+        let assigned = ["com.example.owner": ["com.example.stray"]]
+        let ids = Set(Leftovers.orphans(library: library, owners: owners(["com.example.somethingelse"]), assigned: assigned,
+                                        knownToMacOS: { _ in false }).map(\.id))
+        #expect(ids.contains("com.example.stray"))
+    }
+
+    @Test func theOwnersScanFindsItsAssignedFilesTicked() {
+        let found = Leftovers.scan(identity("com.example.owner"), library: library, assigned: ["com.example.stray"])
+        let strays = found.filter { $0.path.contains("com.example.stray") }
+        #expect(strays.count == 2)
+        #expect(strays.allSatisfy { $0.assigned && $0.tickedByDefault && $0.movable })
+        #expect(found.contains { $0.path.hasSuffix("Application Support/com.example.owner") && !$0.assigned })
+        #expect(!found.contains { $0.path.contains("com.example.other") })
+    }
+
+    @Test func withoutAnAssignmentNothingExtraIsFound() {
+        let found = Leftovers.scan(identity("com.example.owner"), library: library)
+        #expect(!found.contains { $0.path.contains("com.example.stray") })
+    }
+
+    @Test func whatCanNeverBeAssigned() {
+        #expect(Leftovers.canAssign("com.example.stray"))
+        #expect(!Leftovers.canAssign("com.apple.fake"))
+        #expect(!Leftovers.canAssign("group.com.example.shared"))
+        #expect(!Leftovers.canAssign("ABCDE12345.com.example.shared"))
+        #expect(!Leftovers.canAssign("nodots"))
+    }
+
+    @Test func anUnsafeAssignedIDIsNeverScanned() {
+        let found = Leftovers.scan(identity("com.example.owner"), library: library,
+                                   assigned: ["com.apple.fake", "group.com.example.shared"])
+        #expect(!found.contains { $0.path.contains("com.apple.fake") })
+        #expect(!found.contains { $0.path.contains("group.com.example.shared") })
+    }
+}

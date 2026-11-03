@@ -1,6 +1,6 @@
 # Phase 10 step 9: Orphaned App Files, "Belongs to…"
 
-Plan written 2 Nov 2026. **Not built; waiting for Nick's OK.** From the
+Plan written 2 Nov 2026. **Built 2 Nov 2026 with Nick's answers (settings storage, a button on every row, ticked by default); see "Built" at the end.** From the
 decision in [phase10-plan.md](phase10-plan.md): pick the installed app the
 files belong to; PrismPack remembers it; the files leave the list and are
 offered with that app's own files when it's moved to the Trash; "Assigned
@@ -90,3 +90,25 @@ never touched. Light and dark.
    in an expanded row?
 3. **Ticked by default** in the app's Move to Trash window (recommended,
    since you picked them, and marked "You assigned these"), or unticked?
+
+## Built (2 Nov 2026), not committed
+
+- `Prefs.assignedOrphans` (UserDefaults), `Leftovers.activeAssignments`,
+  `Leftovers.canAssign`, `Leftovers.orphans(... assigned:)`,
+  `Leftovers.scan(_:library:assigned:)` with `Found.assigned`; on the page a
+  "Belongs to…" button on each non-shared row, `AssignOwnerPopup`
+  (same-developer apps first, then confirm), the "Assigned files" section with
+  Undo; the Move to Trash window notes "You said these belong to this app".
+- Tests: `AssignedOrphanTests` (6) with `LeftoverTests` pass (temp library).
+- Live check with a throwaway dummy app (`com.nickszun.dummyowner`) and two fake
+  folders (`com.nickszun.dummystray` in Application Support and Caches): the
+  row showed Belongs to…; the pop-up listed the dummy app first with "Same
+  developer"; confirm; Assign recorded it and the files stayed put; Assigned
+  files showed it with Undo; Undo brought the row back; assigned again; the
+  dummy app's Move to Trash window listed the app and both folders ticked with
+  the note; Move to Trash moved all three (checked on disk). The test key was
+  cleared. Light checked; dark checked too (the page rows, the buttons and the pop-up,
+  with the Microsoft apps listed as "Same developer" for OneDriveLauncher);
+  Theme back to Light.
+- **Not seen:** the Trash's contents (Trash is unreadable from the shell; three
+  throwaway items are in it).

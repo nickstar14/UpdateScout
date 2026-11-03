@@ -32,6 +32,8 @@ enum Leftovers {
         let size: Int64
         /// The launchd label of a LaunchAgent, stopped before it moves.
         var label: String? = nil
+        /// Found because the user said it belongs to this app ("Belongs to…").
+        var assigned = false
 
         var tickedByDefault: Bool { match == .id }
         /// Group containers are shown with Show in Finder only. On macOS 27
@@ -160,9 +162,12 @@ enum Leftovers {
     }
 
     /// Everything found, ID matches first.
-    static func scan(_ identity: Identity, library: URL = userLibrary) -> [Found] {
+    static func scan(_ identity: Identity, library: URL = userLibrary, assigned: Set<String> = []) -> [Found] {
         guard !isLink(library) else { return [] }
         let ids = Set(identity.ids.map { $0.lowercased() })
+        // What the user said belongs to this app, kept to what's safe to move.
+        let assignedIDs = Set(assigned.map { $0.lowercased() }.filter(canAssign))
+        var assignedPaths = Set<String>()
         var found: [Found] = []
 
         func look(_ sub: String, _ match: Found.Match, _ test: (_ entry: String, _ url: URL) -> (Bool, String?)) {
@@ -182,9 +187,16 @@ enum Leftovers {
                 let lower = id.lowercased()
                 if sub == "LaunchAgents" {
                     // An agent's label may add to the ID: com.example.foo.agent.
-                    return (ids.contains { lower == $0 || lower.hasPrefix($0 + ".") }, id)
+                    if ids.contains(where: { lower == $0 || lower.hasPrefix($0 + ".") }) { return (true, id) }
+                    if assignedIDs.contains(where: { lower == $0 || lower.hasPrefix($0 + ".") }) {
+                        assignedPaths.insert(url.path)
+                        return (true, id)
+                    }
+                    return (false, nil)
                 }
-                return (ids.contains(lower), nil)
+                if ids.contains(lower) { return (true, nil) }
+                if assignedIDs.contains(lower) { assignedPaths.insert(url.path); return (true, nil) }
+                return (false, nil)
             }
         }
 
@@ -197,7 +209,11 @@ enum Leftovers {
         for sub in ["Application Support", "Caches", "Logs"] {
             look(sub, .name) { entry, _ in (names.contains(entry.lowercased()), nil) }
         }
-        return found
+        return found.map { item in
+            var item = item
+            item.assigned = assignedPaths.contains(item.path)
+            return item
+        }
     }
 
     // MARK: Orphans
@@ -213,6 +229,20 @@ enum Leftovers {
         /// its shared files (shown with a note, never hidden).
         var sameDeveloper = false
         var isGroup: Bool { items.allSatisfy { $0.match == .group } }
+    }
+
+    /// The orphan IDs assigned to an app that is installed right now. An
+    /// assignment to an app that's gone is ignored, so its files show in the
+    /// list again rather than waiting for an owner that isn't there.
+    static func activeAssignments(_ assigned: [String: [String]], installed: Set<String>) -> Set<String> {
+        let installedLower = Set(installed.map { $0.lowercased() })
+        return Set(assigned.filter { installedLower.contains($0.key.lowercased()) }.values.flatMap { $0.map { $0.lowercased() } })
+    }
+
+    /// Only an ID that is safe to move, looks like an app ID and isn't an app
+    /// group (shared folders are never moved) can be assigned.
+    static func canAssign(_ id: String) -> Bool {
+        isSafeID(id) && isAppIDShaped(id) && !isGroupID(id)
     }
 
     /// Looks like an app ID: `com.example.foo`, three parts or more.
@@ -270,8 +300,10 @@ enum Leftovers {
     /// Everything in the Library that no installed app owns, grouped by ID,
     /// largest first. `kept` are IDs the user chose to keep.
     static func orphans(library: URL = userLibrary, owners: Owners = .current(), kept: Set<String> = [],
+                        assigned: [String: [String]] = [:],
                         knownToMacOS: (String) -> Bool = knownToMacOS) -> [Orphan] {
         guard !isLink(library) else { return [] }
+        let assignedIDs = activeAssignments(assigned, installed: owners.appIDs)
         var byID: [String: Orphan] = [:]
         var known: [String: Bool] = [:]
         func isKnown(_ id: String) -> Bool {
@@ -282,7 +314,7 @@ enum Leftovers {
         }
         func add(_ id: String, _ url: URL, _ folder: URL, _ match: Found.Match, label: String? = nil) {
             let key = id.lowercased()
-            guard !kept.contains(key) else { return }
+            guard !kept.contains(key), !assignedIDs.contains(key) else { return }
             let item = Found(path: url.path, folder: folder.path, match: match, size: size(of: url), label: label)
             let changed = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
             var orphan = byID[key] ?? Orphan(id: id, items: [])

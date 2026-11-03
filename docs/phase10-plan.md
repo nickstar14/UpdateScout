@@ -390,12 +390,11 @@ strip on Updates).
 (font previews and the pop-up's style list), the install-progress work
 (commit `2d4af7a`) and step 7 (web details, `4abde8c`).
 
-**Left in Phase 10:** step 9 ("Belongs to…", plan written, waiting for Nick's
-OK: [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 (other
+**Left in Phase 10:** step 9 is built (uncommitted; [step9-belongs-to-plan.md](step9-belongs-to-plan.md)), step 10 (other
 sources), step 11 (⌘Q prompt) and step 13 (final review). Also: Productivity's
 yellow tint still looks gold-brown in dark (needs a colour decision);
-"What's new in 2.0" needs Nick's OK on new wording
-([whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
+"What's new in 2.0" new wording is in the app (Nick approved it 2 Nov;
+fine-tuned in step 13, [whats-new-2.0-proposal.md](whats-new-2.0-proposal.md)); the arrow keys in
 step 7's larger-picture window (Nick to try; automation can't send keys to a
 panel); the Phase 9 leftovers list.
 
@@ -798,6 +797,13 @@ the next. No rebuild while Nick is mid-step.
       through the same queue, password batch, progress, cancel and Activity
       line, wherever it starts (card, row, pop-up, menu bar).
     - **Wording:** the same words for the same thing everywhere.
+    - **"What's new in 2.0" fine-tune (Nick, 2 Nov 2026):** the list went in
+      the app on 2 Nov with his approved wording; he fine-tunes it here (and
+      step 9's line is added once built). Check each entry is still true: for
+      example "no separate windows" (the move-progress window, the
+      larger-picture viewer and the Full Disk Access helper are small
+      windows).
+    - **Arrow keys** in the larger-picture window: Nick tries them here.
     - **Lightness:** the before/after measurements below.
     - A written list of what was checked, what was fixed, and anything left
       for Nick.
