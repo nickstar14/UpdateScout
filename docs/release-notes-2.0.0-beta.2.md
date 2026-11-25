@@ -7,7 +7,7 @@ Fixes from the first beta.
 - **No endless retries.** After two failures in a row, automatic updates stop trying that app until a new version arrives. Updating by hand still works.
 - **One password prompt, and it says why.** Both prompts are the same native alert and say what the password is for and what set it off ("to update Signal, which you started"). Skip is now Cancel.
 - **Notifications** have Open and Dismiss buttons and are removed from Notification Center once used.
-- **Daily cleanup.** Once a day: Homebrew's old versions and downloads, and the pip and npm caches. Logged in Activity, nothing installed is removed, can be turned off in Settings.
+- **Daily cleanup.** Clears Homebrew's old versions and downloads, and the pip and npm caches. It runs at most once every 23 hours: with the first background check after that, or about 45 seconds after PrismPack starts if one is due (it needs the background check on or PrismPack open). Each run is logged in Activity as "Daily cleanup" with what it freed. Nothing you installed is removed, and you can turn it off in Settings.
 - **Set up window.** First launch opens Homebrew and mas first, then optional Full Disk Access with what it is for. Settings shows "Granted" and how to turn it off. The wording follows your macOS version.
 - **Look-alikes.** Different-named apps that share a bundle ID (two editions of one product) are shown as look-alikes, with nothing suggested to remove.
 - **Check for Updates** moved to the PrismPack section at the top of Settings.

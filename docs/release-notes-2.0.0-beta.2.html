@@ -5,7 +5,7 @@
 <li><b>No endless retries.</b> After two failures in a row, automatic updates stop trying that app until a new version arrives. Updating by hand still works.</li>
 <li><b>One password prompt, and it says why.</b> Both password prompts are now the same native alert, and say what the password is for and what set it off, for example "to update Signal, which you started". Skip is now Cancel.</li>
 <li><b>Notifications</b> have Open and Dismiss buttons, and are removed from Notification Center once you use them.</li>
-<li><b>Daily cleanup.</b> Once a day PrismPack clears Homebrew's old versions and downloads, and the pip and npm caches, and logs what it freed in Activity. Nothing you installed is removed. You can turn it off in Settings.</li>
+<li><b>Daily cleanup.</b> Clears Homebrew's old versions and downloads, and the pip and npm caches. It runs at most once every 23 hours: with the first background check after that, or about 45 seconds after PrismPack starts if one is due (it needs the background check on or PrismPack open). Each run is logged in Activity as "Daily cleanup" with what it freed. Nothing you installed is removed, and you can turn it off in Settings.</li>
 <li><b>Set up window.</b> The first launch opens a Set up window: Homebrew and mas first, then optional Full Disk Access with what it is for. Settings shows "Granted" with how to turn it off, and the wording follows your macOS version.</li>
 <li><b>Look-alikes.</b> Apps that share one bundle ID but have different names (such as two editions of one product) are shown as look-alikes, with nothing suggested to remove.</li>
 <li><b>Check for Updates</b> moved to the PrismPack section at the top of Settings.</li>
