@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var agentStalled = LaunchAgent.isStalled
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var askBeforeQuit = Prefs.askBeforeQuit
+    @State private var dailyCleanup = Prefs.dailyCleanup
     @State private var agentError: String?
     @State private var appearance = Prefs.appearance
     @State private var updateConcurrency = Prefs.updateConcurrency
@@ -40,15 +41,7 @@ struct SettingsView: View {
             // form scrolls under them (Nick, 2 Nov 2026).
             .pinnedHeader {
                 PageControls {
-                    HStack(spacing: 8) {
-                        GlassSearchField(prompt: "Search settings", text: $query)
-                        Button {
-                            SelfUpdater.checkForUpdates()
-                        } label: {
-                            Label("Check for Updates", systemImage: "arrow.clockwise")
-                        }
-                        .glass()
-                    }
+                    GlassSearchField(prompt: "Search settings", text: $query)
                 }
             }
     }
@@ -68,6 +61,7 @@ struct SettingsView: View {
         "adoptSelf": "include apps that already update themselves",
         "login": "start at login",
         "quit": "ask before quitting quit command q prompt don't ask again",
+        "cleanup": "clean up caches daily homebrew brew npm pip disk space",
         "background": "check for updates in the background check every interval minutes hours notify",
         "theme": "theme light dark system appearance",
         "dock": "show icon in dock",
@@ -80,7 +74,7 @@ struct SettingsView: View {
         "Setup": ["setup", "fullDisk"],
         "Updating": ["concurrency", "password", "auto", "beta"],
         "Homebrew adoption": ["adoptSuggest", "adoptSelf"],
-        "Background checking": ["login", "quit", "background"],
+        "Background checking": ["login", "quit", "cleanup", "background"],
         "Appearance": ["theme", "dock"],
         "Other sources": ["other"],
         "Drivers": ["drivers"],
@@ -164,6 +158,9 @@ struct SettingsView: View {
                             Text("Version \(SelfUpdater.version)").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button { SelfUpdater.checkForUpdates() } label: {
+                            Label("Check for Updates", systemImage: "arrow.clockwise")
+                        }.glass()
                         Button("Release Notes…") { showingNotes = true }.glass()
                     }
                 }
@@ -193,6 +190,7 @@ struct SettingsView: View {
                         Text(error).font(.caption).foregroundStyle(Color.red.readable).lineLimit(3)
                     }
                     if shows("Setup", "fullDisk") { FullDiskAccessRow() }
+                    if shows("Setup", "setup") { Button("Open setup guide\u{2026}") { SetupWindow.show() }.glass() }
                 }
             } else if showsSection("Setup") {
                 Section("Setup") {
@@ -223,6 +221,7 @@ struct SettingsView: View {
                         }
                     }
                     if shows("Setup", "fullDisk") { FullDiskAccessRow() }
+                    if shows("Setup", "setup") { Button("Open setup guide\u{2026}") { SetupWindow.show() }.glass() }
                 }
             }
 
@@ -303,6 +302,12 @@ struct SettingsView: View {
                 if shows("Background checking", "quit") {
                 Toggle("Ask before quitting (\u{2318}Q)", isOn: $askBeforeQuit)
                     .onChange(of: askBeforeQuit) { _, on in Prefs.askBeforeQuit = on }
+                }
+                if shows("Background checking", "cleanup") {
+                Toggle("Clean up installer caches daily", isOn: $dailyCleanup)
+                    .onChange(of: dailyCleanup) { _, on in Prefs.dailyCleanup = on }
+                Text("Clears Homebrew's old versions and downloads, and the pip and npm caches. Nothing you installed is removed.")
+                    .font(.caption).foregroundStyle(.secondary)
                 }
                 if shows("Background checking", "background") {
                 Toggle("Check for updates in the background", isOn: $agentInstalled)
@@ -488,15 +493,18 @@ private struct FullDiskAccessRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
                 if granted {
-                    Label("Full Disk Access is on", systemImage: "checkmark.circle")
+                    Label("Full Disk Access: Granted", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Color.green.readable)
                 } else {
                     Label("Full Disk Access (optional)", systemImage: "lock.shield")
                 }
                 Text(granted
-                     ? "\(AppIdentity.name) can move apps' data folders to the Trash when you remove an app or clean up orphaned files. It stays on through updates."
-                     : "Apps keep their data in folders macOS guards, so other apps can't change them. Only apps you give Full Disk Access may move them; an administrator password doesn't unlock them. With it, \(AppIdentity.name) can move an app's data folders to the Trash when you remove the app or clean up orphaned files. Without it, those folders are listed with Show in Finder so you can move them yourself. Once on, it stays on through updates.")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(6)
+                     ? "\(AppIdentity.name) can move apps' data folders to the Trash when you remove an app or clean up orphaned files. It stays on through updates. \(FullDiskAccess.disableSteps)"
+                     : "\(FullDiskAccess.purpose) \(FullDiskAccess.allowSteps)")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(12)
+                if FullDiskAccess.isMacOS27_3OrLater {
+                    Text(FullDiskAccess.betaNote).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if !granted {

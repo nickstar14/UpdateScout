@@ -23,6 +23,7 @@ enum EarlyMigration {
     static let current = 1
 
     static func run() {
+        guard !AppIdentity.isFreshProfile else { return }
         guard Bundle.main.bundleIdentifier != Legacy.bundleID else { return }
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: levelKey) < current else { return }
@@ -124,6 +125,7 @@ enum Migration {
     /// Runs at every app launch. Returns true if the app is relaunching from a
     /// new path, so the caller can skip the rest of its launch work.
     static func runAtLaunch() -> Bool {
+        if AppIdentity.isFreshProfile { return false }
         if renameBundleIfNeeded() { return true }
         Task {
             await LaunchAgent.retireLegacyIfNeeded()

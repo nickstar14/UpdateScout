@@ -14,10 +14,38 @@ enum FullDiskAccess {
     /// close it at once, reading nothing. A new grant shows after a relaunch.
     static var isGranted: Bool {
         let fd = open("/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY)
-        guard fd >= 0 else { return false }
-        Darwin.close(fd)
-        return true
+        if fd >= 0 { Darwin.close(fd); return true }
+        // A second guarded place, in case macOS 27.3 changes the first: the
+        // user's Safari folder opens only with Full Disk Access (when it
+        // exists; a missing folder says nothing).
+        if let dir = opendir(NSHomeDirectory() + "/Library/Safari") { closedir(dir); return true }
+        return false
     }
+
+    /// macOS 27.3 reworked the privacy lists (Files & Folders, Full Disk
+    /// Access, System & App Protection Override). It is still in beta, so
+    /// this wording may change until 27.3 ships.
+    static var isMacOS27_3OrLater: Bool {
+        ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 27, minorVersion: 3, patchVersion: 0))
+    }
+
+    static let purpose = "Apps keep their data in folders macOS guards, so other apps can't change them. With Full Disk Access, \(AppIdentity.name) can move an app's data folders to the Trash when you remove the app or clean up orphaned files. Without it, those folders are listed with Show in Finder so you can move them yourself. Updates and installs never need it."
+
+    /// How to switch it off again, for the macOS in use.
+    static var disableSteps: String {
+        isMacOS27_3OrLater
+            ? "To turn it off: System Settings, Privacy & Security, Full Disk Access, select \(AppIdentity.name) and click \u{2212}."
+            : "To turn it off: System Settings, Privacy & Security, Full Disk Access, switch \(AppIdentity.name) off."
+    }
+
+    /// How to allow it, for the macOS in use.
+    static var allowSteps: String {
+        isMacOS27_3OrLater
+            ? "Click Allow\u{2026}, then in Full Disk Access click +, choose \(AppIdentity.name) and choose Bypass System Protections."
+            : "Click Allow\u{2026}, then drag the \(AppIdentity.name) icon from the small window into the Full Disk Access list and switch it on."
+    }
+
+    static let betaNote = "macOS 27.3's Full Disk Access is still in beta and may change before it is released."
 
     /// Opens System Settings on the page with the list. The address macOS 13
     /// and later use first, the older one (macOS 12) if that fails.
@@ -47,7 +75,9 @@ enum FullDiskAccess {
         p.hidesOnDeactivate = false
         p.isReleasedWhenClosed = false
         p.contentViewController = NSHostingController(rootView: FullDiskAccessHelper { close() })
-        if let screen = NSScreen.main?.visibleFrame {
+        // On the display of the window the user clicked from (it opened on the
+        // main display even when that was somewhere else, 25 Nov 2026).
+        if let screen = (NSApp.keyWindow?.screen ?? NSApp.mainWindow?.screen ?? NSScreen.main)?.visibleFrame {
             p.setFrameOrigin(NSPoint(x: screen.maxX - 360, y: screen.maxY - 420))
         }
         panel = p
@@ -63,27 +93,37 @@ enum FullDiskAccess {
 private struct FullDiskAccessHelper: View {
     let onClose: () -> Void
     private let appURL = Bundle.main.bundleURL
+    private let new27 = FullDiskAccess.isMacOS27_3OrLater
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
-                .resizable().frame(width: 80, height: 80)
-                // A plain file URL. `NSItemProvider(contentsOf:)` offered a file
-                // copy, which System Settings' list ignored (31 Oct 2026).
-                .onDrag { NSItemProvider(object: appURL as NSURL) }
-                .help("Drag into the list in System Settings")
-            Text("Drag this icon into the list").font(.headline)
-            Text("macOS guards each app's data folders. Only apps you allow in System Settings may move them to the Trash for you.")
+            icon
+            Text(new27 ? "Add \(AppIdentity.name) to Full Disk Access" : "Drag this icon into the list").font(.headline)
+            Text("macOS guards each app's data folders. Only apps you allow in System Settings may move them to the Trash for you. This is optional.")
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 // Safe here: the panel has a fixed width, unlike the pages.
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
-                step(1, "Open System Settings. It goes straight to Privacy & Security, Full Disk Access. (In Settings' own search it is listed as \"Allow applications to access all user files\".)")
-                step(2, "Drag the icon above into the list, or click + and choose \(AppIdentity.name), and make sure its switch is on.")
-                step(3, "If macOS asks, choose Quit & Reopen. \(AppIdentity.name) restarts in the menu bar: click the prism to open the window again.")
+                if new27 {
+                    step(1, "Click Open System Settings. It goes to Privacy & Security.")
+                    step(2, "Click Full Disk Access, click +, and choose \(AppIdentity.name). Show in Finder finds it for you.")
+                    step(3, "Choose Bypass System Protections, then confirm with your password.")
+                    step(4, "If macOS says Quit Now, click it, then click the prism in the menu bar to open \(AppIdentity.name) again.")
+                } else {
+                    step(1, "Open System Settings. It goes straight to Privacy & Security, Full Disk Access. (In Settings' own search it is listed as \"Allow applications to access all user files\".)")
+                    step(2, "Drag the icon above into the list, or click + and choose \(AppIdentity.name), and make sure its switch is on.")
+                    step(3, "If macOS asks, choose Quit & Reopen. \(AppIdentity.name) restarts in the menu bar: click the prism to open the window again.")
+                }
+            }
+            if new27 {
+                Text(FullDiskAccess.betaNote).font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Button("Close", action: onClose).glass()
+                if new27 {
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([appURL]) }.glass()
+                }
                 Spacer()
                 Button("Open System Settings") { FullDiskAccess.openSystemSettingsPage() }.glassProminent(.blue)
             }
@@ -91,6 +131,19 @@ private struct FullDiskAccessHelper: View {
         .padding(20)
         .padding(.top, 8)
         .frame(width: 340)
+    }
+
+    @ViewBuilder private var icon: some View {
+        let image = Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path)).resizable().frame(width: 80, height: 80)
+        if new27 {
+            // macOS 27.3 reportedly no longer takes a dragged icon: only +.
+            image
+        } else {
+            // A plain file URL. `NSItemProvider(contentsOf:)` offered a file
+            // copy, which System Settings' list ignored (31 Oct 2026).
+            image.onDrag { NSItemProvider(object: appURL as NSURL) }
+                .help("Drag into the list in System Settings")
+        }
     }
 
     private func step(_ n: Int, _ text: String) -> some View {

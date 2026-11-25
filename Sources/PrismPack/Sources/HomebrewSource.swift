@@ -5,8 +5,19 @@ struct HomebrewSource: UpdateSource {
     let displayName = "Homebrew"
 
     /// Casks that run a pkg installer ask for a password; formulae never do.
+    /// So do apps this user can't replace on their own (owned by root or by
+    /// another user): Homebrew needs `sudo` for them, and a background run
+    /// has no password, so it used to fail the same way every 15 minutes
+    /// (Signal and Spotify, 19 to 25 Nov 2026).
     func needsAdmin(_ item: UpdateItem) -> Bool {
-        Self.caskToken(of: item).map(Self.isInstallerCask) ?? false
+        guard let token = Self.caskToken(of: item) else { return false }
+        return Self.isInstallerCask(token) || Self.appNotOurs(item.appPath)
+    }
+
+    static func appNotOurs(_ path: String?) -> Bool {
+        guard let path, let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let owner = attrs[.ownerAccountID] as? NSNumber else { return false }
+        return owner.uint32Value != getuid()
     }
 
     /// The cask token of a Homebrew-managed item, if it is a cask.

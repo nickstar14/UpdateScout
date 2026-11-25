@@ -471,3 +471,83 @@ rewrote the saved lists.
    prefs, agent plist) can go once the beta is trusted. The 1.x preference domain
    `com.nickszun.updatescout` is still there (copied, not moved). The old
    migration code in `Migration.swift` should stay for several releases.
+
+## Beta 2 fixes (25 Nov 2026, built locally, not released)
+
+Found by Nick in beta.1 and in the Activity log (Signal and Spotify failed about
+1,100 and 1,340 times from 19 to 25 Nov: first run had no sudo password, left a
+real app copy in `Caskroom/<token>/<version>`, every retry then said "already an
+App"; the schedule was "Every check", 15 min, with no retry limit). Firefox had
+no failures: the automatic updater skips it (root-owned app, needs a password).
+
+- **One copy, newest wins (Nick, 25 Nov):** `AppDelegate.handOverToRunningCopy`
+  compares build number, then the program file's date. A newer launch posts
+  `prismPackQuitForNewer` (older copy quits without asking; builds from before
+  this rule are force-ended after 3 s) and carries on; an older or equal launch
+  posts the refront notification, activates the first, quits; waits 3 s for an update
+  relaunch; the headless agent has no activation policy so it doesn't count).
+- **Repair:** `BrewRepair.staleUpgradeFolder` also takes a plain
+  `Caskroom/<token>/<version>` folder (real folder, not a link, Trash only, never
+  `--zap`, never /Applications). Tests in `Beta2FixTests`.
+- **Password:** `HomebrewSource.needsAdmin` is also true when the app isn't owned
+  by the current user (`appNotOurs`), so the automatic updater skips it
+  ("Needs your password") and a manual Update uses the password prompt.
+- **Retry limit:** `AutoUpdate.hasGivenUp` (2 failures in a row per item id,
+  which includes the version), in both the agent and the app.
+- **Daily cleanup:** `Cleanup.swift`: `brew cleanup --prune=all`, `pip cache
+  purge`, `npm cache clean --force`; once per 23 h from the background check or
+  45 s after launch; Activity entry; Settings > Background checking toggle
+  (default on). gem and cargo left out on purpose: `gem cleanup` can remove old
+  versions a project still needs.
+- **Look-alikes:** `DuplicateGroup.Kind.lookAlikes` when copies with one bundle
+  ID have different names (Serato DJ Lite / Pro): pill "Look-alike", advice
+  text, no compare/trash UI. Not confirmed that Lite shares Pro's ID
+  (`com.serato.seratodj`); Lite was already uninstalled.
+- **Checked:** `swift build` and the pure suites (`Beta2FixTests`,
+  `AutoUpdateTests`) pass. **Not yet checked:** the UI in light and dark, the
+  Repair button on Signal/Spotify, the single-instance guard, a cleanup run.
+- **Drafts:** `docs/release-notes-2.0.0-beta.2.{html,md}` (need Nick's OK).
+
+Checks on 25 Nov: 5 of 37 Homebrew apps are not owned by Nick (AppCleaner and
+Firefox by root, Signal and VLC by uid 501, Spotify by 502; Nick is 505), so
+only those five leave automatic updates ("Needs your password"). `brew cleanup
+--prune=all --dry-run` would free about 1.9 GB; pip's cache is empty.
+
+### Beta 2, second round (25 Nov 2026, after Nick's tests)
+
+Tested by Nick: Firefox updated, Spotify repaired (data kept), Signal repaired
+and updated (no Signal data folder found afterwards; cause unknown, see below).
+Cleanup freed 1.9 GB on the first run. Built in one go:
+
+- **Password prompt:** `PasswordPrompt.swift` (`PasswordText` words, one native
+  `NSAlert`) is used by the batch prompt (sheet on the main window, OK/Cancel,
+  eye button) and by `AskpassDialog` (its reason comes from the runPrivileged
+  sentence, else `askpass-reason` written by `UpdateController.run`). Says what
+  the password is for and what set it off (you / automatic / repair). The
+  `PasswordSheet` view is gone. Cancel = the old Skip.
+- **Repair and Update:** renamed; `restoreRepairable` brings the button back from
+  the last failed Activity entry; `Notifier.notifyNeedsRepair` on automatic
+  failures. All notifications get Open and Dismiss (category `prismpack`) and
+  any response clears Notification Center (`removeAllDeliveredNotifications`).
+- **Check for Updates** sits beside Release Notes in the PrismPack section.
+- **Full Disk Access:** macOS 27.3 wording and steps (`FullDiskAccess.allowSteps`,
+  `disableSteps`, `betaNote`, `isMacOS27_3OrLater`), helper window without a
+  draggable icon on 27.3 (plus Show in Finder), "Granted" with how to turn it off,
+  second probe (~/Library/Safari) next to the TCC.db one, first-run
+  `SetupWindow` (key `didShowSetupWindow`, shown once to everyone, reopen from
+  Settings > Setup). **From research (second-hand, beta 2): not verified on
+  this Mac:** whether the TCC.db probe still works on 27.3, whether
+  Privacy_AllFiles still opens the right page, how a self-signed app is
+  treated, whether Files & Folders can cover ~/Library/Containers.
+- **Open question:** `~/Library/Application Support/Signal` was missing after
+  the Signal repair; nothing in Activity shows a removal; cause unknown.
+- **Checked:** `swift build`; pure suites (`Beta2FixTests`, `PasswordTextTests`,
+  `AutoUpdateTests`). **Not checked:** the new prompts and Setup window in light
+  and dark, notification buttons, the Granted row on 27.3.
+
+Fresh-profile test (25 Nov 2026): `PRISMPACK_SUPPORT_DIR` (see CLAUDE.md) showed
+the Setup window on a clean slate. Found and fixed: clipped Full Disk Access and
+subtitle text, and the helper window opening on the main display instead of the
+display of the window clicked from (Nick has two). On 27.3 the old
+`Privacy_AllFiles` link opens Privacy & Security and the user clicks Full Disk
+Access, so the helper's step 1 says so. This Mac: macOS 27.3 (26C5047e).

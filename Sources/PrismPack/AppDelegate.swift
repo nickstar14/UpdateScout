@@ -12,8 +12,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         UNUserNotificationCenter.current().delegate = self
         // Relaunching from the renamed bundle: the new copy does the rest.
         if Migration.runAtLaunch() { return }
+        // One copy at a time: a second launch (a test build, a double start)
+        // shows the first copy's window and leaves, so there is never a second
+        // menu bar prism or a second window.
+        if Self.handOverToRunningCopy() { return }
         StatusItemController.shared.install()
+        SetupWindow.showOnceIfNeeded()
         SelfUpdater.start()
+        // With the app open the background agent leaves auto-updates to it;
+        // the daily cleanup is the same, a little after launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45) { Task { await Cleanup.runIfDue() } }
         // The rename pop-up lives in the main window, so open it once; and
         // after an update relaunch, come back to the window.
         let defaults = UserDefaults.standard
@@ -22,6 +30,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if reopen || defaults.bool(forKey: Migration.noticeKey) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { UpdatesWindow.shared.show() }
         }
+    }
+
+    /// Another PrismPack with a window app running (the headless background
+    /// check has no activation policy, so it doesn't count).
+    private static func otherCopy() -> NSRunningApplication? {
+        guard let id = Bundle.main.bundleIdentifier else { return nil }
+        let me = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            .first { $0.processIdentifier != me && $0.activationPolicy != .prohibited && !$0.isTerminated }
+    }
+
+    /// Build number first, then when the program file was written, so two
+    /// builds of the same version still have a newer one.
+    private struct Stamp: Comparable {
+        let build: Int
+        let written: Date
+        static func < (a: Stamp, b: Stamp) -> Bool { (a.build, a.written) < (b.build, b.written) }
+    }
+
+    private static func stamp(of appURL: URL?) -> Stamp {
+        guard let appURL, let bundle = Bundle(url: appURL) else { return Stamp(build: 0, written: .distantPast) }
+        let build = Int(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
+        let written = bundle.executableURL
+            .flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date } ?? .distantPast
+        return Stamp(build: build, written: written)
+    }
+
+    /// Only one copy runs, and it is the newest build. If another copy is
+    /// running: a newer one makes this launch quit (it shows its window); an
+    /// older one is asked to quit, and this launch carries on. Returns true
+    /// when this launch should stop. A copy on its way out (an update's
+    /// relaunch) gets a few seconds to finish first.
+    private static func handOverToRunningCopy() -> Bool {
+        guard otherCopy() != nil else { return false }
+        for _ in 0..<30 where otherCopy() != nil { Thread.sleep(forTimeInterval: 0.1) }
+        guard let other = otherCopy() else { return false }
+        // The running copy's code is no newer than when it started: a build
+        // written over its file since (same path) leaves it running old code.
+        var theirs = stamp(of: other.bundleURL)
+        if let launched = other.launchDate, launched < theirs.written { theirs = Stamp(build: theirs.build, written: launched) }
+        if stamp(of: Bundle.main.bundleURL) > theirs {
+            // This one is newer: the old copy goes. Builds from before this
+            // rule don't listen, so they are ended if they don't quit.
+            DistributedNotificationCenter.default().postNotificationName(
+                .prismPackQuitForNewer, object: nil,
+                userInfo: ["pid": ProcessInfo.processInfo.processIdentifier], deliverImmediately: true)
+            for _ in 0..<30 where otherCopy() != nil { Thread.sleep(forTimeInterval: 0.1) }
+            if let still = otherCopy() {
+                still.forceTerminate()
+                for _ in 0..<20 where otherCopy() != nil { Thread.sleep(forTimeInterval: 0.1) }
+            }
+            return false
+        }
+        DistributedNotificationCenter.default().postNotificationName(
+            .prismPackRefront, object: nil, userInfo: nil, deliverImmediately: true)
+        other.activate()
+        skipQuitPrompt = true
+        NSApp.terminate(nil)
+        return true
     }
 
     /// Set by quits that must not ask: the menu bar's Quit, the rename
@@ -81,10 +148,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        // Clicked means seen: take it out of Notification Center.
-        center.removeDeliveredNotifications(withIdentifiers: [response.notification.request.identifier])
-        DispatchQueue.main.async {
-            UpdatesWindow.shared.show()
+        // Clicked means seen: take PrismPack's notifications out of
+        // Notification Center, whichever button was used (the background
+        // check posts under other ids, so removing just this one left the
+        // rest there).
+        center.removeAllDeliveredNotifications()
+        if response.actionIdentifier != Notifier.dismissAction {
+            DispatchQueue.main.async { UpdatesWindow.shared.show(page: .updates) }
         }
         completionHandler()
     }

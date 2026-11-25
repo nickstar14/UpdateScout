@@ -206,6 +206,14 @@ extension UpdateItem {
 /// `SUFeedURL` to the new name and the repo is renamed (step 13 plan); then
 /// this is the only line (with `REPO` in scripts/release.sh) that changes.
 enum AppIdentity {
+    /// A throwaway profile for testing first-run screens (Nick, 25 Nov 2026):
+    /// started with PRISMPACK_SUPPORT_DIR=<empty folder> in a copy of the app
+    /// that has its own bundle ID. It keeps its data in that folder, and
+    /// skips the 1.x migration, the launch agent, the updater and the daily
+    /// cleanup, so it can't touch the real setup.
+    static let freshProfileFolder: String? = ProcessInfo.processInfo.environment["PRISMPACK_SUPPORT_DIR"]
+    static var isFreshProfile: Bool { freshProfileFolder != nil }
+
     static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "PrismPack"
     static let repo = "nickstar14/UpdateScout"
 }

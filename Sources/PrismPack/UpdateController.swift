@@ -326,6 +326,7 @@ final class UpdateController: ObservableObject {
     /// folder to the Trash (recoverable, not deleted), then reinstall.
     func repair(_ item: UpdateItem) {
         guard let (token, folder) = repairable[item.id] else { return }
+        repairing.insert(item.id)
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDir), isDir.boolValue else {
             // Already gone (fixed some other way) — just retry.
@@ -700,6 +701,7 @@ final class UpdateController: ObservableObject {
         if batchActive, pendingInstalls.isEmpty, runningLanes.isEmpty {
             batchActive = false
             PasswordBroker.shared.stop()
+            Askpass.clearReason()
             // Re-detect once the queue drains so completed/externally-updated
             // items fall off the list instead of going stale.
             checkNow()
@@ -747,18 +749,38 @@ final class UpdateController: ObservableObject {
     /// Set while the password sheet should show.
     @Published var passwordRequest: PasswordRequest? { didSet { updateSpinner() } }
 
+    /// Items being repaired, so the prompt says so.
+    private var repairing: Set<String> = []
+
     private func requestPasswordIfNeeded() {
         guard Prefs.askPasswordOncePerBatch, passwordRequest == nil, !PasswordBroker.shared.isActive else { return }
-        let waiting = pendingInstalls.filter { adminItems.contains($0.id) }.count
-        guard waiting > 0 else { return }
-        passwordRequest = PasswordRequest(count: waiting)
+        let waiting = pendingInstalls.filter { adminItems.contains($0.id) }
+        guard !waiting.isEmpty else { return }
+        passwordRequest = PasswordRequest(count: waiting.count)
+        // The prompt says what the password is for and what set it off.
+        let cause: PasswordText.Cause = waiting.contains { repairing.contains($0.id) } ? .repair
+            : waiting.allSatisfy({ autoPending.contains($0.id) }) ? .automatic : .you
+        let headline = PasswordText.headline(apps: waiting.map(\.name), cause: cause)
+        let detail = PasswordText.detail(count: waiting.count)
         UpdatesWindow.shared.show()
         // Bounce the Dock icon until the user comes to it (Nick, 30 Oct 2026).
         // Only possible while the Dock icon is shown.
         NSApp.requestUserAttention(.criticalRequest)
+        Task { @MainActor in
+            let ok = await PasswordPrompt.ask(window: UpdatesWindow.shared.mainWindow, headline: headline, detail: detail) { password in
+                await PasswordBroker.shared.start(password: password)
+            }
+            if ok {
+                passwordRequest = nil
+                startReadyInstalls()
+            } else {
+                // Cancel: leave those as "Needs admin" with a Retry.
+                skipAdminItems()
+            }
+        }
     }
 
-    /// The sheet's Authorize. False when the password is wrong.
+    /// Starts the batch password (kept for callers outside the prompt). False when it is wrong.
     func authorize(password: String) async -> Bool {
         guard await PasswordBroker.shared.start(password: password) else { return false }
         passwordRequest = nil
@@ -766,7 +788,7 @@ final class UpdateController: ObservableObject {
         return true
     }
 
-    /// The sheet's "Skip those N": leave them as "Needs admin" with a Retry.
+    /// The prompt's Cancel: leave them as "Needs admin" with a Retry.
     func skipAdminItems() {
         let skipped = pendingInstalls.filter { adminItems.contains($0.id) }
         pendingInstalls.removeAll { adminItems.contains($0.id) }
@@ -848,6 +870,9 @@ final class UpdateController: ObservableObject {
         let started = Date()
         let automatic = autoPending.contains(item.id)
         let how = automatic ? "Automatically · " : ""
+        // For the askpass panel: what this install's password is for.
+        Askpass.writeReason(PasswordText.purpose(apps: [item.name], cause: repairing.contains(item.id) ? .repair
+                                                 : automatic ? .automatic : .you))
         let install = Task {
             try await Shell.$installTag.withValue(Self.processTag(item)) {
               try await Shell.$noPasswordPrompt.withValue(automatic) {
@@ -913,10 +938,12 @@ final class UpdateController: ObservableObject {
                                     log: (outputTails[item.id] ?? []).joined(separator: "\n")))
                 if case PrismPackError.staleCaskUpgrade(let token, let folder) = error {
                     repairable[item.id] = (token, folder)
+                    if automatic { Notifier.notifyNeedsRepair(name: item.name, itemID: item.id) }
                 }
                 autoFinished(item, ok: false)
             }
             runningInstalls[item.id] = nil
+            repairing.remove(item.id)
             outputTails[item.id] = nil
             runningLanes[item.id] = nil
             runningAdmin.remove(item.id)
@@ -1005,7 +1032,23 @@ final class UpdateController: ObservableObject {
     func reloadFromDisk() {
         let fresh = Store.load()
         if fresh != state { state = fresh; maybeAutoUpdate() }
+        restoreRepairable()
         updateSpinner()
+    }
+
+    /// An update that last failed on Homebrew's leftover folder gets its
+    /// Repair and Update button back, even after the app was restarted or the
+    /// background check found the failure.
+    private func restoreRepairable() {
+        for item in state.items where item.installToken.hasPrefix("cask:") && repairable[item.id] == nil && !isBusy(item) {
+            guard let last = state.activity.first(where: { $0.itemID == item.id }), last.kind == .failed,
+                  let log = last.log else { continue }
+            let token = String(item.installToken.dropFirst(5))
+            if let folder = BrewRepair.staleUpgradeFolder(in: log, token: token),
+               FileManager.default.fileExists(atPath: folder.path) {
+                repairable[item.id] = (token, folder)
+            }
+        }
     }
 
     // MARK: - Automatic updates
@@ -1054,7 +1097,7 @@ final class UpdateController: ObservableObject {
             AutoUpdate.releaseLock(lock)
             await HomebrewSource.lookUpInstallerCasks(state.items.compactMap(HomebrewSource.caskToken(of:)))
             let items = state.items.filter { item in
-                !isBusy(item) && AutoUpdate.blocker(
+                !isBusy(item) && !AutoUpdate.hasGivenUp(item, activity: state.activity) && AutoUpdate.blocker(
                     item, hidden: isIgnored(item), pinned: isPinned(item),
                     needsAdmin: Self.source(for: item.sourceID)?.needsAdmin(item) ?? true,
                     appOpen: AutoUpdate.isOpen(item), rule: autoRule(item)) == nil

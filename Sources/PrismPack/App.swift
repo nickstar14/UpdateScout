@@ -42,6 +42,7 @@ struct Main {
             let after = Store.load()
             Notifier.notifyNewUpdates(fresh, waiting: after.items.filter { !after.isHidden($0) })
             Notifier.notifyAdoptionDigest(digest)
+            await Cleanup.runIfDue()
             // Give the notification a moment to post before exiting.
             try? await Task.sleep(for: .seconds(2))
             semaphore.signal()
@@ -68,10 +69,21 @@ struct PrismPackApp: App {
             }
             // `--open-settings` also opens the status window first, so the
             // centring path being exercised is the real one.
+            // `--show-fda-helper` opens the Full Disk Access helper window by itself (testing).
+            if CommandLine.arguments.contains("--show-fda-helper") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { FullDiskAccess.showHelper() }
+            }
             if CommandLine.arguments.contains("--open-settings") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { UpdatesWindow.shared.show() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { SettingsWindow.shared.show() }
             }
+        }
+        DistributedNotificationCenter.default().addObserver(
+            forName: .prismPackQuitForNewer, object: nil, queue: .main
+        ) { note in
+            let sender = (note.userInfo?["pid"] as? Int32) ?? (note.userInfo?["pid"] as? Int).map(Int32.init) ?? 0
+            guard sender != ProcessInfo.processInfo.processIdentifier else { return }
+            AppDelegate.quitWithoutAsking()
         }
         // When the askpass dialog closes, bring the status window back to the
         // front (the auth prompt pushes us behind other apps).
@@ -83,19 +95,13 @@ struct PrismPackApp: App {
             }
         }
         Migration.prepareNotice()
-        // First launch with missing dependencies or no Full Disk Access →
-        // open Settings so the Setup section can offer them.
-        // After the 2.0 rename macOS starts Full Disk Access over, so look again once.
+        // First launch: the Setup window (tools, then optional Full Disk
+        // Access), even when nothing is missing. After the 2.0 rename macOS
+        // starts Full Disk Access over, so it opens once more for that.
         let recheck = UserDefaults.standard.bool(forKey: EarlyMigration.recheckPermissionsKey)
         UserDefaults.standard.removeObject(forKey: EarlyMigration.recheckPermissionsKey)
-        if recheck || !UserDefaults.standard.bool(forKey: "didFirstRunSetup") {
-            UserDefaults.standard.set(true, forKey: "didFirstRunSetup")
-            if Shell.which("brew") == nil || Shell.which("mas") == nil || !FullDiskAccess.isGranted {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    SettingsWindow.shared.show()
-                }
-            }
-        }
+        UserDefaults.standard.set(true, forKey: "didFirstRunSetup")
+        if recheck { UserDefaults.standard.removeObject(forKey: SetupWindow.shownKey) }
     }
 
     // The status item is an NSStatusItem (StatusItemController), so left and

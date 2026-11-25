@@ -91,6 +91,21 @@ enum AutoUpdate {
         return nil
     }
 
+    /// Automatic updates give up on an update after this many failures in a
+    /// row (Signal and Spotify were retried over 1,000 times in six days).
+    /// Updating by hand still works, and a new version starts the count again.
+    static let maxAutomaticFailures = 2
+
+    static func hasGivenUp(_ item: UpdateItem, activity: [ActivityEntry]) -> Bool {
+        var failures = 0
+        for entry in activity where entry.itemID == item.id {
+            guard entry.kind == .failed else { break }
+            failures += 1
+            if failures >= maxAutomaticFailures { return true }
+        }
+        return false
+    }
+
     /// A run is due by the schedule. A little slack, so a daily run doesn't
     /// slip a whole check interval each day.
     static func isDue(now: Date = Date(), last: Date? = AutoUpdate.lastRun,
@@ -163,7 +178,7 @@ enum AutoUpdate {
         await HomebrewSource.lookUpInstallerCasks(state.items.compactMap(HomebrewSource.caskToken(of:)))
         let items = state.items.filter { item in
             let source = UpdateController.source(for: item.sourceID)
-            return blocker(item, hidden: state.isHidden(item), pinned: isPinned(item),
+            return !hasGivenUp(item, activity: state.activity) && blocker(item, hidden: state.isHidden(item), pinned: isPinned(item),
                            needsAdmin: source?.needsAdmin(item) ?? true, appOpen: isOpen(item),
                            rule: rule(for: item.appKey)) == nil
         }
@@ -186,6 +201,7 @@ enum AutoUpdate {
                 }
             } catch {
                 failed.append(item.name)
+                if case PrismPackError.staleCaskUpgrade = error { Notifier.notifyNeedsRepair(name: item.name, itemID: item.id) }
                 Store.mutate {
                     $0.log(ActivityEntry(kind: .failed, title: item.logTitle,
                                          detail: "Automatically · \(UpdateController.sourceName(item.sourceID)) · \(error.localizedDescription)",

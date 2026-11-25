@@ -8,6 +8,10 @@ struct DuplicateGroup: Identifiable, Hashable {
     enum Kind: Hashable {
         /// Two copies of one app on disk (same bundle id).
         case twoCopies
+        /// Different apps that share one bundle id (Serato DJ Lite and DJ Pro,
+        /// 25 Nov 2026): probably two editions of one product, so nothing is
+        /// suggested and nothing can be moved from here.
+        case lookAlikes
         /// An App Store app that a Homebrew cask also claims.
         case twoStores(cask: String)
     }
@@ -26,6 +30,8 @@ struct DuplicateGroup: Identifiable, Hashable {
         switch kind {
         case .twoCopies:
             "Two copies of \(name). Keep the one in \((keep as NSString).deletingLastPathComponent), and move the other to the Trash."
+        case .lookAlikes:
+            "These share one bundle ID but have different names, so they may be two editions of one product (like Serato DJ Lite and DJ Pro) rather than copies. Nothing is suggested. If you do want one gone, uninstall it from its own page."
         case .twoStores(let cask):
             "\(name) comes from the App Store, and Homebrew also tracks it (cask \(cask)). The App Store keeps it up to date, so Homebrew can stop tracking it. The app isn't touched."
         }
@@ -45,6 +51,13 @@ enum Duplicates {
                                  opened: use.count)
             })
             let name = copies.first { $0.path == keep }?.name ?? copies[0].name
+            // Different names: not plain copies. Show them, suggest nothing.
+            if Set(copies.map { $0.name.lowercased() }).count > 1 {
+                let paths = copies.map(\.path).sorted()
+                groups.append(DuplicateGroup(kind: .lookAlikes, name: copies.map(\.name).sorted().joined(separator: " and "),
+                                             keep: paths[0], extras: Array(paths.dropFirst())))
+                continue
+            }
             groups.append(DuplicateGroup(kind: .twoCopies, name: name, keep: keep,
                                          extras: copies.map(\.path).filter { $0 != keep }))
         }

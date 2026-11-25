@@ -4,6 +4,8 @@ import AppKit
 extension Notification.Name {
     /// Posted by the --askpass process when its dialog closes.
     static let prismPackRefront = Notification.Name("com.nickszun.prismpack.refront")
+    /// A newer build started: the older copy quits (userInfo "pid" is the newer one).
+    static let prismPackQuitForNewer = Notification.Name("com.nickszun.prismpack.quitForNewer")
 }
 
 /// `PrismPack --askpass`: sudo runs this (via askpass.sh) when an install
@@ -20,38 +22,18 @@ enum AskpassDialog {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let alert = NSAlert()
-        // runPrivileged passes what the password is for; anything else that
-        // reaches sudo (brew installing a pkg cask) is an update install.
-        alert.messageText = ProcessInfo.processInfo.environment[Askpass.reasonKey]
-            ?? "\(AppIdentity.name) is trying to install an update."
-        alert.informativeText = "Enter your password to allow this."
-        alert.icon = circularKeyIcon()
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-
-        // Accessory: secure field + overlaid plain field, with an eye toggle.
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 238, height: 24))
-        let secureField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 208, height: 24))
-        secureField.placeholderString = "Password"
-        let plainField = NSTextField(frame: secureField.frame)
-        plainField.placeholderString = "Password"
-        plainField.isHidden = true
-        let eyeButton = NSButton(frame: NSRect(x: 212, y: 0, width: 26, height: 24))
-        eyeButton.bezelStyle = .accessoryBarAction
-        eyeButton.isBordered = false
-        eyeButton.image = NSImage(systemSymbolName: "eye", accessibilityDescription: "Show password")
-
-        let toggler = EyeToggler(secure: secureField, plain: plainField, button: eyeButton)
-        eyeButton.target = toggler
-        eyeButton.action = #selector(EyeToggler.toggle)
-
-        container.addSubview(secureField)
-        container.addSubview(plainField)
-        container.addSubview(eyeButton)
-        alert.accessoryView = container
-        // Focus the field immediately so the cursor is blinking on arrival.
-        alert.window.initialFirstResponder = secureField
+        // What the password is for: a sentence from runPrivileged, else the
+        // cause the app wrote down when it started the install, else a
+        // general line.
+        let env = ProcessInfo.processInfo.environment
+        let written = (try? String(contentsOf: Askpass.reasonFile, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let headline = env[Askpass.reasonKey]
+            ?? written.flatMap { $0.isEmpty ? nil : "\(AppIdentity.name) needs your password \($0)." }
+            ?? "\(AppIdentity.name) needs your password to install an update."
+        let (alert, field) = PasswordPrompt.makeAlert(headline: headline,
+                                                      detail: "It's used for this step only and isn't saved.")
+        let secureField = field.secure
 
         app.activate(ignoringOtherApps: true)
         // initialFirstResponder alone doesn't always land (the alert can hand
@@ -62,7 +44,6 @@ enum AskpassDialog {
             secureField.currentEditor()?.selectedRange = NSRange(location: 0, length: 0)
         }
         let response = alert.runModal()
-        withExtendedLifetime(toggler) {}
 
         // Tell the main app instance to bring its window back to the front now
         // that the auth dialog is gone (the install keeps running behind it).
@@ -70,7 +51,7 @@ enum AskpassDialog {
             .prismPackRefront, object: nil, userInfo: nil, deliverImmediately: true)
 
         if response == .alertFirstButtonReturn {
-            let password = toggler.currentValue
+            let password = field.value
             FileHandle.standardOutput.write(Data((password + "\n").utf8))
             exit(0)
         }

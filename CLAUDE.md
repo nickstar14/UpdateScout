@@ -76,6 +76,14 @@ Phase 9 (leftover cleanup) has its own record in
   stop working in that build. Never read or touch the keychain yourself.
 - **Compile check:** `swift build`.
 - **Running a test build:**
+  - **First-run screens on a clean slate:** copy `build/PrismPack.app`, set the copy's
+    `CFBundleIdentifier` to something else (for example
+    `com.nickszun.prismpack.fresh`), sign it ad hoc (`codesign --force --deep -s -`),
+    and start its executable with `PRISMPACK_SUPPORT_DIR=<empty folder>`. It then keeps
+    its data there and skips the 1.x migration, launch agent, updater and daily
+    cleanup. It still sees the real `/Applications`: never press Update in it. Remove
+    it afterwards (`defaults delete <its id>`). `--show-fda-helper` opens the Full
+    Disk Access helper by itself.
   - Quit the installed copy first. Both copies share the bundle ID and
     `~/Library/Application Support/PrismPack/`. **The first launch of any 2.0
     build on a Mac that still has 1.x data moves the real data folder, copies

@@ -177,6 +177,13 @@ enum Askpass {
     /// runPrivileged, through sudo, to the askpass process.
     static let reasonKey = "PRISMPACK_ASKPASS_REASON"
 
+    /// What the next install's password is for ("to update Signal, which you
+    /// started"), written by the app when it starts one; the askpass process
+    /// reads it, because brew strips the environment on the way to sudo.
+    static var reasonFile: URL { Store.supportDirectory.appendingPathComponent("askpass-reason") }
+    static func writeReason(_ text: String) { try? text.write(to: reasonFile, atomically: true, encoding: .utf8) }
+    static func clearReason() { try? FileManager.default.removeItem(at: reasonFile) }
+
     static var path: String {
         let url = Store.supportDirectory.appendingPathComponent("askpass.sh")
         // Re-invoke our own binary in --askpass mode, which shows a

@@ -127,6 +127,9 @@ final class UpdatesWindow {
     private var titleWatch: AnyCancellable?
     private var sidebarToggle: SidebarToggleAccessory?
 
+    /// The window, for sheets that attach to it.
+    var mainWindow: NSWindow? { window }
+
     /// Frame of the window when it's on screen — other windows centre on it
     /// rather than on the display.
     var visibleFrame: NSRect? {
@@ -270,10 +273,6 @@ struct MainView: View {
         }
         .sheet(isPresented: $controller.showingAdoptionReview) {
             AdoptionReviewSheet().environmentObject(controller)
-        }
-        .sheet(item: $controller.passwordRequest) { request in
-            PasswordSheet(request: request).environmentObject(controller)
-                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $showRenameNotice) {
             RenameWelcome { showRenameNotice = false }

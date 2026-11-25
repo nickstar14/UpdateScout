@@ -368,9 +368,9 @@ struct UpdateRow: View {
                         .help(error)
                 }
                 if controller.repairable[item.id] != nil {
-                    Button("Repair") { controller.repair(item) }
+                    Button("Repair and Update") { controller.repair(item) }
                         .glassProminent(.orange).controlSize(.small)
-                        .help("Moves Homebrew's leftover upgrade folder to the Trash and reinstalls")
+                        .help("Moves Homebrew's leftover folder to the Trash, then reinstalls and updates it. Your app's data isn't touched.")
                 } else {
                     Button(error == nil ? item.actionLabel : "Retry") { controller.requestUpdate(item) }
                         .glassProminent(style.color).controlSize(.small)

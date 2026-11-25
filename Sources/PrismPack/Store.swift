@@ -97,6 +97,11 @@ struct Store {
     }
 
     static var supportDirectory: URL {
+        if let folder = AppIdentity.freshProfileFolder {
+            let url = URL(fileURLWithPath: folder, isDirectory: true)
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            return url
+        }
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("PrismPack", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -185,6 +190,11 @@ enum Prefs {
     }
 
     /// ⌘Q asks "Quit PrismPack?" first; "Don't ask again" turns it off.
+    static var dailyCleanup: Bool {
+        get { Cleanup.enabled }
+        set { Cleanup.enabled = newValue }
+    }
+
     static var askBeforeQuit: Bool {
         get { UserDefaults.standard.object(forKey: "askBeforeQuit") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "askBeforeQuit") }

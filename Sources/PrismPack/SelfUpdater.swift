@@ -58,6 +58,7 @@ enum SelfUpdater {
     /// `controller` was only created by a manual Check for Updates, so no
     /// automatic check ever ran. Never called from the headless background check.
     static func start() {
+        if AppIdentity.isFreshProfile { return }
         _ = controller
     }
 

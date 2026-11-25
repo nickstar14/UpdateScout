@@ -325,7 +325,7 @@ private struct InstalledItem: View {
     private var tags: some View {
         if pkg.sourceID == "unmanaged" { StatusPill.notManaged } else { StatusPill.source(pkg.sourceID) }
         if let path = pkg.appPath, let group = controller.duplicateGroup(for: path) {
-            StatusPill(text: group.kind == .twoCopies ? "\(group.extras.count + 1) copies" : "Duplicate", color: .orange)
+            StatusPill(text: group.kind == .twoCopies ? "\(group.extras.count + 1) copies" : group.kind == .lookAlikes ? "Look-alike" : "Duplicate", color: .orange)
         }
         if let item, controller.isIgnored(item) {
             StatusPill(text: "Hidden", color: .secondary)

@@ -281,6 +281,10 @@ struct DuplicateActions: View {
             case .twoCopies:
                 // Side by side, and the user picks (Nick, 2 Nov 2026).
                 DuplicateCompare(group: group)
+            case .lookAlikes:
+                Label(group.advice, systemImage: "square.on.square")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             case .twoStores(let cask):
                 Label(group.advice, systemImage: "square.on.square")
                     .font(.callout).foregroundStyle(.secondary)
