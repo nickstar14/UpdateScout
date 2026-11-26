@@ -362,8 +362,23 @@ struct ActivityEntry: Codable, Equatable, Identifiable {
     var itemID: String? = nil
     var sourceID: String? = nil
     var seconds: Int? = nil
-    /// The last lines of output, for Show log on failures.
+    /// The last lines of output, for Show log (failures, and installs).
     var log: String? = nil
+    // More detail for the row's dropdown. All optional, so older history loads.
+    var fromVersion: String? = nil
+    var toVersion: String? = nil
+    /// "Automatically" or "By you".
+    var how: String? = nil
+    /// The command that ran, when it's a plain one.
+    var command: String? = nil
+    var appPath: String? = nil
+    /// The app's version found on disk after an install.
+    var versionAfter: String? = nil
+    /// A plain-words explanation, shown in the dropdown and the (i) pop-up.
+    var note: String? = nil
+
+    /// True for the "Homebrew lists it as outdated at the same version" entries.
+    var isBrewQuirk: Bool { itemID?.hasPrefix("quirk|") == true }
 }
 
 extension UpdateItem {

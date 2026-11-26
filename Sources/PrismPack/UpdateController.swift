@@ -140,6 +140,21 @@ final class UpdateController: ObservableObject {
         state = Store.mutate { $0.activity.removeAll { ids.contains($0.id) } }
     }
 
+    /// The plain command an install runs, for the Activity detail. Nil for
+    /// sources that don't run one command.
+    nonisolated static func commandText(for item: UpdateItem) -> String? {
+        guard item.sourceID == "homebrew" else { return nil }
+        let parts = item.installToken.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        return parts[0] == "cask" ? "brew upgrade --cask \(parts[1])" : "brew upgrade \(parts[1])"
+    }
+
+    /// The app's version as found on disk right now.
+    nonisolated static func versionOnDisk(_ path: String?) -> String? {
+        guard let path, let info = Bundle(path: path)?.infoDictionary else { return nil }
+        return info["CFBundleShortVersionString"] as? String ?? info["CFBundleVersion"] as? String
+    }
+
     private func log(_ entry: ActivityEntry) {
         state = Store.mutate { $0.log(entry) }
     }
@@ -273,6 +288,10 @@ final class UpdateController: ObservableObject {
             s.log(ActivityEntry(kind: .checked,
                                 title: fresh.count == 1 ? "Check found 1 new update" : "Check found \(fresh.count) new updates",
                                 detail: names))
+        }
+        // Homebrew's same-version false alarms, noted once per app and version.
+        for skipped in BrewQuirks.drain() where !s.activity.contains(where: { $0.itemID == BrewQuirks.key(skipped) }) {
+            s.log(BrewQuirks.entry(for: skipped))
         }
         return fresh
     }
@@ -902,6 +921,7 @@ final class UpdateController: ObservableObject {
                 installStates[item.id] = .done
                 moveProgress[item.id]?.finished = true
                 let seconds = Int(Date().timeIntervalSince(started).rounded())
+                let tail = (outputTails[item.id] ?? []).joined(separator: "\n")
                 if item.sourceID == "remove" {
                     finishRemoval(item, seconds: seconds)
                 } else if item.sourceID == "adopt" {
@@ -912,7 +932,10 @@ final class UpdateController: ObservableObject {
                     state = Store.mutate {
                         $0.log(ActivityEntry(kind: .installed, title: item.logTitle,
                                              detail: DiscoverInstaller.sourceTitle(of: item.installToken),
-                                             itemID: item.id, sourceID: item.sourceID, seconds: seconds))
+                                             itemID: item.id, sourceID: item.sourceID, seconds: seconds,
+                                             log: tail, how: automatic ? "Automatically" : "By you",
+                                             command: Self.commandText(for: item), appPath: item.appPath,
+                                             versionAfter: Self.versionOnDisk(item.appPath)))
                     }
                     loadInstalled()
                 } else {
@@ -920,7 +943,13 @@ final class UpdateController: ObservableObject {
                         $0.items.removeAll { $0.id == item.id }
                         $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
                                              detail: how + Self.sourceName(item.sourceID), itemID: item.id,
-                                             sourceID: item.sourceID, seconds: seconds))
+                                             sourceID: item.sourceID, seconds: seconds, log: tail,
+                                             fromVersion: item.installedVersion, toVersion: item.latestVersion,
+                                             how: automatic ? "Automatically" : "By you",
+                                             command: Self.commandText(for: item), appPath: item.appPath,
+                                             versionAfter: Self.versionOnDisk(item.appPath),
+                                             note: item.installedVersion == item.latestVersion
+                                                 ? "The version didn't change. The source still says it is out of date." : nil))
                     }
                 }
                 autoFinished(item, ok: true)
@@ -935,7 +964,10 @@ final class UpdateController: ObservableObject {
                     : ActivityEntry(kind: .failed, title: item.logTitle,
                                     detail: "\(how)\(Self.sourceName(item.sourceID)) · \(error.localizedDescription)",
                                     itemID: item.id, sourceID: item.sourceID,
-                                    log: (outputTails[item.id] ?? []).joined(separator: "\n")))
+                                    log: (outputTails[item.id] ?? []).joined(separator: "\n"),
+                                    fromVersion: item.installedVersion, toVersion: item.latestVersion,
+                                    how: automatic ? "Automatically" : "By you",
+                                    command: Self.commandText(for: item), appPath: item.appPath))
                 if case PrismPackError.staleCaskUpgrade(let token, let folder) = error {
                     repairable[item.id] = (token, folder)
                     if automatic { Notifier.notifyNeedsRepair(name: item.name, itemID: item.id) }

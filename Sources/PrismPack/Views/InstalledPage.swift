@@ -476,6 +476,9 @@ struct ActivityPage: View {
     @State private var query = ""
     @State private var show = "all"
     @State private var ticked: Set<UUID> = []
+    @State private var expanded: Set<UUID> = []
+    /// Rows opened at least once: their details are built then, and stay so they can roll shut.
+    @State private var everOpened: Set<UUID> = []
     @AppStorage("activityOldestFirst") private var oldestFirst = false
 
     private var shows: [(value: String, title: String)] {
@@ -497,7 +500,7 @@ struct ActivityPage: View {
         Group {
             if controller.state.activity.isEmpty {
                 ContentUnavailableView("No activity yet", systemImage: "clock.arrow.circlepath",
-                                       description: Text("Installs, failures and checks that find something show up here."))
+                                       description: Text("Installs, failures and checks that find something show up here. You can export them to get help."))
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: query)
             } else {
@@ -518,19 +521,32 @@ struct ActivityPage: View {
                 HStack(spacing: 8) {
                     SortMenu(selection: $show, options: shows, help: "Show one kind")
                     SortDirectionButton(reversed: $oldestFirst, order: oldestFirst ? "Oldest first" : "Newest first")
+                    let allShown = Set(shown.map(\.id))
+                    let everyShownTicked = !allShown.isEmpty && allShown.isSubset(of: ticked)
+                    Button(everyShownTicked ? "Select None" : "Select All") {
+                        if everyShownTicked { ticked.subtract(allShown) } else { ticked.formUnion(allShown) }
+                    }
+                    .glass().disabled(allShown.isEmpty)
+                    .help(everyShownTicked ? "Untick every entry in this list" : "Tick every entry in this list, to export, copy or clear them")
                     Spacer(minLength: 8)
                     let selected = ticked.intersection(controller.state.activity.map(\.id))
-                    if selected.isEmpty {
-                        Button("Delete All") { confirmDeleteAll() }
-                            .glassDestructive()
-                            .disabled(controller.state.activity.isEmpty)
-                    } else {
-                        Button("Delete \(selected.count)") {
-                            controller.deleteActivity(selected)
-                            ticked.removeAll()
-                        }
-                        .glassDestructive()
+                    if !selected.isEmpty {
+                        Text("\(selected.count) selected").font(.caption).foregroundStyle(.secondary)
                     }
+                    Button("Export Activity") { Task { await export(selected, toFile: true) } }
+                        .glass().disabled(controller.state.activity.isEmpty)
+                        .help(selected.isEmpty
+                              ? "Save a text file of all your activity, to send when you need help"
+                              : "Save a text file of the ticked entries, to send when you need help")
+                    Button("Copy to Clipboard") { Task { await export(selected, toFile: false) } }
+                        .glass().disabled(selected.isEmpty)
+                        .help(selected.isEmpty
+                              ? "Tick entries (or Select All) to copy them, then paste into a message"
+                              : "Copy only the ticked entries as a report, to paste into a message")
+                    Button("Clear") { confirmClear(selected) }
+                        .glassDestructive()
+                        .disabled(selected.isEmpty)
+                        .help(selected.isEmpty ? "Tick entries (or Select All) to clear them" : "Remove the ticked entries from this list")
                 }
             }
         }
@@ -558,28 +574,108 @@ struct ActivityPage: View {
     }
 
     private func row(_ entry: ActivityEntry) -> some View {
-        HStack(spacing: 10) {
-            Toggle("Select", isOn: Binding(
-                get: { ticked.contains(entry.id) },
-                set: { on in if on { ticked.insert(entry.id) } else { ticked.remove(entry.id) } }))
-                .toggleStyle(.checkbox).labelsHidden()
-            StatusPill(text: entry.kind.title, color: entry.kind.color).frame(width: 84, alignment: .leading)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
-                Text(detail(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        let open = expanded.contains(entry.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Toggle("Select", isOn: Binding(
+                    get: { ticked.contains(entry.id) },
+                    set: { on in if on { ticked.insert(entry.id) } else { ticked.remove(entry.id) } }))
+                    .toggleStyle(.checkbox).labelsHidden()
+                StatusPill(text: entry.kind.title, color: entry.kind.color).frame(width: 84, alignment: .leading)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(entry.title).font(.body.weight(.semibold)).lineLimit(1)
+                    Text(detail(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if entry.isBrewQuirk, let note = entry.note {
+                    WarningBadge(title: "Homebrew false alarm", message: note,
+                                 symbol: "info.circle.fill", color: .blue)
+                }
+                if [.failed, .skipped, .cancelled].contains(entry.kind),
+                   let id = entry.itemID, let item = controller.visibleItems.first(where: { $0.id == id }),
+                   !controller.isBusy(item) {
+                    Button("Retry") { controller.requestUpdate(item) }.glass().controlSize(.small)
+                }
+                if let log = entry.log, !log.isEmpty {
+                    Button("Show log") { shownLog = entry }.glass().controlSize(.small)
+                }
+                Button {
+                    everOpened.insert(entry.id)
+                    withAnimation(UpdatesPage.roll) {
+                        if open { expanded.remove(entry.id) } else { expanded.insert(entry.id) }
+                    }
+                } label: {
+                    Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(open ? "Hide details" : "Show details")
+                .help(open ? "Hide details" : "Show details")
             }
-            Spacer(minLength: 0)
-            if [.failed, .skipped, .cancelled].contains(entry.kind),
-               let id = entry.itemID, let item = controller.visibleItems.first(where: { $0.id == id }),
-               !controller.isBusy(item) {
-                Button("Retry") { controller.requestUpdate(item) }.glass().controlSize(.small)
-            }
-            if let log = entry.log, !log.isEmpty {
-                Button("Show log") { shownLog = entry }.glass().controlSize(.small)
+            if everOpened.contains(entry.id) {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(ActivityExport.detailLines(entry).enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(line.label).font(.caption).foregroundStyle(.secondary)
+                                .frame(width: 130, alignment: .trailing)
+                            Text(ActivityExport.scrub(line.value)).font(.caption.monospaced())
+                                .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    if entry.isBrewQuirk, let token = entry.itemID?.split(separator: "|").dropFirst().first?.split(separator: ":").last {
+                        let kind = entry.itemID?.split(separator: "|").dropFirst().first?.split(separator: ":").first.map(String.init) ?? "cask"
+                        Button("Copy Homebrew report") { copyQuirkReport(entry, token: String(token), kind: kind) }
+                            .glass().controlSize(.small).padding(.top, 4)
+                            .help("Copies text to paste into a Homebrew bug report. Nothing is sent.")
+                    }
+                }
+                .padding(.leading, 26).padding(.top, 8)
+                // Same roll as the Updates sections: the height runs between zero
+                // and natural size, clipped, while the text fades in place.
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: open ? nil : 0, alignment: .top)
+                .clipped()
+                .opacity(open ? 1 : 0)
+                .allowsHitTesting(open)
+                .accessibilityHidden(!open)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .modifier(SectionPanel(color: entry.kind.color.opacity(0.35)))
+    }
+
+    private func brewVersion() async -> String? {
+        guard let brew = HomebrewSource.brewPath,
+              let result = try? await Shell.run(brew, ["--version"]) else { return nil }
+        return result.stdout.split(separator: "\n").first.map(String.init)
+    }
+
+    private func copyQuirkReport(_ entry: ActivityEntry, token: String, kind: String) {
+        Task {
+            let skipped = BrewQuirks.Skipped(token: token, version: entry.toVersion ?? "", kind: kind)
+            let text = BrewQuirks.report(for: skipped, brewVersion: await brewVersion() ?? "unknown")
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+    }
+
+    /// The ticked entries, or all of them when none are ticked.
+    private func export(_ selected: Set<UUID>, toFile: Bool) async {
+        let all = controller.state.activity
+        let entries = selected.isEmpty ? all : all.filter { selected.contains($0.id) }
+        let text = ActivityExport.text(entries: entries, updates: controller.visibleItems, brewVersion: await brewVersion(),
+                                      appVersion: SelfUpdater.version)
+        if toFile {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = "PrismPack activity \(Date().formatted(.iso8601.year().month().day())).txt"
+            panel.allowedContentTypes = [.plainText]
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try? text.write(to: url, atomically: true, encoding: .utf8)
+        } else {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
     }
 
     /// Date and time on every row (Nick, 2 Nov 2026), then the details.
@@ -589,19 +685,25 @@ struct ActivityPage: View {
         return parts.joined(separator: " · ")
     }
 
-    private func confirmDeleteAll() {
-        let alert = NSAlert()
-        alert.messageText = "Delete all activity?"
-        alert.informativeText = "Every entry is deleted, with its log. This can't be undone."
-        alert.alertStyle = .warning
-        let go = alert.addButton(withTitle: "Delete All")
-        go.hasDestructiveAction = true
-        go.keyEquivalent = ""
-        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
-        if alert.runModal() == .alertFirstButtonReturn {
-            controller.clearActivity()
-            ticked.removeAll()
+    /// Clears the ticked entries. Asks first when it's more than one.
+    private func confirmClear(_ selected: Set<UUID>) {
+        guard !selected.isEmpty else { return }
+        if selected.count > 1 {
+            let everything = selected.count >= controller.state.activity.count
+            let alert = NSAlert()
+            alert.messageText = everything ? "Clear all activity?" : "Clear \(selected.count) entries?"
+            alert.informativeText = "\(everything ? "Every entry" : "These entries") will be removed, with their logs. This can't be undone."
+            alert.alertStyle = .warning
+            let go = alert.addButton(withTitle: "Clear")
+            go.hasDestructiveAction = true
+            go.keyEquivalent = ""
+            alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        controller.deleteActivity(selected)
+        ticked.subtract(selected)
+        expanded.subtract(selected)
+        everOpened.subtract(selected)
     }
 }
 

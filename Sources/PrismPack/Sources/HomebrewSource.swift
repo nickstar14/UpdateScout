@@ -106,6 +106,11 @@ struct HomebrewSource: UpdateSource {
 
         var items: [UpdateItem] = []
         for f in outdated.formulae {
+            // Same check as for casks below: identical versions are never an update.
+            if BrewQuirks.isSameVersion(installed: f.installed_versions.last, latest: f.current_version) {
+                BrewQuirks.record(token: f.name, version: f.current_version, kind: "formula")
+                continue
+            }
             items.append(UpdateItem(sourceID: id, name: f.name,
                                     installedVersion: f.installed_versions.last ?? "?",
                                     latestVersion: f.current_version,
@@ -113,6 +118,15 @@ struct HomebrewSource: UpdateSource {
                                     installToken: "formula:\(f.name)"))
         }
         for c in outdated.casks {
+            // Homebrew can call something outdated while both versions are the
+            // same string (seen with a self-updating cask whose version ends in
+            // a download hash: Homebrew compares the app's build number with
+            // that hash). Updating can never clear that, so skip it and note it
+            // in Activity. Any app can hit this.
+            if BrewQuirks.isSameVersion(installed: c.installed_versions.last, latest: c.current_version) {
+                BrewQuirks.record(token: c.name, version: c.current_version)
+                continue
+            }
             items.append(UpdateItem(sourceID: id, name: c.name,
                                     installedVersion: c.installed_versions.last ?? "?",
                                     latestVersion: c.current_version,
@@ -221,4 +235,77 @@ struct HomebrewSource: UpdateSource {
 actor ResultBox<T: Sendable> {
     private(set) var value: T?
     func set(_ new: T) { value = new }
+}
+
+
+/// Homebrew's "outdated at the same version" false alarm. `detect()` records
+/// each one and the check's merge step logs it once in Activity.
+enum BrewQuirks {
+    struct Skipped: Equatable { let token: String; let version: String; var kind: String = "cask" }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var pending: [Skipped] = []
+
+    static func isSameVersion(installed: String?, latest: String) -> Bool {
+        guard let installed, !latest.isEmpty else { return false }
+        return installed == latest
+    }
+
+    static func record(token: String, version: String, kind: String = "cask") {
+        lock.lock(); defer { lock.unlock() }
+        let entry = Skipped(token: token, version: version, kind: kind)
+        if !pending.contains(entry) { pending.append(entry) }
+    }
+
+    static func drain() -> [Skipped] {
+        lock.lock(); defer { lock.unlock() }
+        defer { pending = [] }
+        return pending
+    }
+
+    /// The Activity key: one entry per app and version, however often it's checked.
+    static func key(_ s: Skipped) -> String { "quirk|\(s.kind):\(s.token)|\(s.version)" }
+
+    static func entry(for s: Skipped) -> ActivityEntry {
+        ActivityEntry(kind: .checked,
+                      title: "\(s.token): Homebrew says outdated, same version",
+                      detail: "Skipped · a Homebrew quirk, nothing to update",
+                      itemID: key(s), sourceID: "homebrew",
+                      log: "brew outdated --verbose: \(s.token) (\(s.version)) != \(s.version)",
+                      fromVersion: s.version, toVersion: s.version,
+                      note: explanation(for: s))
+    }
+
+    static func explanation(for s: Skipped) -> String {
+        var text = "Homebrew lists \(s.token) as outdated, but the installed and latest versions are the same (\(s.version)). "
+            + "This can happen to any app. "
+        if s.kind == "cask" {
+            text += "One known cause: for apps that update themselves, Homebrew compares the app's build number "
+                + "with the last part of the cask's version, and when that part is a download hash the build number always looks older. "
+        }
+        return text + "PrismPack checks for this, so there's no confusion: \(s.token) is treated as up to date and is not offered as an update. "
+            + "It is listed again when a real new version appears."
+    }
+
+    /// Text to paste into a Homebrew bug report.
+    static func report(for s: Skipped, brewVersion: String) -> String {
+        let flag = s.kind == "cask" ? "--cask " : ""
+        var text = """
+        brew outdated reports \(s.token) as outdated when the installed and latest versions are identical.
+
+        \(s.token) (\(s.version)) != \(s.version)
+
+        Homebrew: \(brewVersion)
+        `brew upgrade --dry-run \(flag)\(s.token)` shows \(s.version) -> \(s.version).
+        """
+        if s.kind == "cask", let hash = s.version.split(separator: ",").last, s.version.contains(",") {
+            text += """
+
+            The cask's version has the form "short,hash" and the cask has auto_updates true. \
+            In Cask#auto_updates_bundle_outdated?, the installed bundle version is compared with \
+            the part after the comma (\(hash)), so the build number looks older even though nothing is newer.
+            """
+        }
+        return text
+    }
 }

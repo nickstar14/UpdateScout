@@ -66,3 +66,18 @@ struct PasswordTextTests {
         #expect(PasswordText.detail(count: 3).hasSuffix("Cancel leaves them for later."))
     }
 }
+
+/// Release Notes always opens on the newest version (Nick, 26 Nov 2026).
+struct ReleaseNotesSelectionTests {
+    private func entry(_ tag: String) -> ReleaseEntry {
+        ReleaseEntry(tag: tag, name: tag, date: nil, body: "", url: "", prerelease: true)
+    }
+
+    @Test func opensOnTheNewestVersion() {
+        let stale = [entry("v2.0.0-beta.1")]
+        let fresh = [entry("v2.0.0-beta.3"), entry("v2.0.0-beta.2"), entry("v2.0.0-beta.1")]
+        #expect(ReleaseHistory.initialTag(in: stale) == "v2.0.0-beta.1")
+        #expect(ReleaseHistory.initialTag(in: fresh) == "v2.0.0-beta.3")
+        #expect(ReleaseHistory.initialTag(in: []) == "")
+    }
+}

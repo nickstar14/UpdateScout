@@ -197,7 +197,13 @@ enum AutoUpdate {
                     $0.log(ActivityEntry(kind: .updated, title: "\(item.name) \(item.installedVersion) to \(item.latestVersion)",
                                          detail: "Automatically · \(UpdateController.sourceName(item.sourceID))",
                                          itemID: item.id, sourceID: item.sourceID,
-                                         seconds: Int(Date().timeIntervalSince(started).rounded())))
+                                         seconds: Int(Date().timeIntervalSince(started).rounded()),
+                                         fromVersion: item.installedVersion, toVersion: item.latestVersion,
+                                         how: "Automatically", command: UpdateController.commandText(for: item),
+                                         appPath: item.appPath,
+                                         versionAfter: UpdateController.versionOnDisk(item.appPath),
+                                         note: item.installedVersion == item.latestVersion
+                                             ? "The version didn't change. The source still says it is out of date." : nil))
                 }
             } catch {
                 failed.append(item.name)
@@ -205,7 +211,10 @@ enum AutoUpdate {
                 Store.mutate {
                     $0.log(ActivityEntry(kind: .failed, title: item.logTitle,
                                          detail: "Automatically · \(UpdateController.sourceName(item.sourceID)) · \(error.localizedDescription)",
-                                         itemID: item.id, sourceID: item.sourceID))
+                                         itemID: item.id, sourceID: item.sourceID,
+                                         fromVersion: item.installedVersion, toVersion: item.latestVersion,
+                                         how: "Automatically", command: UpdateController.commandText(for: item),
+                                         appPath: item.appPath))
                 }
             }
         }

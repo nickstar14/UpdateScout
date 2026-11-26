@@ -63,17 +63,24 @@ enum ReleaseHistory {
         return entries
     }
 
+    /// The version the window opens on: always the newest (Nick, 26 Nov 2026).
+    static func initialTag(in shown: [ReleaseEntry]) -> String {
+        shown.first?.tag ?? ""
+    }
+
     /// Betas are listed only for someone on the Beta track.
     static func visible(_ entries: [ReleaseEntry], includePrereleases: Bool) -> [ReleaseEntry] {
         includePrereleases ? entries : entries.filter { !$0.prerelease }
     }
 }
 
-/// Settings → Release notes: this version first, earlier ones from the menu.
+/// Settings → Release notes: the newest version first, earlier ones from the menu.
 struct ReleaseNotesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var entries = ReleaseHistory.cached()
     @State private var selected = ""
+    /// Set once the user chooses a version, so a late list never overrides it.
+    @State private var picked = false
     @State private var loading = true
     @State private var failed = false
 
@@ -101,7 +108,7 @@ struct ReleaseNotesSheet: View {
             .padding(.trailing, 34)   // room for the close circle
             if let entry = current {
                 HStack {
-                    SortMenu(selection: $selected,
+                    SortMenu(selection: Binding(get: { selected }, set: { selected = $0; picked = true }),
                              options: shown.map { (value: $0.tag, title: label($0)) }, help: "Version")
                     Spacer()
                     Button("Open on GitHub") {
@@ -139,7 +146,7 @@ struct ReleaseNotesSheet: View {
         .frame(width: 540, height: 460)
         .popupClose()
         .task {
-            selected = shown.first { $0.version == SelfUpdater.version }?.tag ?? shown.first?.tag ?? ""
+            selected = ReleaseHistory.initialTag(in: shown)
             do {
                 entries = try await ReleaseHistory.fetch()
                 failed = false
@@ -147,8 +154,11 @@ struct ReleaseNotesSheet: View {
                 failed = true
             }
             loading = false
-            if current == nil || !shown.contains(where: { $0.tag == selected }) {
-                selected = shown.first { $0.version == SelfUpdater.version }?.tag ?? shown.first?.tag ?? ""
+            // The saved list can be older than the newest release, so choose
+            // again now that the fresh list is in, unless the user has
+            // already picked one.
+            if !picked || current == nil || !shown.contains(where: { $0.tag == selected }) {
+                selected = ReleaseHistory.initialTag(in: shown)
             }
         }
     }
