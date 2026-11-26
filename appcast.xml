@@ -6,6 +6,26 @@
         <description>PrismPack release feed</description>
         <language>en</language>
         <item>
+            <title>Version 2.0.0-beta.3</title>
+            <pubDate>Thu, 26 Nov 2026 10:05:08 -0500</pubDate>
+            <description><![CDATA[<p><b>PrismPack 2.0.0 beta 3.</b> Fixes and a better Activity page.</p>
+<ul>
+<li><b>Apps that Homebrew wrongly calls outdated.</b> Homebrew can list an app as outdated when the installed and latest versions are the same, so "updating" it changes nothing and it stays in the list forever. It can happen to any app or Homebrew package (one known cause: for apps that update themselves, Homebrew compares the app's build number with a download hash in the version). PrismPack now checks for this, so there's no confusion: these are treated as up to date and not offered as updates. Each one is noted once in Activity with a short explanation and a <b>Copy Homebrew report</b> button. The app is listed again when a real new version appears.</li>
+<li><b>Activity details.</b> Each Activity entry has a dropdown that rolls open with the exact time, the source, the versions, whether it ran automatically or by you, the command, how long it took, and the version found on disk afterwards. Installs that worked now keep their output too (Show log).</li>
+<li><b>Export Activity.</b> <b>Export Activity</b> saves a plain text report (PrismPack, macOS and Homebrew versions, the updates listed, and every entry with its details and log, or only the ticked ones). <b>Copy to Clipboard</b> copies a report of the entries you ticked, and <b>Select All</b> ticks everything shown. <b>Clear</b> removes the ticked entries (it asks first when you clear more than one). Your home folder is shown as ~, and no passwords are included.</li>
+<li><b>Release Notes</b> opens on the newest version, and keeps your choice if the list loads late.</li>
+</ul>
+<p>This is a beta. Full details are on the GitHub release page.</p>]]></description>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/nickstar14/UpdateScout/releases/download/v2.0.0-beta.3/PrismPack-2.0.0-beta.3.zip"
+                sparkle:version="28"
+                sparkle:shortVersionString="2.0.0-beta.3"
+                sparkle:edSignature="IGFYs/7oP2zwhDqZcxRcGrlYCeUlHUVs4OcBdPVV5izPrOyUfNrEWBGWkl+nbM+gxeGbS7yq2koig/GsbWMBAA==" length="6202286"
+                type="application/octet-stream"/>
+        </item>
+        <item>
             <title>Version 2.0.0-beta.2</title>
             <pubDate>Wed, 25 Nov 2026 15:13:24 -0500</pubDate>
             <description><![CDATA[<p><b>PrismPack 2.0.0 beta 2.</b> Fixes from the first beta.</p>
